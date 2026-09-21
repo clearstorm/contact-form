@@ -15,8 +15,7 @@ export const jsonMailer: Mailer = {
     if (!endpoint) {
       return {
         ok: false,
-        message:
-          "Form configuration error: no endpoint. Add an `endpoint` to the form's JSON spec, or set data-endpoint on the form.",
+        message: config.copy?.configError ?? "Form configuration error: the submit endpoint is not configured.",
       };
     }
 
@@ -40,7 +39,12 @@ export const jsonMailer: Mailer = {
 
     return {
       ok: false,
-      message: message || `Submission failed (HTTP ${response.status}). Please try again.`,
+      message:
+        message ||
+        (config.copy?.submitError ?? `Submission failed (HTTP ${response.status}). Please try again.`).replace(
+          "{status}",
+          String(response.status),
+        ),
     };
   },
 };

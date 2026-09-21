@@ -1,7 +1,7 @@
 {
   "name": "@clearstorm/contact-form",
-  "version": "0.1.0",
-  "description": "Reusable Astro contact forms: framework-agnostic validation core, CF7 + generic JSON transport adapters, self-contained --rf-* theming. Zero runtime dependencies.",
+  "version": "0.2.0",
+  "description": "Reusable Astro contact forms: framework-agnostic validation core, CF7 + generic JSON transport adapters, consumer-driven copy (19 field types), self-contained --rf-* theming. Zero runtime dependencies.",
   "type": "module",
   "private": true,
   "license": "MIT",

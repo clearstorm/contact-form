@@ -5,16 +5,24 @@
  * Renders a form from a JSON `FormSpec`, validates it with the
  * framework-agnostic core, and submits through the transport adapter named
  * by `form.mailer` ("cf7" — Contact Form 7 — by default; "json" for generic
- * endpoints). Styles are self-contained (`rf-*` namespaced CSS driven by
- * `--rf-*` custom properties) — override any variable on your own scope to
- * re-theme.
+ * endpoints).
+ *
+ * Configuration is explicit — this component never reads environment
+ * variables. Endpoint config comes from the `config` prop, or falls back to
+ * the form spec's own `cf7`/`endpoint` block. The consumer decides how the
+ * values reach the component (own env, hard-coded, content JSON, …).
+ *
+ * Styling is self-contained and themeable: `rf-*` namespaced CSS driven by
+ * `--rf-*` custom properties (colours, `--rf-color-scheme` for native
+ * controls, and `--rf-*` spacing tokens). Defaults are a generic, compact
+ * light scheme — override any variable on your own scope to re-theme.
  */
 import FormField from "./FormField.astro";
 import { serializeRules, toFieldSpecs, type FormSpec } from "../core";
 
 interface Props {
   form: FormSpec;
-  /** Explicit endpoint overrides — take precedence over build-time env. */
+  /** Explicit endpoint overrides — take precedence over the form spec. */
   config?: {
     endpoint?: string;
     apiUrl?: string;
@@ -38,10 +46,9 @@ const mailerName = form.mailer ?? "cf7";
 // behaviour from this serialised spec; the format tests stay in the core.
 const fieldConfig = toFieldSpecs(form.fields);
 
-// Endpoint config for the mailers — explicit props win, else build-time env.
-// Resolved values ride on the form as data-* attributes for the client.
-const wpUrl = config.apiUrl ?? (import.meta.env.PUBLIC_API_URL as string | undefined);
-const cf7FormId = config.cf7FormId ?? (import.meta.env.PUBLIC_CF7_FORM_ID as string | undefined);
+// Endpoint config — explicit props win, else the form spec's own block.
+const wpUrl = config.apiUrl ?? form.cf7?.apiUrl;
+const cf7FormId = config.cf7FormId ?? form.cf7?.formId;
 const formEndpoint = config.endpoint ?? form.endpoint;
 
 if (
@@ -51,8 +58,8 @@ if (
   console.warn(
     `[ContactForm] "${formName}" (mailer: ${mailerName}) is missing its endpoint config — ` +
       (mailerName === "cf7"
-        ? "set PUBLIC_API_URL and PUBLIC_CF7_FORM_ID (or pass config.apiUrl / config.cf7FormId)."
-        : "add an `endpoint` to the form spec (or pass config.endpoint)."),
+        ? "pass config.apiUrl / config.cf7FormId, or set cf7.apiUrl / cf7.formId in the form spec."
+        : "add an `endpoint` to the form spec, or pass config.endpoint."),
   );
 }
 ---
@@ -67,6 +74,7 @@ if (
   data-wp-url={wpUrl}
   data-form-id={cf7FormId}
   data-rules={serializeRules(fieldConfig)}
+  data-copy={form.copy ? JSON.stringify(form.copy) : undefined}
   novalidate
 >
   {form.fields.map((field) => (
@@ -81,6 +89,13 @@ if (
       rows={field.rows}
       options={field.options}
       span={field.size ?? 50}
+      placeholder={field.placeholder}
+      value={field.value}
+      min={field.min}
+      max={field.max}
+      step={field.step}
+      maxlength={field.maxlength}
+      pattern={field.pattern}
     />
   ))}
   <input
@@ -101,26 +116,43 @@ if (
 <style is:global>
   /* ---- Contact form shell (namespaced; themeable via --rf-* custom props) ---- */
 
-  /* Default theme. Hosts override any --rf-* variable by declaring it on
-     their own scope (e.g. :root or the section wrapper). */
+  /* Default theme — generic, compact, light. Hosts override any --rf-*
+     variable (colours, native-control scheme, spacing) by declaring it on
+     their own scope (e.g. :root, a wrapper, or .rf-form itself). */
   :where(.rf-form) {
-    --rf-field-bg: #1b1512;
-    --rf-field-border: #3a302b;
-    --rf-field-text: #faf5ee;
-    --rf-focus: #f0bd79;
-    --rf-muted: #b9ada2;
-    --rf-submit-bg: #eedbc3;
-    --rf-submit-text: #120e0c;
-    --rf-success: #79b98a;
-    --rf-success-text: #bce0c4;
-    --rf-danger: #e56b65;
+    /* colour */
+    --rf-field-bg: #ffffff;
+    --rf-field-border: #d1d5db;
+    --rf-field-text: #111827;
+    --rf-focus: #2563eb;
+    --rf-muted: #6b7280;
+    --rf-submit-bg: #111827;
+    --rf-submit-text: #ffffff;
+    --rf-success: #16a34a;
+    --rf-success-text: #14532d;
+    --rf-danger: #dc2626;
+    /* native controls (date pickers etc.) */
+    --rf-color-scheme: light;
+    /* spacing — compact minimum rhythm */
+    --rf-gap-x: 0.75rem;
+    --rf-gap-y: 1rem;
+    --rf-field-gap: 0.375rem;
+    --rf-field-padding-y: 0.5rem;
+    --rf-field-padding-x: 0.75rem;
+    --rf-field-min-height: 2.75rem;
+    --rf-textarea-min-height: 7rem;
+    --rf-submit-min-height: 2.75rem;
+    --rf-submit-padding-x: 1.1rem;
+    --rf-submit-gap: 0.5rem;
+    --rf-submit-margin-top: 0.25rem;
+    --rf-status-padding: 0.75rem;
   }
 
   .rf-form {
     display: grid;
     grid-template-columns: 1fr;
-    column-gap: 1.25rem;
-    row-gap: 1.5rem;
+    column-gap: var(--rf-gap-x);
+    row-gap: var(--rf-gap-y);
     width: 100%;
   }
 
@@ -128,22 +160,22 @@ if (
     display: flex;
     flex-direction: column;
     align-items: stretch;
-    gap: 1.5rem;
-    margin-top: 0.5rem;
+    gap: var(--rf-gap-y);
+    margin-top: var(--rf-submit-margin-top);
     grid-column: span 1;
   }
 
   .rf-submit {
     display: inline-flex;
-    min-height: 3.25rem;
+    min-height: var(--rf-submit-min-height);
     align-items: center;
     justify-content: center;
-    gap: 0.7rem;
+    gap: var(--rf-submit-gap);
     border: 1px solid var(--rf-submit-bg);
     border-radius: 2px;
     background: var(--rf-submit-bg);
     color: var(--rf-submit-text);
-    padding: 0 1.6rem;
+    padding: 0 var(--rf-submit-padding-x);
     font-size: 0.78rem;
     font-weight: 700;
     letter-spacing: 0.09em;
@@ -165,7 +197,7 @@ if (
   /* Status box — success colours by default; .rf-status--error switches them. */
   .rf-status {
     grid-column: span 1;
-    padding: 1rem;
+    padding: var(--rf-status-padding);
     border: 1px solid var(--rf-success);
     color: var(--rf-success-text);
   }
@@ -210,6 +242,7 @@ if (
     validateValue,
     type FieldSpec,
     type Rule,
+    type FormCopy,
   } from "../core";
   import { getMailer, type MailerConfig } from "../mailers";
 
@@ -239,12 +272,32 @@ if (
     control.classList.add("rf-input-invalid");
   };
 
-  const validateField = (control: Control, rule: Rule | undefined): boolean => {
+  // Checkbox/radio groups share a name — the "value" is whether any option is
+  // selected, collapsed to "1" / "" before validation.
+  const selectionState = (form: HTMLFormElement, name: string): string => {
+    const checked = Array.from(
+      form.querySelectorAll<HTMLInputElement>(`input[name="${name}"]`),
+    ).some((el) => el.checked);
+    return checked ? "1" : "";
+  };
+
+  const validateField = (
+    control: Control,
+    rule: Rule | undefined,
+    form: HTMLFormElement,
+  ): boolean => {
     clearError(control);
-    const message = validateValue(
-      rule,
-      control instanceof HTMLSelectElement ? control.value : control.value.trim(),
-    );
+    let value: string;
+    if (
+      control instanceof HTMLInputElement &&
+      (control.type === "checkbox" || control.type === "radio")
+    ) {
+      value = selectionState(form, control.name);
+    } else {
+      value =
+        control instanceof HTMLSelectElement ? control.value : control.value.trim();
+    }
+    const message = validateValue(rule, value);
     if (message) {
       setInvalid(control, message);
       return false;
@@ -279,12 +332,15 @@ if (
     fields: FieldSpec[],
     mailerName: string,
     successMessage: string,
+    copy: FormCopy,
   ): Promise<void> {
     const form = event.currentTarget;
     if (!(form instanceof HTMLFormElement)) return;
     event.preventDefault();
 
-    const rules = buildRules(fields);
+    const rules = buildRules(fields, copy);
+    const genericError =
+      copy.error ?? "Something went wrong. Please try again in a moment.";
 
     const status = form.querySelector<HTMLElement>(".rf-status");
     const button = form.querySelector<HTMLButtonElement>('button[type="submit"]');
@@ -306,7 +362,7 @@ if (
     );
 
     const invalidControls = controls.filter(
-      (control) => !validateField(control, rules[control.name]),
+      (control) => !validateField(control, rules[control.name], form),
     );
 
     if (invalidControls.length > 0) {
@@ -315,17 +371,19 @@ if (
     }
 
     const originalLabel = button?.textContent ?? "";
+    const sendingLabel = copy.sending ?? "Sending…";
     const setSending = (sending: boolean): void => {
       if (!button) return;
       button.disabled = sending;
       button.setAttribute("aria-busy", String(sending));
-      button.textContent = sending ? "Sending…" : originalLabel;
+      button.textContent = sending ? sendingLabel : originalLabel;
     };
 
     const config: MailerConfig = {
       endpoint: form.dataset.endpoint,
       apiUrl: form.dataset.wpUrl,
       formId: form.dataset.formId,
+      copy,
     };
 
     setSending(true);
@@ -340,17 +398,12 @@ if (
         form.reset();
         controls.forEach((control) => clearError(control));
       } else {
-        showError(
-          status,
-          result.message || "Something went wrong. Please try again in a moment.",
-        );
+        showError(status, result.message || genericError);
       }
     } catch (error) {
       showError(
         status,
-        error instanceof Error && error.message
-          ? error.message
-          : "Something went wrong. Please try again in a moment.",
+        error instanceof Error && error.message ? error.message : genericError,
       );
     } finally {
       setSending(false);
@@ -380,21 +433,30 @@ if (
   // Wire every contact-form instance (works regardless of bundle deduplication).
   document.querySelectorAll<HTMLFormElement>("form[data-mail-form]").forEach((form) => {
     const fields = parseFieldSpec(form.dataset.rules ?? "");
-    const rules = buildRules(fields);
+    let copy: FormCopy = {};
+    if (form.dataset.copy) {
+      try {
+        copy = JSON.parse(form.dataset.copy) as FormCopy;
+      } catch {
+        /* malformed copy — keep defaults */
+      }
+    }
+    const rules = buildRules(fields, copy);
     const mailerName = form.dataset.mailer ?? "cf7";
     const status = form.querySelector<HTMLElement>(".rf-status");
     const successMessage = status?.textContent ?? "";
 
     form.addEventListener("submit", (event) =>
-      handleSubmit(event, fields, mailerName, successMessage),
+      handleSubmit(event, fields, mailerName, successMessage, copy),
     );
     form
       .querySelectorAll<Control>("input, select, textarea")
       .forEach((control) => {
         const fieldRules = rules[control.name];
         const onInput = (): void => {
+          // Re-validate on change once a field has been flagged invalid.
           if (control.hasAttribute("aria-invalid"))
-            validateField(control, fieldRules);
+            validateField(control, fieldRules, form);
         };
         control.addEventListener("input", onInput);
         control.addEventListener("change", onInput);

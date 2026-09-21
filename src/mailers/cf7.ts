@@ -65,12 +65,11 @@ interface Cf7Result {
 export const cf7Mailer: Mailer = {
   name: "cf7",
   async submit({ data, fields, config }): Promise<MailerResult> {
-    const { apiUrl, formId } = config;
+    const { apiUrl, formId, copy } = config;
     if (!apiUrl || !formId) {
       return {
         ok: false,
-        message:
-          "Form configuration error: missing API URL or form ID. Set data-wp-url and data-form-id on the form, or configure PUBLIC_API_URL and PUBLIC_CF7_FORM_ID.",
+        message: copy?.configError ?? "Form configuration error: missing API URL or form ID.",
       };
     }
 
@@ -99,16 +98,14 @@ export const cf7Mailer: Mailer = {
         .join(" ");
       return {
         ok: false,
-        message:
-          messages || "Some fields need your attention. Please check the form.",
+        message: messages || copy?.invalidForm || "Some fields need your attention. Please check the form.",
       };
     }
 
     return {
       ok: false,
       message:
-        result.message ||
-        "There was an error sending your message. Please try again.",
+        result.message || copy?.error || "There was an error sending your message. Please try again.",
     };
   },
 };

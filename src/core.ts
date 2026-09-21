@@ -6,17 +6,75 @@
  * payload normalisation. It has no framework or component dependencies of
  * its own (FormData works in browsers and Node ≥ 18), so it can also be
  * reused server-side — e.g. by a mail-delivery worker (see the mailers).
+ *
+ * Versioned here is behaviour, not copy: every visitor-facing string can be
+ * overridden by the consumer via `FormSpec.copy` (form-level) or
+ * `FormFieldSpec.message` (per field). The strings baked into this module
+ * are only defaults.
  */
 
 /* ---- Field / form spec (the JSON "source of truth") ---- */
 
-export type FieldType = "text" | "email" | "tel" | "date" | "time" | "select" | "textarea";
+/** Input types the form solution can render and validate. */
+export type FieldType =
+  | "text"
+  | "email"
+  | "tel"
+  | "url"
+  | "password"
+  | "search"
+  | "number"
+  | "date"
+  | "time"
+  | "datetime-local"
+  | "month"
+  | "week"
+  | "textarea"
+  | "select"
+  | "checkbox"
+  | "radio"
+  | "hidden"
+  | "range"
+  | "color";
 
 /** Field width as a percentage of the (12-column) form row. */
 export type FieldSize = 100 | 66 | 50 | 33 | 25;
 
 /** Transport adapters shipped with the form solution. */
 export type MailerName = "cf7" | "json";
+
+/**
+ * Visitor-facing copy for a form. Every key is optional — when absent the
+ * package's built-in default is used. Overrides win per field in this order:
+ * `FormFieldSpec.message` → `FormCopy[key]` → built-in default.
+ */
+export interface FormCopy {
+  /** Generic empty-required message (fallback for any field type). */
+  required?: string;
+  /** First/last name default (overrides both name messages). */
+  name?: string;
+  email?: string;
+  tel?: string;
+  url?: string;
+  number?: string;
+  /** Range fields (also covers out-of-bounds messages). */
+  range?: string;
+  /** Colour fields. */
+  color?: string;
+  textarea?: string;
+  /** Checkbox/radio groups that must be selected. */
+  checkbox?: string;
+  /** Submit button label while the request is in flight. */
+  sending?: string;
+  /** Generic submission failure shown to the visitor. */
+  error?: string;
+  /** Mailer says the form failed validation but gave no per-field details. */
+  invalidForm?: string;
+  /** The form is missing its endpoint configuration. */
+  configError?: string;
+  /** HTTP-error fallback; `{status}` is replaced with the response status. */
+  submitError?: string;
+}
 
 export interface FormFieldSpec {
   type?: FieldType;
@@ -27,9 +85,21 @@ export interface FormFieldSpec {
   required?: boolean;
   optional?: boolean;
   rows?: number;
+  /** Select options, or the choices of a checkbox/radio group. */
   options?: string[];
   /** Width of the field within the row (defaults to 50). */
   size?: FieldSize;
+  /** Per-field validation message override (used for required and invalid). */
+  message?: string;
+  /** Input passthrough attributes. */
+  placeholder?: string;
+  /** Static value (hidden fields, pre-filled inputs). */
+  value?: string;
+  min?: number | string;
+  max?: number | string;
+  step?: number | string;
+  maxlength?: number;
+  pattern?: string;
 }
 
 export interface FormSpec {
@@ -45,6 +115,10 @@ export interface FormSpec {
   mailer?: MailerName;
   /** Where the form data is sent — required by the "json" mailer. */
   endpoint?: string;
+  /** CF7-specific endpoint config (alternative to passing props at render). */
+  cf7?: { apiUrl?: string; formId?: string };
+  /** Visitor-facing copy overrides for this form. */
+  copy?: FormCopy;
   fields: FormFieldSpec[];
 }
 
@@ -54,6 +128,10 @@ export interface FieldSpec {
   type?: string;
   required?: boolean;
   label?: string;
+  /** Per-field validation message override. */
+  message?: string;
+  min?: number | string;
+  max?: number | string;
 }
 
 /** The client-side field spec (validation + mailers) for a form's fields. */
@@ -63,6 +141,9 @@ export function toFieldSpecs(fields: FormFieldSpec[]): FieldSpec[] {
     type: field.type ?? "text",
     required: Boolean(field.required),
     label: field.label,
+    message: field.message,
+    min: field.min,
+    max: field.max,
   }));
 }
 
@@ -88,27 +169,39 @@ export interface Rule {
   message: string;
 }
 
+const NAME_RE = /^[\p{L}\s''-]{2,}$/u;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const PHONE_RE = /^\+?[\d\s()-]{7,15}$/;
-const NAME_RE = /^[\p{L}\s''-]{2,}$/u;
+const URL_RE = /^[a-z][a-z0-9+.-]*:\/\/\S+$/i;
+const NUMBER_RE = /^-?\d+(\.\d+)?$/;
+const COLOR_RE = /^#[0-9a-f]{6}$/i;
 
 /**
  * Build the per-field validation rules from a field spec. Required-ness comes
- * from the JSON spec; the format tests are shared code keyed by field type.
+ * from the JSON spec; the format tests are shared code keyed by field type;
+ * every message resolves `field.message` → `copy[key]` → default.
  */
-export function buildRules(fields: FieldSpec[]): Record<string, Rule> {
+export function buildRules(fields: FieldSpec[], copy: FormCopy = {}): Record<string, Rule> {
   const rules: Record<string, Rule> = {};
+  const messageFor = (field: FieldSpec, key: keyof FormCopy, fallback: string): string =>
+    field.message ?? copy[key] ?? fallback;
+
   for (const field of fields) {
     const required = Boolean(field.required);
     const name = field.name;
+    // Hidden fields receive no user input — never validate them.
+    if (field.type === "hidden") continue;
     if (name === "first_name" || name === "last_name") {
       rules[name] = {
         required,
         test: (value) => NAME_RE.test(value),
-        message:
+        message: messageFor(
+          field,
+          "name",
           name === "first_name"
             ? "Enter your first name (2+ characters)."
             : "Enter your last name (2+ characters).",
+        ),
       };
       continue;
     }
@@ -117,33 +210,71 @@ export function buildRules(fields: FieldSpec[]): Record<string, Rule> {
         rules[name] = {
           required,
           test: (value) => EMAIL_RE.test(value),
-          message: "Enter a valid email address.",
+          message: messageFor(field, "email", "Enter a valid email address."),
         };
         break;
       case "tel":
         rules[name] = {
           required,
           test: (value) => PHONE_RE.test(value),
-          message: "Enter a valid phone number.",
+          message: messageFor(field, "tel", "Enter a valid phone number."),
+        };
+        break;
+      case "url":
+        rules[name] = {
+          required,
+          test: (value) => URL_RE.test(value),
+          message: messageFor(field, "url", "Enter a valid URL."),
+        };
+        break;
+      case "number":
+      case "range":
+        rules[name] = {
+          required,
+          test: (value) => {
+            if (!NUMBER_RE.test(value)) return false;
+            const n = Number(value);
+            const min = field.min !== undefined ? Number(field.min) : field.type === "range" ? 0 : undefined;
+            const max = field.max !== undefined ? Number(field.max) : field.type === "range" ? 100 : undefined;
+            if (min !== undefined && n < min) return false;
+            if (max !== undefined && n > max) return false;
+            return true;
+          },
+          message: messageFor(
+            field,
+            field.type === "range" ? "range" : "number",
+            field.type === "range" ? "Choose a value within the range." : "Enter a valid number.",
+          ),
+        };
+        break;
+      case "color":
+        rules[name] = {
+          required,
+          test: (value) => COLOR_RE.test(value),
+          message: messageFor(field, "color", "Enter a valid colour."),
+        };
+        break;
+      case "checkbox":
+      case "radio":
+        // The component aggregates selection state into "1" / "" for the rule.
+        rules[name] = {
+          required,
+          test: (value) => value === "1",
+          message: messageFor(field, "checkbox", "Please select this option."),
         };
         break;
       case "textarea":
         rules[name] = {
           required,
           test: (value) => value.length >= 10,
-          message: "Message must be at least 10 characters.",
+          message: messageFor(field, "textarea", "Message must be at least 10 characters."),
         };
         break;
       default:
         rules[name] = {
           required,
           test: () => true,
-          message:
-            name === "subject"
-              ? "Choose a subject."
-              : name === "guests"
-                ? "Choose the number of guests."
-                : "Please fill this in.",
+          message: messageFor(field, "required", "Please fill this in."),
         };
     }
   }
@@ -151,8 +282,10 @@ export function buildRules(fields: FieldSpec[]): Record<string, Rule> {
 }
 
 /**
- * Validate one (already-trimmed) value against a rule. Returns the message to
- * show, or null when the value passes.
+ * Validate one value against a rule. The value should already represent the
+ * field's current state (checkbox/radio groups are collapsed to "1" / "" by
+ * the component before calling this). Returns the message to show, or null
+ * when the value passes.
  */
 export function validateValue(rule: Rule | undefined, value: string): string | null {
   if (!rule) return null;
@@ -192,12 +325,17 @@ export function parseTime(raw: string): string {
 /**
  * Build a FormData containing exactly the spec fields' (trimmed) values —
  * the canonical payload that transport adapters send. Fields outside the
- * spec (e.g. a honeypot) are never forwarded.
+ * spec (e.g. a honeypot) are never forwarded. Multi-value fields (checkbox
+ * groups) are joined into a single comma-separated value.
  */
 export function canonicalData(data: FormData, fields: FieldSpec[]): FormData {
   const payload = new FormData();
   for (const field of fields) {
-    payload.set(field.name, String(data.get(field.name) ?? "").trim());
+    const values = data
+      .getAll(field.name)
+      .map((value) => String(value).trim())
+      .filter(Boolean);
+    payload.set(field.name, values.length > 1 ? values.join(", ") : (values[0] ?? ""));
   }
   return payload;
 }

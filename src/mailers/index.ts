@@ -7,7 +7,7 @@
  * `{ ok, message }` result, so the component never needs to know the
  * backend's wire protocol.
  */
-import type { FieldSpec } from "../core";
+import type { FieldSpec, FormCopy } from "../core";
 import { cf7Mailer } from "./cf7";
 import { jsonMailer } from "./json";
 
@@ -24,6 +24,11 @@ export interface MailerConfig {
   apiUrl?: string;
   /** CF7: WordPress Contact Form 7 form id. */
   formId?: string;
+  /**
+   * Copy overrides threaded through from the form spec — the mailers fall
+   * back to these for their visitor-facing messages before built-in defaults.
+   */
+  copy?: FormCopy;
 }
 
 export interface MailerContext {

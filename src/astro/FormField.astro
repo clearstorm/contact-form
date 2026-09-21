@@ -8,10 +8,18 @@ interface Props {
   optional?: boolean;
   autocomplete?: string;
   rows?: number;
-  /** Render a <select> with these options. */
+  /** Select options, or the choices of a checkbox/radio group. */
   options?: string[];
   /** Grid span within the 12-column row (defaults to 50 → 6 columns on desktop). */
   span?: number;
+  /** Input passthrough attributes. */
+  placeholder?: string;
+  value?: string;
+  min?: number | string;
+  max?: number | string;
+  step?: number | string;
+  maxlength?: number;
+  pattern?: string;
 }
 
 const {
@@ -25,25 +33,91 @@ const {
   rows = 6,
   options,
   span = 50,
+  placeholder,
+  value,
+  min,
+  max,
+  step,
+  maxlength,
+  pattern,
 } = Astro.props;
+
+const isGroup = (type === "checkbox" || type === "radio") && (options?.length ?? 0) > 0;
+const isSingleCheckbox = type === "checkbox" && !((options?.length ?? 0) > 0);
 ---
 
-<div class={`rf-field rf-span-${span}`}>
-  <label for={id} class="rf-label">
-    {label}
-    {optional && <span class="rf-optional"> Optional</span>}
-  </label>
-  {
-    options ? (
-      <select id={id} name={name} required={required} class="rf-input">
-        {options.map((option) => <option>{option}</option>)}
-      </select>
-    ) : type === "textarea" ? (
-      <textarea id={id} name={name} rows={rows} required={required} class="rf-input rf-textarea"></textarea>
-    ) : (
-      <input id={id} name={name} type={type} autocomplete={autocomplete} required={required} class="rf-input" />
-    )
-  }
+<div
+  class={`rf-field rf-span-${span}${type === "hidden" ? " rf-field--hidden" : ""}`}
+>
+  {type !== "hidden" &&
+    (isGroup ? (
+      <span class="rf-label" id={`${id}-label`}>
+        {label}
+        {optional && <span class="rf-optional"> Optional</span>}
+      </span>
+    ) : !isSingleCheckbox ? (
+      <label for={id} class="rf-label">
+        {label}
+        {optional && <span class="rf-optional"> Optional</span>}
+      </label>
+    ) : null)}
+
+  {type === "hidden" ? (
+    <input type="hidden" id={id} name={name} value={value ?? ""} />
+  ) : isGroup ? (
+    <div class="rf-options" role="group" aria-labelledby={`${id}-label`}>
+      {options!.map((option, i) => (
+        <label class="rf-option">
+          <input
+            type={type === "checkbox" ? "checkbox" : "radio"}
+            name={name}
+            value={option}
+            required={required}
+            id={`${id}-${i}`}
+          />
+          <span>{option}</span>
+        </label>
+      ))}
+    </div>
+  ) : isSingleCheckbox ? (
+    <label class="rf-option rf-option--single">
+      <input type="checkbox" id={id} name={name} required={required} />
+      <span class="rf-label">
+        {label}
+        {optional && <span class="rf-optional"> Optional</span>}
+      </span>
+    </label>
+  ) : type === "textarea" ? (
+    <textarea
+      id={id}
+      name={name}
+      rows={rows}
+      required={required}
+      placeholder={placeholder}
+      maxlength={maxlength}
+      class="rf-input rf-textarea"
+    ></textarea>
+  ) : options?.length ? (
+    <select id={id} name={name} required={required} class="rf-input">
+      {options.map((option) => <option>{option}</option>)}
+    </select>
+  ) : (
+    <input
+      id={id}
+      name={name}
+      type={type}
+      autocomplete={autocomplete}
+      required={required}
+      placeholder={placeholder}
+      value={value}
+      min={min}
+      max={max}
+      step={step}
+      maxlength={maxlength}
+      pattern={pattern}
+      class="rf-input"
+    />
+  )}
 </div>
 
 <style is:global>
@@ -52,8 +126,12 @@ const {
   .rf-field {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: var(--rf-field-gap, 0.375rem);
     min-width: 0;
+  }
+
+  .rf-field--hidden {
+    display: none;
   }
 
   .rf-label {
@@ -65,45 +143,94 @@ const {
 
   .rf-label .rf-optional {
     font-weight: 400;
-    color: var(--rf-muted, #b9ada2);
+    color: var(--rf-muted, #6b7280);
   }
 
-  .rf-field input,
+  .rf-field input:not(input[type="checkbox"]):not(input[type="radio"]),
   .rf-field select,
   .rf-field textarea {
     width: 100%;
-    min-height: 3.5rem;
-    border: 1px solid var(--rf-field-border, #3a302b);
+    min-height: var(--rf-field-min-height, 2.75rem);
+    border: 1px solid var(--rf-field-border, #d1d5db);
     border-radius: 2px;
-    background: var(--rf-field-bg, #1b1512);
-    color: var(--rf-field-text, #faf5ee);
-    padding: 0.75rem 1rem;
-    color-scheme: dark;
+    background: var(--rf-field-bg, #ffffff);
+    color: var(--rf-field-text, #111827);
+    padding: var(--rf-field-padding-y, 0.5rem) var(--rf-field-padding-x, 0.75rem);
+    color-scheme: var(--rf-color-scheme, light);
     font: inherit;
     outline: 2px solid transparent;
     outline-offset: 2px;
   }
 
-  .rf-field input:focus-visible,
+  .rf-field input:not(input[type="checkbox"]):not(input[type="radio"]):focus-visible,
   .rf-field select:focus-visible,
   .rf-field textarea:focus-visible {
-    outline-color: var(--rf-focus, #f0bd79);
+    outline-color: var(--rf-focus, #2563eb);
+  }
+
+  .rf-field input[type="range"] {
+    min-height: 2rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  .rf-field input[type="color"] {
+    padding: 0.125rem;
   }
 
   .rf-field textarea {
-    min-height: 9rem;
+    min-height: var(--rf-textarea-min-height, 7rem);
     resize: vertical;
+  }
+
+  /* Checkbox / radio groups and single options — natural sizing, no full-width styling. */
+  .rf-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem var(--rf-gap-x, 0.75rem);
+    padding-top: 0.25rem;
+  }
+
+  .rf-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    cursor: pointer;
+  }
+
+  .rf-option input {
+    width: auto;
+    min-height: auto;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    accent-color: var(--rf-focus, #2563eb);
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+  }
+
+  .rf-option input:focus-visible {
+    outline-color: var(--rf-focus, #2563eb);
+  }
+
+  .rf-option--single .rf-label {
+    font-size: 0.9rem;
+    font-weight: 400;
   }
 
   /* Field error state (added by the form's script at runtime). */
   .rf-input-invalid {
-    border-color: var(--rf-danger, #e56b65) !important;
-    outline-color: var(--rf-danger, #e56b65) !important;
+    border-color: var(--rf-danger, #dc2626) !important;
+    outline-color: var(--rf-danger, #dc2626) !important;
   }
 
   .rf-field-error {
     margin: -0.15rem 0 0;
-    color: var(--rf-danger, #e56b65);
+    color: var(--rf-danger, #dc2626);
     font-size: 0.75rem;
     line-height: 1.4;
   }

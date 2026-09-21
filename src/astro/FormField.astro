@@ -1,0 +1,120 @@
+---
+interface Props {
+  label: string;
+  id: string;
+  name: string;
+  type?: string;
+  required?: boolean;
+  optional?: boolean;
+  autocomplete?: string;
+  rows?: number;
+  /** Render a <select> with these options. */
+  options?: string[];
+  /** Grid span within the 12-column row (defaults to 50 → 6 columns on desktop). */
+  span?: number;
+}
+
+const {
+  label,
+  id,
+  name,
+  type = "text",
+  required = false,
+  optional = false,
+  autocomplete,
+  rows = 6,
+  options,
+  span = 50,
+} = Astro.props;
+---
+
+<div class={`rf-field rf-span-${span}`}>
+  <label for={id} class="rf-label">
+    {label}
+    {optional && <span class="rf-optional"> Optional</span>}
+  </label>
+  {
+    options ? (
+      <select id={id} name={name} required={required} class="rf-input">
+        {options.map((option) => <option>{option}</option>)}
+      </select>
+    ) : type === "textarea" ? (
+      <textarea id={id} name={name} rows={rows} required={required} class="rf-input rf-textarea"></textarea>
+    ) : (
+      <input id={id} name={name} type={type} autocomplete={autocomplete} required={required} class="rf-input" />
+    )
+  }
+</div>
+
+<style is:global>
+  /* ---- Contact form fields (namespaced; themeable via --rf-* custom props) ---- */
+
+  .rf-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+
+  .rf-label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    color: inherit;
+  }
+
+  .rf-label .rf-optional {
+    font-weight: 400;
+    color: var(--rf-muted, #b9ada2);
+  }
+
+  .rf-field input,
+  .rf-field select,
+  .rf-field textarea {
+    width: 100%;
+    min-height: 3.5rem;
+    border: 1px solid var(--rf-field-border, #3a302b);
+    border-radius: 2px;
+    background: var(--rf-field-bg, #1b1512);
+    color: var(--rf-field-text, #faf5ee);
+    padding: 0.75rem 1rem;
+    color-scheme: dark;
+    font: inherit;
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+  }
+
+  .rf-field input:focus-visible,
+  .rf-field select:focus-visible,
+  .rf-field textarea:focus-visible {
+    outline-color: var(--rf-focus, #f0bd79);
+  }
+
+  .rf-field textarea {
+    min-height: 9rem;
+    resize: vertical;
+  }
+
+  /* Field error state (added by the form's script at runtime). */
+  .rf-input-invalid {
+    border-color: var(--rf-danger, #e56b65) !important;
+    outline-color: var(--rf-danger, #e56b65) !important;
+  }
+
+  .rf-field-error {
+    margin: -0.15rem 0 0;
+    color: var(--rf-danger, #e56b65);
+    font-size: 0.75rem;
+    line-height: 1.4;
+  }
+
+  /* 12-column row spans on desktop — field `size` is the width percentage,
+     mapped to a 12-column span (100→12, 66→8, 50→6, 33→4, 25→3). */
+  @media (min-width: 48rem) {
+    .rf-span-100 { grid-column: span 12; }
+    .rf-span-66 { grid-column: span 8; }
+    .rf-span-50 { grid-column: span 6; }
+    .rf-span-33 { grid-column: span 4; }
+    .rf-span-25 { grid-column: span 3; }
+  }
+</style>

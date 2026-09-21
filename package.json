@@ -1,0 +1,40 @@
+{
+  "name": "@clearstorm/contact-form",
+  "version": "0.1.0",
+  "description": "Reusable Astro contact forms: framework-agnostic validation core, CF7 + generic JSON transport adapters, self-contained --rf-* theming. Zero runtime dependencies.",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "keywords": [
+    "astro",
+    "astro-component",
+    "contact-form",
+    "contact-form-7",
+    "cf7",
+    "wordpress",
+    "static-site"
+  ],
+  "exports": {
+    ".": "./src/core.ts",
+    "./core": "./src/core.ts",
+    "./mailers": "./src/mailers/index.ts",
+    "./astro/ContactForm.astro": "./src/astro/ContactForm.astro",
+    "./astro/FormField.astro": "./src/astro/FormField.astro"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "test": "node scripts/test.mjs"
+  },
+  "peerDependencies": {
+    "astro": "^4.0.0 || ^5.0.0 || ^6.0.0 || ^7.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "esbuild@0.25.12": true
+  }
+}

@@ -1,0 +1,403 @@
+---
+/**
+ * Reusable contact form (Astro component).
+ *
+ * Renders a form from a JSON `FormSpec`, validates it with the
+ * framework-agnostic core, and submits through the transport adapter named
+ * by `form.mailer` ("cf7" — Contact Form 7 — by default; "json" for generic
+ * endpoints). Styles are self-contained (`rf-*` namespaced CSS driven by
+ * `--rf-*` custom properties) — override any variable on your own scope to
+ * re-theme.
+ */
+import FormField from "./FormField.astro";
+import { serializeRules, toFieldSpecs, type FormSpec } from "../core";
+
+interface Props {
+  form: FormSpec;
+  /** Explicit endpoint overrides — take precedence over build-time env. */
+  config?: {
+    endpoint?: string;
+    apiUrl?: string;
+    cf7FormId?: string;
+  };
+  /**
+   * "datetime" pre-fills date/time inputs with the current local date and a
+   * near-now time (common for booking forms). Off by default.
+   */
+  prefill?: "datetime";
+}
+
+const { form, config = {}, prefill } = Astro.props;
+
+const formName = form.name;
+const formId = `${form.name}-form`;
+const mailerName = form.mailer ?? "cf7";
+
+// JSON is the source of truth for which fields are required and how extra
+// fields are folded into the message. The shared bundle rebuilds per-form
+// behaviour from this serialised spec; the format tests stay in the core.
+const fieldConfig = toFieldSpecs(form.fields);
+
+// Endpoint config for the mailers — explicit props win, else build-time env.
+// Resolved values ride on the form as data-* attributes for the client.
+const wpUrl = config.apiUrl ?? (import.meta.env.PUBLIC_API_URL as string | undefined);
+const cf7FormId = config.cf7FormId ?? (import.meta.env.PUBLIC_CF7_FORM_ID as string | undefined);
+const formEndpoint = config.endpoint ?? form.endpoint;
+
+if (
+  (mailerName === "cf7" && (!wpUrl || !cf7FormId)) ||
+  (mailerName === "json" && !formEndpoint)
+) {
+  console.warn(
+    `[ContactForm] "${formName}" (mailer: ${mailerName}) is missing its endpoint config — ` +
+      (mailerName === "cf7"
+        ? "set PUBLIC_API_URL and PUBLIC_CF7_FORM_ID (or pass config.apiUrl / config.cf7FormId)."
+        : "add an `endpoint` to the form spec (or pass config.endpoint)."),
+  );
+}
+---
+
+<form
+  id={formId}
+  class="rf-form"
+  data-mail-form={formName}
+  data-mailer={mailerName}
+  data-prefill={prefill}
+  data-endpoint={formEndpoint}
+  data-wp-url={wpUrl}
+  data-form-id={cf7FormId}
+  data-rules={serializeRules(fieldConfig)}
+  novalidate
+>
+  {form.fields.map((field) => (
+    <FormField
+      label={field.label}
+      id={field.id}
+      name={field.name}
+      type={field.type}
+      autocomplete={field.autocomplete}
+      required={field.required}
+      optional={field.optional}
+      rows={field.rows}
+      options={field.options}
+      span={field.size ?? 50}
+    />
+  ))}
+  <input
+    type="text"
+    name="website"
+    data-honeypot="true"
+    tabindex="-1"
+    autocomplete="off"
+    aria-hidden="true"
+    class="rf-honeypot"
+  />
+  <div class="rf-submit-row">
+    <button class="rf-submit" type="submit">{form.submit} <span aria-hidden="true">→</span></button>
+  </div>
+  <p class="rf-status" role="status" hidden>{form.status}</p>
+</form>
+
+<style is:global>
+  /* ---- Contact form shell (namespaced; themeable via --rf-* custom props) ---- */
+
+  /* Default theme. Hosts override any --rf-* variable by declaring it on
+     their own scope (e.g. :root or the section wrapper). */
+  :where(.rf-form) {
+    --rf-field-bg: #1b1512;
+    --rf-field-border: #3a302b;
+    --rf-field-text: #faf5ee;
+    --rf-focus: #f0bd79;
+    --rf-muted: #b9ada2;
+    --rf-submit-bg: #eedbc3;
+    --rf-submit-text: #120e0c;
+    --rf-success: #79b98a;
+    --rf-success-text: #bce0c4;
+    --rf-danger: #e56b65;
+  }
+
+  .rf-form {
+    display: grid;
+    grid-template-columns: 1fr;
+    column-gap: 1.25rem;
+    row-gap: 1.5rem;
+    width: 100%;
+  }
+
+  .rf-submit-row {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1.5rem;
+    margin-top: 0.5rem;
+    grid-column: span 1;
+  }
+
+  .rf-submit {
+    display: inline-flex;
+    min-height: 3.25rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.7rem;
+    border: 1px solid var(--rf-submit-bg);
+    border-radius: 2px;
+    background: var(--rf-submit-bg);
+    color: var(--rf-submit-text);
+    padding: 0 1.6rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    line-height: 1;
+    text-transform: uppercase;
+    transition: background-color 150ms, color 150ms;
+    cursor: pointer;
+  }
+
+  .rf-submit:hover {
+    background: transparent;
+    color: var(--rf-submit-bg);
+  }
+
+  .rf-submit:disabled {
+    cursor: default;
+  }
+
+  /* Status box — success colours by default; .rf-status--error switches them. */
+  .rf-status {
+    grid-column: span 1;
+    padding: 1rem;
+    border: 1px solid var(--rf-success);
+    color: var(--rf-success-text);
+  }
+
+  .rf-status--error {
+    border-color: var(--rf-danger);
+    color: var(--rf-danger);
+  }
+
+  /* Honeypot anti-spam field — off-screen, invisible to humans, present for bots. */
+  .rf-honeypot {
+    position: absolute;
+    left: -9999px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  @media (min-width: 48rem) {
+    .rf-form {
+      grid-template-columns: repeat(12, 1fr);
+    }
+
+    .rf-submit-row {
+      grid-column: span 12;
+      flex-direction: row;
+      align-items: center;
+    }
+
+    .rf-status {
+      grid-column: span 12;
+    }
+  }
+</style>
+
+<script>
+  import {
+    buildRules,
+    parseFieldSpec,
+    validateValue,
+    type FieldSpec,
+    type Rule,
+  } from "../core";
+  import { getMailer, type MailerConfig } from "../mailers";
+
+  type Control = HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
+  type Status = HTMLElement | null;
+
+  /* ---- Field error state ---- */
+
+  const findError = (control: Control): HTMLElement | null =>
+    control.parentElement?.querySelector(".rf-field-error") ?? null;
+
+  const clearError = (control: Control): void => {
+    findError(control)?.remove();
+    control.removeAttribute("aria-invalid");
+    control.classList.remove("rf-input-invalid");
+  };
+
+  const setInvalid = (control: Control, message: string): void => {
+    let el = findError(control);
+    if (!el) {
+      el = document.createElement("p");
+      el.className = "rf-field-error";
+      control.parentElement?.appendChild(el);
+    }
+    el.textContent = message;
+    control.setAttribute("aria-invalid", "true");
+    control.classList.add("rf-input-invalid");
+  };
+
+  const validateField = (control: Control, rule: Rule | undefined): boolean => {
+    clearError(control);
+    const message = validateValue(
+      rule,
+      control instanceof HTMLSelectElement ? control.value : control.value.trim(),
+    );
+    if (message) {
+      setInvalid(control, message);
+      return false;
+    }
+    return true;
+  };
+
+  /* ---- Status box ---- */
+
+  const showSuccess = (status: Status, message: string): void => {
+    if (!status) return;
+    status.classList.remove("rf-status--error");
+    status.hidden = false;
+    status.textContent = message;
+  };
+
+  const showError = (status: Status, message: string): void => {
+    if (!status) return;
+    status.classList.add("rf-status--error");
+    status.hidden = false;
+    status.textContent = message;
+  };
+
+  const hideStatus = (status: Status): void => {
+    if (!status) return;
+    status.classList.remove("rf-status--error");
+    status.hidden = true;
+  };
+
+  async function handleSubmit(
+    event: Event,
+    fields: FieldSpec[],
+    mailerName: string,
+    successMessage: string,
+  ): Promise<void> {
+    const form = event.currentTarget;
+    if (!(form instanceof HTMLFormElement)) return;
+    event.preventDefault();
+
+    const rules = buildRules(fields);
+
+    const status = form.querySelector<HTMLElement>(".rf-status");
+    const button = form.querySelector<HTMLButtonElement>('button[type="submit"]');
+    hideStatus(status);
+
+    // Honeypot: a filled hidden field means a bot — pretend success, send nothing.
+    const honeypot = form.querySelector<HTMLInputElement>("[data-honeypot]");
+    if (honeypot && honeypot.value.trim() !== "") {
+      showSuccess(status, successMessage);
+      form.reset();
+      return;
+    }
+
+    const controls = Array.from(form.elements).filter(
+      (el): el is Control =>
+        el instanceof HTMLInputElement ||
+        el instanceof HTMLTextAreaElement ||
+        el instanceof HTMLSelectElement,
+    );
+
+    const invalidControls = controls.filter(
+      (control) => !validateField(control, rules[control.name]),
+    );
+
+    if (invalidControls.length > 0) {
+      invalidControls[0].focus();
+      return;
+    }
+
+    const originalLabel = button?.textContent ?? "";
+    const setSending = (sending: boolean): void => {
+      if (!button) return;
+      button.disabled = sending;
+      button.setAttribute("aria-busy", String(sending));
+      button.textContent = sending ? "Sending…" : originalLabel;
+    };
+
+    const config: MailerConfig = {
+      endpoint: form.dataset.endpoint,
+      apiUrl: form.dataset.wpUrl,
+      formId: form.dataset.formId,
+    };
+
+    setSending(true);
+    try {
+      const result = await getMailer(mailerName).submit({
+        data: new FormData(form),
+        fields,
+        config,
+      });
+      if (result.ok) {
+        showSuccess(status, successMessage);
+        form.reset();
+        controls.forEach((control) => clearError(control));
+      } else {
+        showError(
+          status,
+          result.message || "Something went wrong. Please try again in a moment.",
+        );
+      }
+    } catch (error) {
+      showError(
+        status,
+        error instanceof Error && error.message
+          ? error.message
+          : "Something went wrong. Please try again in a moment.",
+      );
+    } finally {
+      setSending(false);
+    }
+  }
+
+  // Opt-in defaults: with prefill="datetime" on the form, pre-fill date/time
+  // inputs with "now". Both fields stay optional in the form's spec.
+  if (document.querySelector("form[data-prefill='datetime']")) {
+    const now = new Date();
+    const localNow = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+    const todayValue = localNow.toISOString().slice(0, 10);
+    const nowValue = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+    document
+      .querySelectorAll<HTMLFormElement>("form[data-prefill='datetime']")
+      .forEach((form) => {
+        const dateInput = form.querySelector<HTMLInputElement>('input[name="date"]');
+        if (dateInput && !dateInput.value) {
+          dateInput.min = todayValue;
+          dateInput.value = todayValue;
+        }
+        const timeInput = form.querySelector<HTMLInputElement>('input[name="time"]');
+        if (timeInput && !timeInput.value) timeInput.value = nowValue;
+      });
+  }
+
+  // Wire every contact-form instance (works regardless of bundle deduplication).
+  document.querySelectorAll<HTMLFormElement>("form[data-mail-form]").forEach((form) => {
+    const fields = parseFieldSpec(form.dataset.rules ?? "");
+    const rules = buildRules(fields);
+    const mailerName = form.dataset.mailer ?? "cf7";
+    const status = form.querySelector<HTMLElement>(".rf-status");
+    const successMessage = status?.textContent ?? "";
+
+    form.addEventListener("submit", (event) =>
+      handleSubmit(event, fields, mailerName, successMessage),
+    );
+    form
+      .querySelectorAll<Control>("input, select, textarea")
+      .forEach((control) => {
+        const fieldRules = rules[control.name];
+        const onInput = (): void => {
+          if (control.hasAttribute("aria-invalid"))
+            validateField(control, fieldRules);
+        };
+        control.addEventListener("input", onInput);
+        control.addEventListener("change", onInput);
+      });
+  });
+</script>

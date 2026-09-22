@@ -2,9 +2,21 @@
 import DemoLayout from "../layouts/DemoLayout.astro";
 import ContactForm from "@clearstorm/contact-form/astro/ContactForm.astro";
 import type { FormSpec } from "@clearstorm/contact-form/core";
-import spec from "../../../specs/enquiry.json";
+import enquiry from "../../../specs/enquiry.json";
+import conditions from "../../../specs/conditions.json";
 
-const form = spec as FormSpec;
+const enquiryForm = enquiry as FormSpec;
+const conditionsForm = conditions as FormSpec;
+
+const operatorRows: Array<[string, string, string]> = [
+  ["equals", '{ "operator": "equals", "value": "Other" }', "<code>svc</code> is exactly “Other” → <code>svc_other</code>"],
+  ["notEquals", '{ "operator": "notEquals", "value": "New site" }', "<code>project</code> isn't “New site” → <code>current_url</code>"],
+  ["in", '{ "operator": "in", "value": ["Starter", "Not sure"] }', "<code>priority</code> is one of the list → <code>priority_hint</code>"],
+  ["notIn", '{ "operator": "notIn", "value": ["Over R60k"] }', "<code>budget</code> isn't in the list → <code>budget_note</code>"],
+  ["includes", '{ "operator": "includes", "value": "Other" }', "<code>topics</code> group contains “Other” → <code>topics_other</code>"],
+  ["filled", '{ "operator": "filled" }', "<code>rush</code> is ticked → <code>deadline</code>"],
+  ["empty", '{ "operator": "empty" }', "<code>call</code> is unticked → <code>email_note</code>"],
+];
 ---
 <DemoLayout title="Conditional fields demo">
   <p class="demo-kicker">showWhen conditions</p>
@@ -12,14 +24,16 @@ const form = spec as FormSpec;
   <p class="lead">
     Fields hide and reveal from the visitor's own input — declared as JSON
     (<code>showWhen</code>), evaluated live by the shared client script. No
-    markup changes, no extra JS on the page.
+    markup changes, no extra JS on the page. Two forms below: a realistic
+    enquiry (two conditions) and an operator reference (all seven operators,
+    one self-documenting reveal each).
   </p>
 
+  <h2>Realistic form</h2>
   <div class="demo-card">
-    <ContactForm form={form} />
+    <ContactForm form={enquiryForm} />
   </div>
 
-  <h2>What's conditional here</h2>
   <table class="demo-table">
     <thead>
       <tr><th>Field</th><th>Condition</th><th>Effect</th></tr>
@@ -45,12 +59,31 @@ const form = spec as FormSpec;
     payload, the backend receives only what the visitor actually saw.
   </p>
 
-  <h2>The spec</h2>
-  <pre>{`"showWhen": { "field": "service", "operator": "equals", "value": "Other" }
-"showWhen": { "field": "rush",    "operator": "filled" }`}</pre>
-  <p class="lead" style="margin-block:0">
-    See <code>examples/specs/enquiry.json</code> for the full spec and the
-    README for all seven operators (<code>notEquals</code>, <code>in</code>,
-    <code>notIn</code>, <code>includes</code>, plus AND-joined arrays).
+  <h2>All seven operators</h2>
+  <div class="demo-card">
+    <ContactForm form={conditionsForm} />
+  </div>
+
+  <table class="demo-table">
+    <thead>
+      <tr><th>Operator</th><th>JSON condition</th><th>Live example (field → reveal)</th></tr>
+    </thead>
+    <tbody>
+      {operatorRows.map(([operator, condition, example]) => (
+        <tr>
+          <td><code>{operator}</code></td>
+          <td><code>{condition}</code></td>
+          <td set:html={example} />
+        </tr>
+      ))}
+    </tbody>
+  </table>
+
+  <p class="lead">
+    An array of conditions means <strong>AND</strong> — every one must hold.
+    Unknown operators never match (the field stays hidden). See
+    <code>examples/specs/enquiry.json</code> and
+    <code>examples/specs/conditions.json</code> for the full specs, or the README
+    for the complete operator reference.
   </p>
 </DemoLayout>

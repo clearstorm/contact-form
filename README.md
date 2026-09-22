@@ -250,6 +250,11 @@ Behaviour:
 ]
 ```
 
+> Run every operator live: the demo's `/conditional` page renders
+> [`examples/specs/conditions.json`](examples/specs/conditions.json) — one
+> self-documenting reveal per operator — alongside the realistic
+> [`examples/specs/enquiry.json`](examples/specs/enquiry.json).
+
 ---
 
 ## Copy (text copy is consumer-driven)

@@ -29,7 +29,7 @@ demo.
 | --- | --- |
 | `/` | Index + quickstart |
 | `/kitchen-sink` | **All 19 field types** in one spec — rendering and every validation rule; checkbox groups, radio, single consent toggle, hidden passthrough; per-field `message` overrides; 50/66/33/100 column spans |
-| `/conditional` | **Conditional fields (`showWhen`)** — a `select` revealing a required text field (`equals`) and an urgent checkbox revealing a date (`filled`); hidden fields are out of scope and out of the payload |
+| `/conditional` | **Conditional fields (`showWhen`)** — a realistic form (`equals` service → other, `filled` rush → deadline) plus an operator-reference form exercising all seven operators (`equals`, `notEquals`, `in`, `notIn`, `includes`, `filled`, `empty`); hidden fields are out of scope and out of the payload |
 | `/contact` | **`cf7` mailer** — endpoint via `config` prop read from `PUBLIC_API_URL` / `PUBLIC_CF7_FORM_ID`; shows the resolved CF7 endpoint (or a friendly config-error note) |
 | `/booking` | **`prefill="datetime"`** — date/time pre-filled and still optional; required guests select; optional extras that fold into the payload |
 | `/json` | **`json` mailer** — posts the canonical payload to the echo server so you can inspect the exact wire format (honeypot dropped, checkbox groups comma-joined, values trimmed) |
@@ -57,7 +57,8 @@ data — edit a spec and the page changes.
 | File | Highlights |
 | --- | --- |
 | `all-fields.json` | All 19 field types; per-field `message` overrides; a form-level `copy` bag; a `hidden` field with a static value |
-| `enquiry.json` | **Conditional fields** — a required "other service" reveal (`service` equals `"Other"`) and a required deadline reveal (urgent checkbox `filled`) |
+| `enquiry.json` | **Conditional fields (realistic)** — a required "other service" reveal (`service` equals `"Other"`) and a required deadline reveal (urgent checkbox `filled`) |
+| `conditions.json` | **Conditional fields (operator reference)** — all seven `showWhen` operators, one self-documenting reveal per row (`equals`, `notEquals`, `in`, `notIn`, `includes`, `filled`, `empty`) |
 | `contact-cf7.json` | The classic CF7 shape (the reference site's general-enquiry form) — `mailer` omitted, so it defaults to `cf7` |
 | `booking.json` | `prefill="datetime"` companion — optional date/time, required guests, optional message |
 | `json-endpoint.json` | `mailer: "json"` with an `endpoint`; a checkbox group to show multi-value joining |

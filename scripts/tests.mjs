@@ -16,6 +16,7 @@ import {
   parseFieldSpec,
   parseTime,
   serializeRules,
+  stepperModifiers,
   toFieldSpecs,
   toSteps,
   validateValue,
@@ -313,6 +314,24 @@ check(
 check(
   "toSteps: heading:false and full align carried",
   headerWizard.steps[1].heading === false && headerWizard.steps[1].align === "full",
+);
+
+// --- 2.12. Stepper styling (align + line) ---
+check("stepperModifiers: undefined → none", stepperModifiers(undefined) === "");
+check(
+  "stepperModifiers: defaults (left, no line) → none",
+  stepperModifiers({}) === "" && stepperModifiers({ align: "left" }) === "",
+);
+check("stepperModifiers: center", stepperModifiers({ align: "center" }) === "rf-steps--center");
+check("stepperModifiers: right", stepperModifiers({ align: "right" }) === "rf-steps--right");
+check(
+  "stepperModifiers: space-evenly",
+  stepperModifiers({ align: "space-evenly" }) === "rf-steps--space-evenly",
+);
+check("stepperModifiers: line adds class", stepperModifiers({ line: true }) === "rf-steps--line");
+check(
+  "stepperModifiers: combined",
+  stepperModifiers({ align: "center", line: true }) === "rf-steps--center rf-steps--line",
 );
 
 // --- 3. parseTime ---

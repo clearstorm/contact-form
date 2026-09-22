@@ -3,6 +3,7 @@
   "submit": { "label": "Send enquiry", "variant": "primary" },
   "next": { "label": "Next", "variant": "primary" },
   "prev": { "label": "Previous", "variant": "secondary" },
+  "stepper": { "align": "center", "line": true },
   "status": "Thanks — the multi-step form worked end to end.",
   "mailer": "json",
   "endpoint": "http://localhost:8787/submit",
@@ -83,7 +84,7 @@
     {
       "type": "step",
       "label": "Details",
-      "align": "full",
+      "align": "right",
       "submit": "Send enquiry"
     },
     {

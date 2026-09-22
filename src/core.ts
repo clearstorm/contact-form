@@ -289,6 +289,31 @@ export function buttonVariant(spec: ButtonSpec | undefined, fallback: ButtonVari
   return typeof spec === "string" ? fallback : (spec?.variant ?? fallback);
 }
 
+/* ---- Stepper (wizard navigation strip) ---- */
+
+/**
+ * Opt-in styling for the wizard stepper (`<ol class="rf-steps">`). Defaults
+ * (`align: "left"`, no line) reproduce the plain flex row. `line` flanks the
+ * step chips like a pane header — left → rule fills the right of the row,
+ * right → rule on the left, center → rules both sides; with `space-evenly` a
+ * flank can't flex, so the rule runs full-width beneath the row instead.
+ */
+export interface StepperSpec {
+  /** Horizontal alignment (defaults to "left"). */
+  align?: "left" | "center" | "right" | "space-evenly";
+  /** Flanking rule — off by default. */
+  line?: boolean;
+}
+
+/** Modifier classes for the stepper ("rf-steps--…"), empty when default. */
+export function stepperModifiers(stepper: StepperSpec | undefined): string {
+  if (!stepper) return "";
+  const parts: string[] = [];
+  if (stepper.align && stepper.align !== "left") parts.push(`rf-steps--${stepper.align}`);
+  if (stepper.line) parts.push("rf-steps--line");
+  return parts.join(" ");
+}
+
 export interface FormSpec {
   /** Baked form identity (e.g. "enquiry" | "booking") — keys data-mail-form, the form id and the JS hooks. */
   name: string;
@@ -302,6 +327,8 @@ export interface FormSpec {
   next?: ButtonSpec;
   /** Wizard Previous button — the Back control (default "secondary"). */
   prev?: ButtonSpec;
+  /** Opt-in wizard stepper styling (alignment + flanking line). */
+  stepper?: StepperSpec;
   status: string;
   /**
    * Transport adapter used on submit (defaults to "cf7"). "json" posts the

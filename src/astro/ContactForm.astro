@@ -22,6 +22,7 @@ import {
   buttonLabel,
   buttonVariant,
   serializeRules,
+  stepperModifiers,
   toFieldSpecs,
   toSteps,
   type FormSpec,
@@ -78,6 +79,8 @@ const stepsMeta = layout.steps.map((step) => ({
   label: step.label,
   submit: step.submit,
 }));
+// Stepper styling — opt-in; empty by default (plain left-aligned row).
+const stepperMods = stepperModifiers(form.stepper);
 
 // Endpoint config — explicit props win, else the form spec's own block.
 const wpUrl = config.apiUrl ?? form.cf7?.apiUrl;
@@ -127,7 +130,11 @@ if (
           <FormElements elements={layout.shared} />
         </div>
       )}
-      <ol class="rf-steps" data-steps-nav aria-label="Form progress">
+      <ol
+        class={`rf-steps${stepperMods ? ` ${stepperMods}` : ""}`}
+        data-steps-nav
+        aria-label="Form progress"
+      >
         {layout.steps.map((step, i) => (
           <li
             class="rf-step"
@@ -262,6 +269,9 @@ if (
     --rf-step-label-size: 0.78rem;
     --rf-steps-gap: 0.5rem 1rem;
     --rf-steps-margin: 0 0 0.5rem;
+    --rf-steps-line-color: var(--rf-field-border, #d1d5db);
+    --rf-steps-line-thickness: 1px;
+    --rf-steps-line-gap: 0.75rem;
     --rf-step-footer-gap: 0.5rem;
     --rf-step-header-gap: 0.5rem;
     --rf-step-header-num-size: 1.6rem;
@@ -418,6 +428,55 @@ if (
     margin: var(--rf-steps-margin, 0 0 0.5rem);
     padding: 0;
     list-style: none;
+  }
+
+  /* Alignment — opt-in via `FormSpec.stepper.align` (default left). */
+  .rf-steps--center {
+    justify-content: center;
+  }
+
+  .rf-steps--right {
+    justify-content: flex-end;
+  }
+
+  .rf-steps--space-evenly {
+    justify-content: space-evenly;
+  }
+
+  /* Line — flank the strip like a pane header: left → rule right of the row,
+     right → rule on the left, center → rules both sides. With space-evenly a
+     flank can't flex, so the rule runs full-width beneath the row instead. */
+  .rf-steps--line {
+    align-items: center;
+    gap: var(--rf-steps-line-gap, 0.75rem);
+  }
+
+  .rf-steps--line::before,
+  .rf-steps--line::after {
+    content: "";
+    flex: 1;
+    border-top: var(--rf-steps-line-thickness, 1px) solid
+      var(--rf-steps-line-color, #d1d5db);
+  }
+
+  .rf-steps--left.rf-steps--line::before {
+    display: none;
+  }
+
+  .rf-steps--right.rf-steps--line::after {
+    display: none;
+  }
+
+  .rf-steps--space-evenly.rf-steps--line {
+    gap: var(--rf-steps-gap, 0.5rem 1rem);
+    padding-bottom: calc(var(--rf-steps-line-thickness, 1px) * 2);
+    border-bottom: var(--rf-steps-line-thickness, 1px) solid
+      var(--rf-steps-line-color, #d1d5db);
+  }
+
+  .rf-steps--space-evenly.rf-steps--line::before,
+  .rf-steps--space-evenly.rf-steps--line::after {
+    display: none;
   }
 
   .rf-step {
@@ -1000,6 +1059,14 @@ if (
         if (!btn.disabled && target < currentStep) goTo(target, { focus: true });
       });
     });
+
+    // Footer Back/Previous — never validates (locked spec); focuses the
+    // target pane header like a stepper jump.
+    form
+      .querySelector<HTMLButtonElement>("[data-step-back]")
+      ?.addEventListener("click", () => {
+        if (currentStep > 0) goTo(currentStep - 1, { focus: true });
+      });
 
     // Conditional fields: re-evaluate whenever a controlling control changes.
     const onControllerInput = (event: Event): void => {

@@ -12,6 +12,7 @@ const wizardRows: Array<[string, string, string]> = [
   ["step header", '{ "type": "step", "label": "Project", "title": "Tell us about your project", "align": "center" }', "each pane opens with a number chip + heading — the same <code>align</code> / <code>line</code> styling as decorative headings (<code>heading: false</code> opts out)"],
   ["clickable steps", "stepper items behind the current step", "completed steps become links back (no validation — same semantics as Back; “Next” re-validates on the way forward)"],
   ["button specs", '"submit": { "label": "Send enquiry", "variant": "primary" }', "<code>submit</code> / <code>next</code> / <code>prev</code> each accept a label or <code>{ label, variant }</code> — <code>primary</code> | <code>secondary</code> | <code>ghost</code>"],
+  ["stepper styling", '"stepper": { "align": "center", "line": true }', "opt-in: aligns the navigation strip (<code>left</code> / <code>center</code> / <code>right</code> / <code>space-evenly</code>) and flanks it with rules like a pane header (<code>space-evenly</code> falls back to a rule beneath)"],
   ["shared prefix", "{fields before the first «step» marker}", "rendered once above the stepper — visible on every step, included in every step’s validation"],
   ["hoisted hidden", '{ "type": "hidden", "name": "referrer", "value": "wizard-demo" }', "hidden fields render once outside the panes and are present on every step’s payload"],
   ["cross-step showWhen", '{ "showWhen": { "field": "rush", "operator": "filled" } }', "a field on a later step whose conditions read a checkbox from an earlier step"],
@@ -51,9 +52,10 @@ const wizardRows: Array<[string, string, string]> = [
   <p class="lead">
     See <code>examples/specs/wizard.json</code> for the full spec — three steps
     (step 2 shows a centered pane header with its own <code>title</code>, step 3
-    a full-rule header), a cross-step conditional field (the kick-off date
-    reveals when “This is urgent” is ticked on the previous step) and a hoisted
-    hidden field. Try leaving a required field empty and pressing “Next”, then
-    come back and click a completed chip in the stepper.
+    a header flanked rule-left / title-right), a cross-step conditional field
+    (the kick-off date reveals when “This is urgent” is ticked on the previous
+    step) and a hoisted hidden field. Try leaving a required field empty and
+    pressing “Next”, then come back with “Previous” or by clicking a completed
+    chip in the centered, rule-flanked stepper.
   </p>
 </DemoLayout>

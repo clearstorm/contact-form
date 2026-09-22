@@ -277,6 +277,11 @@ Behaviour:
   current one, its chip becomes a link back to it (no validation, like Back;
   Next re-validates on the way forward), so the visitor can jump straight back
   to an earlier step to edit it.
+- **Stepper styling (opt-in)** — a top-level `stepper` form key aligns the
+  navigation strip (`align`: `left` / `center` / `right` / `space-evenly`) and
+  optionally flanks it with a rule (`line: true`, like a pane header;
+  `space-evenly` falls back to a rule beneath the row). Defaults reproduce a
+  plain left-aligned strip.
 - Buttons are the form spec's `submit` / `next` / `prev`, each a plain label
   or `{ "label", "variant" }` with `primary` | `secondary` | `ghost`
   (defaults: `submit`/`next` → primary, `prev` → secondary). Legacy
@@ -474,6 +479,9 @@ Every hard-coded size is themeable — compact minimums by default:
 | `--rf-step-label-size` | `0.78rem` | stepper label font-size |
 | `--rf-steps-gap` | `0.5rem 1rem` | stepper item gap |
 | `--rf-steps-margin` | `0 0 0.5rem` | stepper margin |
+| `--rf-steps-line-color` | `var(--rf-field-border)` | stepper flanking rule colour |
+| `--rf-steps-line-thickness` | `1px` | stepper flanking rule thickness |
+| `--rf-steps-line-gap` | `0.75rem` | stepper flanking rule gap (`space-evenly` uses the item gap instead) |
 | `--rf-step-footer-gap` | `0.5rem` | Back/Next footer gap |
 | `--rf-step-header-gap` | `0.5rem` | pane header number↔title gap |
 | `--rf-step-header-num-size` | `1.6rem` | pane header number chip size |

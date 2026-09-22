@@ -18,7 +18,8 @@
  * light scheme — override any variable on your own scope to re-theme.
  */
 import FormField from "./FormField.astro";
-import { serializeRules, toFieldSpecs, type FormSpec } from "../core";
+import Decor from "./Decor.astro";
+import { serializeRules, toFieldSpecs, isFieldSpec, type FormSpec } from "../core";
 
 interface Props {
   form: FormSpec;
@@ -77,27 +78,31 @@ if (
   data-copy={form.copy ? JSON.stringify(form.copy) : undefined}
   novalidate
 >
-  {form.fields.map((field) => (
-    <FormField
-      label={field.label}
-      id={field.id}
-      name={field.name}
-      type={field.type}
-      autocomplete={field.autocomplete}
-      required={field.required}
-      optional={field.optional}
-      rows={field.rows}
-      options={field.options}
-      span={field.size ?? 50}
-      placeholder={field.placeholder}
-      value={field.value}
-      min={field.min}
-      max={field.max}
-      step={field.step}
-      maxlength={field.maxlength}
-      pattern={field.pattern}
-    />
-  ))}
+  {form.fields.map((element) =>
+    isFieldSpec(element) ? (
+      <FormField
+        label={element.label}
+        id={element.id}
+        name={element.name}
+        type={element.type}
+        autocomplete={element.autocomplete}
+        required={element.required}
+        optional={element.optional}
+        rows={element.rows}
+        options={element.options}
+        span={element.size ?? 50}
+        placeholder={element.placeholder}
+        value={element.value}
+        min={element.min}
+        max={element.max}
+        step={element.step}
+        maxlength={element.maxlength}
+        pattern={element.pattern}
+      />
+    ) : (
+      <Decor decor={element} />
+    ),
+  )}
   <input
     type="text"
     name="website"
@@ -146,6 +151,24 @@ if (
     --rf-submit-gap: 0.5rem;
     --rf-submit-margin-top: 0.25rem;
     --rf-status-padding: 0.75rem;
+    /* structural elements (headings, descriptions, dividers, sections) */
+    --rf-heading-size: 1rem;
+    --rf-heading-weight: 700;
+    --rf-heading-color: inherit;
+    --rf-heading-margin: 0.25rem 0 0;
+    --rf-description-size: 0.82rem;
+    --rf-description-color: #6b7280;
+    --rf-description-margin: 0.125rem 0 0;
+    --rf-divider-color: #d1d5db;
+    --rf-divider-thickness: 1px;
+    --rf-divider-margin: 0.5rem 0;
+    --rf-divider-spacer-min: 1rem;
+    --rf-section-color: #d1d5db;
+    --rf-section-thickness: 1px;
+    --rf-section-margin: 0.75rem 0;
+    --rf-section-gap: 0.75rem;
+    --rf-section-label-size: 0.78rem;
+    --rf-section-label-color: #6b7280;
   }
 
   .rf-form {

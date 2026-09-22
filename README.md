@@ -195,6 +195,42 @@ passthrough attributes — `placeholder`, `value`, `min`, `max`, `step`,
 
 ---
 
+## Form structure (headings, descriptions, dividers, sections)
+
+`fields` is the ordered layout of the form — and it may mix real fields with
+**structural elements** that shape the page without being fields. They render
+static markup only: they carry no `name`/`id`, are dropped from the client
+field spec during serialisation, and so never validate, never appear in the
+payload, and never reach the shared script.
+
+```jsonc
+"fields": [
+  { "type": "heading",    "text": "Project details", "align": "center" },  // full-width <h3> title
+  { "type": "description", "text": "We reply within a day.", "size": 66 },  // muted helper text (sized)
+  { "type": "section",    "label": "Contact details" },                     // section break, centered label
+  { "type": "text",       "id": "name", "name": "name", "label": "Name" },  // real field
+  { "type": "divider" },                                                     // thin rule
+  { "type": "divider",    "visible": false, "min": "2rem" }                 // invisible spacer (rhythm control)
+]
+```
+
+| Type | Keys | Renders |
+| --- | --- | --- |
+| `heading` | `text`, optional `align` (`left` \| `center`) | full-width section title (`<h3 class="rf-heading">`) |
+| `description` | `text`, optional `size` (100 \| 66 \| 50 \| 33 \| 25, default 100) | muted helper text sharing the field grid spans |
+| `divider` | optional `visible` (default `true`), optional `min` (CSS length) | thin rule, or with `visible: false` an invisible spacer |
+| `section` | optional `label` | section break; the label sits centered on the rule |
+
+Styling follows the same theme system with dedicated tokens —
+`--rf-heading-*`, `--rf-description-*`, `--rf-divider-*`, `--rf-section-*`
+(see [Theming](#theming-rf-custom-properties)).
+
+> Live demo: `/structure` renders
+> [`examples/specs/structure.json`](examples/specs/structure.json) — all four
+> elements in one form.
+
+---
+
 ## Conditional fields (`showWhen`)
 
 Any field can hide and reveal based on the visitor's own input. The condition
@@ -253,7 +289,8 @@ Behaviour:
 > Run every operator live: the demo's `/conditional` page renders
 > [`examples/specs/conditions.json`](examples/specs/conditions.json) — one
 > self-documenting reveal per operator — alongside the realistic
-> [`examples/specs/enquiry.json`](examples/specs/enquiry.json).
+> [`examples/specs/enquiry.json`](examples/specs/enquiry.json) and an AND
+> example ([`examples/specs/and.json`](examples/specs/and.json)).
 
 ---
 

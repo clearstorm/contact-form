@@ -143,6 +143,58 @@ export interface FormFieldSpec {
   pattern?: string;
 }
 
+/* ---- Structural elements (heading, description, divider, section) ---- */
+
+/**
+ * Non-field elements that shape a form's layout. They render static markup
+ * only: they carry no `name`/`id`, are dropped from the client field spec
+ * during serialisation (see `toFieldSpecs`), and so never validate, never
+ * reach the shared client script, and never appear in the payload.
+ */
+export interface HeadingSpec {
+  type: "heading";
+  text: string;
+  /** Horizontal alignment (defaults to "left"). */
+  align?: "left" | "center";
+}
+
+export interface DescriptionSpec {
+  type: "description";
+  text: string;
+  /** Width within the row — the same FieldSize as fields (defaults to 100). */
+  size?: FieldSize;
+}
+
+export interface DividerSpec {
+  type: "divider";
+  /** False renders an invisible spacer (vertical rhythm control) instead of a rule. */
+  visible?: boolean;
+  /** Spacer height as a CSS length — only applies when `visible` is false. */
+  min?: string;
+}
+
+export interface SectionSpec {
+  type: "section";
+  /** Optional label rendered centered on the section rule. */
+  label?: string;
+}
+
+export type DecorSpec = HeadingSpec | DescriptionSpec | DividerSpec | SectionSpec;
+
+/** A field or a structural element — the members of `FormSpec.fields`. */
+export type FormElement = FormFieldSpec | DecorSpec;
+
+/**
+ * True when a fields-array entry is a real field rather than a structural
+ * element. Every field carries a `name`; structural elements
+ * (`heading`, `description`, `divider`, `section`) never do — that single
+ * check is the discriminator used everywhere a field is required
+ * (serialisation, rules, payload).
+ */
+export function isFieldSpec(element: FormElement): element is FormFieldSpec {
+  return typeof (element as FormFieldSpec).name === "string";
+}
+
 export interface FormSpec {
   /** Baked form identity (e.g. "enquiry" | "booking") — keys data-mail-form, the form id and the JS hooks. */
   name: string;
@@ -160,7 +212,11 @@ export interface FormSpec {
   cf7?: { apiUrl?: string; formId?: string };
   /** Visitor-facing copy overrides for this form. */
   copy?: FormCopy;
-  fields: FormFieldSpec[];
+  /**
+   * The ordered layout of the form: real fields plus (optionally) structural
+   * elements — `heading`, `description`, `divider`, `section`.
+   */
+  fields: FormElement[];
 }
 
 /** Client-side serialisation of a field, carried on the form as data-rules. */
@@ -186,8 +242,9 @@ export interface FieldSpec {
 }
 
 /** The client-side field spec (validation + mailers) for a form's fields. */
-export function toFieldSpecs(fields: FormFieldSpec[]): FieldSpec[] {
-  return fields.map((field) => {
+export function toFieldSpecs(fields: FormElement[]): FieldSpec[] {
+  // Structural elements are render-time only — they never reach the client.
+  return fields.filter(isFieldSpec).map((field) => {
     const visibility = field.showWhen
       ? (Array.isArray(field.showWhen) ? field.showWhen : [field.showWhen])
       : undefined;

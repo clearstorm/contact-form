@@ -9,6 +9,7 @@ import {
   buildRules,
   canonicalData,
   evaluateVisibility,
+  isFieldSpec,
   parseFieldSpec,
   parseTime,
   serializeRules,
@@ -191,6 +192,25 @@ check("payload drops hidden conditional field", !("other_service" in Object.from
 // A required conditional field is validated like any other when visible.
 const condRules = buildRules(toFieldSpecs([{ type: "email", name: "alt_email", label: "Alt email", required: true, showWhen: { field: "plain", operator: "filled" } }]));
 check("conditional field still builds rules", "alt_email" in condRules && condRules.alt_email.required === true);
+
+// --- 2.8. Structural elements (heading / description / divider / section) ---
+const structRaw = [
+  { type: "text", id: "full_name", name: "full_name", label: "Name", required: true },
+  { type: "heading", text: "Project details", align: "center" },
+  { type: "description", text: "Helper copy", size: 66 },
+  { type: "divider", visible: false, min: "2rem" },
+  { type: "section", label: "Contact details" },
+  { type: "email", id: "email2", name: "email2", label: "Email" },
+];
+check("isFieldSpec true for fields", isFieldSpec(structRaw[0]) && isFieldSpec(structRaw[5]));
+check("isFieldSpec false for structural elements", !isFieldSpec(structRaw[1]) && !isFieldSpec(structRaw[2]) && !isFieldSpec(structRaw[3]) && !isFieldSpec(structRaw[4]));
+const structSpecs = toFieldSpecs(structRaw);
+check("toFieldSpecs drops all structural elements", structSpecs.length === 2, String(structSpecs.length));
+check("toFieldSpecs keeps field order", structSpecs.map((f) => f.name).join(",") === "full_name,email2", structSpecs.map((f) => f.name).join(","));
+const structSerialized = serializeRules(structSpecs);
+check("serialized rules are field-only (no decor keys)", !structSerialized.includes('"text":') && !structSerialized.includes('"align"') && !structSerialized.includes('"visible"'), structSerialized);
+check("round-trip carries only fields", parseFieldSpec(structSerialized).length === 2);
+check("buildRules only sees fields", Object.keys(buildRules(structSpecs)).sort().join(",") === "email2,full_name");
 
 // --- 3. parseTime ---
 check("parseTime 12h pm", parseTime("7:00 pm") === "19:00");

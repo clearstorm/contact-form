@@ -1,0 +1,116 @@
+---
+/**
+ * Structural (non-field) elements for the contact form: headings, helper
+ * descriptions, thin dividers (or invisible spacers) and labeled section
+ * breaks. They render static markup only — they carry no input, so the
+ * shared client script never sees them; serialisation drops them from
+ * `data-rules`, and they never enter validation or the payload.
+ *
+ * Styling follows the same `rf-*` + `--rf-*` theming pattern as fields.
+ */
+import type { DecorSpec } from "../core";
+
+interface Props {
+  decor: DecorSpec;
+}
+
+const { decor } = Astro.props;
+const headingAlign = decor.type === "heading" ? decor.align ?? "left" : "left";
+const descriptionSize = decor.type === "description" ? decor.size ?? 100 : 100;
+---
+
+{decor.type === "heading" && (
+  <h3 class={`rf-heading rf-heading--${headingAlign}`}>{decor.text}</h3>
+)}
+
+{decor.type === "description" && (
+  <p class={`rf-description rf-span-${descriptionSize}`}>{decor.text}</p>
+)}
+
+{decor.type === "divider" &&
+  (decor.visible === false ? (
+    <div
+      class="rf-divider rf-divider--spacer"
+      style={decor.min ? `min-height: ${decor.min}` : undefined}
+    />
+  ) : (
+    <hr class="rf-divider" />
+  ))}
+
+{decor.type === "section" && (
+  <div
+    class={`rf-section${decor.label ? " rf-section--labeled" : ""}`}
+    role="separator"
+  >
+    {decor.label && <span class="rf-section-label">{decor.label}</span>}
+  </div>
+)}
+
+<style is:global>
+  .rf-heading {
+    grid-column: span 12;
+    margin: var(--rf-heading-margin, 0.25rem 0 0);
+    font-size: var(--rf-heading-size, 1rem);
+    font-weight: var(--rf-heading-weight, 700);
+    letter-spacing: 0.04em;
+    line-height: 1.3;
+    color: var(--rf-heading-color, inherit);
+  }
+
+  .rf-heading--center {
+    text-align: center;
+  }
+
+  /* Description spans reuse the shared .rf-span-* grid classes from
+     FormField.astro (100 → full row on desktop, every span full-width on
+     mobile) — no grid-column set here so the span class wins. */
+  .rf-description {
+    margin: var(--rf-description-margin, 0.125rem 0 0);
+    font-size: var(--rf-description-size, 0.82rem);
+    line-height: 1.5;
+    color: var(--rf-description-color, var(--rf-muted, #6b7280));
+  }
+
+  .rf-divider {
+    grid-column: span 12;
+    margin: var(--rf-divider-margin, 0.5rem 0);
+    border: 0;
+    border-top: var(--rf-divider-thickness, 1px) solid
+      var(--rf-divider-color, var(--rf-field-border, #d1d5db));
+  }
+
+  .rf-divider--spacer {
+    min-height: var(--rf-divider-spacer-min, 1rem);
+  }
+
+  .rf-section {
+    grid-column: span 12;
+    margin: var(--rf-section-margin, 0.75rem 0);
+    border-top: var(--rf-section-thickness, 1px) solid
+      var(--rf-section-color, var(--rf-field-border, #d1d5db));
+  }
+
+  .rf-section--labeled {
+    display: flex;
+    align-items: center;
+    gap: var(--rf-section-gap, 0.75rem);
+    border-top: 0;
+  }
+
+  .rf-section--labeled::before,
+  .rf-section--labeled::after {
+    content: "";
+    flex: 1;
+    border-top: var(--rf-section-thickness, 1px) solid
+      var(--rf-section-color, var(--rf-field-border, #d1d5db));
+  }
+
+  .rf-section-label {
+    font-size: var(--rf-section-label-size, 0.78rem);
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--rf-section-label-color, var(--rf-muted, #6b7280));
+  }
+</style>

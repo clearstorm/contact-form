@@ -4,9 +4,11 @@ import ContactForm from "@clearstorm/contact-form/astro/ContactForm.astro";
 import type { FormSpec } from "@clearstorm/contact-form/core";
 import enquiry from "../../../specs/enquiry.json";
 import conditions from "../../../specs/conditions.json";
+import and from "../../../specs/and.json";
 
 const enquiryForm = enquiry as FormSpec;
 const conditionsForm = conditions as FormSpec;
+const andForm = and as FormSpec;
 
 const operatorRows: Array<[string, string, string]> = [
   ["equals", '{ "operator": "equals", "value": "Other" }', "<code>svc</code> is exactly “Other” → <code>svc_other</code>"],
@@ -79,11 +81,22 @@ const operatorRows: Array<[string, string, string]> = [
     </tbody>
   </table>
 
+  <h2>AND — every condition must hold</h2>
   <p class="lead">
-    An array of conditions means <strong>AND</strong> — every one must hold.
+    An <em>array</em> of conditions means <strong>AND</strong>: the field is
+    shown only while every one of them holds. In the form below the note
+    appears only when Service is exactly “Other” <em>and</em> “This is urgent”
+    is ticked — either on its own keeps it hidden.
+  </p>
+  <div class="demo-card">
+    <ContactForm form={andForm} />
+  </div>
+
+  <p class="lead">
     Unknown operators never match (the field stays hidden). See
-    <code>examples/specs/enquiry.json</code> and
-    <code>examples/specs/conditions.json</code> for the full specs, or the README
+    <code>examples/specs/enquiry.json</code>,
+    <code>examples/specs/conditions.json</code> and
+    <code>examples/specs/and.json</code> for the full specs, or the README
     for the complete operator reference.
   </p>
 </DemoLayout>

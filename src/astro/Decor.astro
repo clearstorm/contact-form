@@ -30,7 +30,7 @@ const descriptionSpan = decor.type === "description" ? gridSpan(decor.size ?? 10
 )}
 
 {decor.type === "description" && (
-  <p class="rf-description" style={`--rf-span: ${descriptionSpan}`}>
+  <p class={`rf-description rf-span-${descriptionSpan}`}>
     {decor.text}
   </p>
 )}
@@ -94,19 +94,14 @@ const descriptionSpan = decor.type === "description" ? gridSpan(decor.size ?? 10
     display: none;
   }
 
-  /* Description spans the row via the inline `--rf-span` (from `gridSpan`,
-     default 100 → 12 columns on desktop, full-width on mobile). */
+  /* Description spans the row via the shared `.rf-span-{1..12}` classes from
+     FormField.astro (span from `gridSpan`, default 100 → 12 columns on
+     desktop, full-width below 48rem). */
   .rf-description {
     margin: var(--rf-description-margin, 0.125rem 0 0);
     font-size: var(--rf-description-size, 0.82rem);
     line-height: 1.5;
     color: var(--rf-description-color, var(--rf-muted, #6b7280));
-  }
-
-  @media (min-width: 48rem) {
-    .rf-description {
-      grid-column: span var(--rf-span, 12);
-    }
   }
 
   .rf-divider {

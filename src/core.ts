@@ -76,6 +76,45 @@ export interface FormCopy {
   submitError?: string;
 }
 
+/* ---- Conditional fields (showWhen) ---- */
+
+/**
+ * Conditions that decide whether a field is shown, evaluated client-side from
+ * the visitor's current input. Available operators:
+ *
+ * - `equals` / `notEquals` — the controlling field currently has / doesn't have
+ *   exactly this value (text, select, radio).
+ * - `in` / `notIn` — the controlling field's current value(s) overlap / don't
+ *   overlap the given list.
+ * - `includes` — a checkbox group includes the given value(s); an array means
+ *   "all of these".
+ * - `filled` / `empty` — the controlling field has / has no trimmed non-empty
+ *   value.
+ *
+ * A field whose `showWhen` is an *array* of conditions is shown only when every
+ * condition holds (AND). Unknown operators never match (the field stays
+ * hidden) — the component logs one warning at wiring time.
+ */
+export type VisibilityOperator =
+  | "equals"
+  | "notEquals"
+  | "in"
+  | "notIn"
+  | "includes"
+  | "filled"
+  | "empty";
+
+export interface VisibilityCondition {
+  /** Name of the controlling field whose value drives this condition. */
+  field: string;
+  operator: VisibilityOperator;
+  /** Required by `equals`/`notEquals`/`in`/`notIn`/`includes`; ignored by `filled`/`empty`. */
+  value?: string | string[];
+}
+
+/** Single condition, or an array of conditions joined with AND. */
+export type VisibilityRule = VisibilityCondition | VisibilityCondition[];
+
 export interface FormFieldSpec {
   type?: FieldType;
   id: string;
@@ -91,6 +130,8 @@ export interface FormFieldSpec {
   size?: FieldSize;
   /** Per-field validation message override (used for required and invalid). */
   message?: string;
+  /** Show this field only while the condition(s) hold (conditional fields). */
+  showWhen?: VisibilityRule;
   /** Input passthrough attributes. */
   placeholder?: string;
   /** Static value (hidden fields, pre-filled inputs). */
@@ -132,19 +173,40 @@ export interface FieldSpec {
   message?: string;
   min?: number | string;
   max?: number | string;
+  /**
+   * Conditional fields: the normalized (always-array) showWhen conditions.
+   * Absent on unconditional fields.
+   */
+  visibility?: VisibilityCondition[];
+  /**
+   * Names of the fields whose values the visibility conditions read — the
+   * client listens to these to re-evaluate. Absent on unconditional fields.
+   */
+  dependsOn?: string[];
 }
 
 /** The client-side field spec (validation + mailers) for a form's fields. */
 export function toFieldSpecs(fields: FormFieldSpec[]): FieldSpec[] {
-  return fields.map((field) => ({
-    name: field.name,
-    type: field.type ?? "text",
-    required: Boolean(field.required),
-    label: field.label,
-    message: field.message,
-    min: field.min,
-    max: field.max,
-  }));
+  return fields.map((field) => {
+    const visibility = field.showWhen
+      ? (Array.isArray(field.showWhen) ? field.showWhen : [field.showWhen])
+      : undefined;
+    return {
+      name: field.name,
+      type: field.type ?? "text",
+      required: Boolean(field.required),
+      label: field.label,
+      message: field.message,
+      min: field.min,
+      max: field.max,
+      ...(visibility && visibility.length > 0
+        ? {
+            visibility,
+            dependsOn: [...new Set(visibility.map((c) => c.field))],
+          }
+        : {}),
+    };
+  });
 }
 
 /** Serialise the field spec for the data-rules attribute. */
@@ -159,6 +221,76 @@ export function parseFieldSpec(json: string): FieldSpec[] {
   } catch {
     return [];
   }
+}
+
+/* ---- Conditional visibility evaluation ---- */
+
+/** Normalise a condition's `value` into a list of option strings (for `in`/`in`-family operators). */
+const valueList = (value: string | string[] | undefined): string[] => {
+  if (value === undefined) return [];
+  return Array.isArray(value) ? value.map(String) : [String(value)];
+};
+
+/**
+ * Evaluate a field's showWhen conditions against the caller-supplied current
+ * values (`values[name]` = trimmed, non-empty values of the controls named
+ * `name`; checkbox/radio groups contribute only their checked values). An
+ * array of conditions requires every one to hold (AND). Unknown operators and
+ * conditions with no usable value never match — the field stays hidden.
+ */
+export function evaluateVisibility(
+  conditions: VisibilityCondition[],
+  values: Record<string, string[]>,
+): boolean {
+  for (const condition of conditions) {
+    const field = values[condition.field] ?? [];
+    const list = valueList(condition.value);
+    switch (condition.operator) {
+      case "equals":
+        if (list.length !== 1 || field.length !== 1 || field[0] !== list[0]) return false;
+        break;
+      case "notEquals":
+        if (list.length === 1 && field.length === 1 && field[0] === list[0]) return false;
+        break;
+      case "in":
+        if (list.length === 0 || !field.some((v) => list.includes(v))) return false;
+        break;
+      case "notIn":
+        if (list.length !== 0 && field.some((v) => list.includes(v))) return false;
+        break;
+      case "includes":
+        if (list.length === 0 || !list.every((v) => field.includes(v))) return false;
+        break;
+      case "filled":
+        if (field.length === 0) return false;
+        break;
+      case "empty":
+        if (field.length !== 0) return false;
+        break;
+      default:
+        return false; // unknown operator — fail safe to hidden
+    }
+  }
+  return true;
+}
+
+/**
+ * Names of the fields that should be in scope right now: every unconditional
+ * field plus every conditional field whose conditions currently hold. Binary
+ * fields (type "hidden") are excluded from validation but still visible — they
+ * are plain spec members, so they stay included.
+ */
+export function visibleNames(
+  fields: FieldSpec[],
+  values: Record<string, string[]>,
+): Set<string> {
+  const visible = new Set<string>();
+  for (const field of fields) {
+    if (!field.visibility?.length || evaluateVisibility(field.visibility, values)) {
+      visible.add(field.name);
+    }
+  }
+  return visible;
 }
 
 /* ---- Validation ---- */

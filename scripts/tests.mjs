@@ -7,10 +7,14 @@ import {
 import { jsonMailer } from "../src/mailers/json.ts";
 import {
   buildRules,
-  validateValue,
-  parseTime,
-  toFieldSpecs,
   canonicalData,
+  evaluateVisibility,
+  parseFieldSpec,
+  parseTime,
+  serializeRules,
+  toFieldSpecs,
+  validateValue,
+  visibleNames,
 } from "../src/core.ts";
 
 let failures = 0;
@@ -124,6 +128,69 @@ check("required checkbox ticked", validateValue(demoRules.consent, "1") === null
 check("checkbox group not required", demoRules.topics.required === false);
 check("radio empty rejected", validateValue(demoRules.plan, "") !== null);
 check("hidden skips rules", !("site_id" in demoRules));
+
+// --- 2.7. Conditional fields (showWhen) ---
+const condRaw = [
+  { type: "text", name: "other_service", label: "Other service", required: true, showWhen: { field: "service", operator: "equals", value: "Other" } },
+  { type: "text", name: "other_topic", label: "Other topic", showWhen: [{ field: "service", operator: "equals", value: "Other" }, { field: "topic", operator: "includes", value: "Custom" }] },
+  { type: "text", name: "plain", label: "Plain" },
+];
+const condFields = toFieldSpecs(condRaw);
+const byName = (n) => condFields.find((f) => f.name === n);
+const serialized = parseFieldSpec(serializeRules(condFields));
+
+check("showWhen single → visibility array of 1", JSON.stringify(byName("other_service").visibility) === JSON.stringify([{ field: "service", operator: "equals", value: "Other" }]));
+check("showWhen single → dependsOn", JSON.stringify(byName("other_service").dependsOn) === JSON.stringify(["service"]));
+check("showWhen array (AND) kept", byName("other_topic").visibility.length === 2, String(byName("other_topic").visibility?.length));
+check("showWhen array → dependsOn deduped", JSON.stringify(byName("other_topic").dependsOn) === JSON.stringify(["service", "topic"]));
+check("unconditional field has no visibility/dependsOn", !("visibility" in byName("plain")) && !("dependsOn" in byName("plain")));
+check("data-rules round-trip keeps visibility", JSON.stringify(serialized.find((f) => f.name === "other_service").visibility) === JSON.stringify(byName("other_service").visibility));
+check("data-rules round-trip keeps dependsOn", JSON.stringify(serialized.find((f) => f.name === "other_topic").dependsOn) === JSON.stringify(["service", "topic"]));
+
+check("equals matches", evaluateVisibility([{ field: "service", operator: "equals", value: "Other" }], { service: ["Other"] }));
+check("equals misses", !evaluateVisibility([{ field: "service", operator: "equals", value: "Other" }], { service: ["Web"] }));
+check("notEquals matches on different value", evaluateVisibility([{ field: "service", operator: "notEquals", value: "Other" }], { service: ["Web"] }));
+check("notEquals matches when empty", evaluateVisibility([{ field: "service", operator: "notEquals", value: "Other" }], { service: [] }));
+check("notEquals misses on equal value", !evaluateVisibility([{ field: "service", operator: "notEquals", value: "Other" }], { service: ["Other"] }));
+check("in matches", evaluateVisibility([{ field: "plan", operator: "in", value: ["Pro", "Team"] }], { plan: ["Team"] }));
+check("in misses", !evaluateVisibility([{ field: "plan", operator: "in", value: ["Pro", "Team"] }], { plan: ["Free"] }));
+check("in accepts single string value", evaluateVisibility([{ field: "plan", operator: "in", value: "Pro" }], { plan: ["Pro"] }));
+check("notIn", !evaluateVisibility([{ field: "plan", operator: "notIn", value: ["Pro", "Team"] }], { plan: ["Pro"] }));
+check("includes string in group", evaluateVisibility([{ field: "topic", operator: "includes", value: "News" }], { topic: ["Design", "News"] }));
+check("includes misses", !evaluateVisibility([{ field: "topic", operator: "includes", value: "News" }], { topic: ["Design"] }));
+check("includes array = all-of", evaluateVisibility([{ field: "topic", operator: "includes", value: ["News", "Design"] }], { topic: ["News", "Design"] }));
+check("includes array misses partial", !evaluateVisibility([{ field: "topic", operator: "includes", value: ["News", "Business"] }], { topic: ["News", "Design"] }));
+check("filled", evaluateVisibility([{ field: "rush", operator: "filled" }], { rush: ["on"] }));
+check("filled misses", !evaluateVisibility([{ field: "rush", operator: "filled" }], { rush: [] }));
+check("empty", evaluateVisibility([{ field: "rush", operator: "empty" }], { rush: [] }));
+check("array = AND, both hold", evaluateVisibility([{ field: "service", operator: "equals", value: "Other" }, { field: "topic", operator: "includes", value: "Custom" }], { service: ["Other"], topic: ["Custom"] }));
+check("array = AND, one fails", !evaluateVisibility([{ field: "service", operator: "equals", value: "Other" }, { field: "topic", operator: "includes", value: "Custom" }], { service: ["Other"], topic: ["Default"] }));
+check("unknown operator never matches", !evaluateVisibility([{ field: "x", operator: "equalsX", value: "y" }], { x: ["y"] }));
+check("missing controller values → empty", evaluateVisibility([{ field: "rush", operator: "empty" }], {}));
+
+// visibleNames → the fields a submission actually carries.
+const visible = visibleNames(condFields, { service: ["Web"], topic: ["Default"] });
+check("visibleNames keeps unconditional", visible.has("plain"));
+check("visibleNames hides unmet condition", !visible.has("other_service"));
+check("visibleNames evaluates AND", visible.has("other_topic") === false);
+const visibleOther = visibleNames(condFields, { service: ["Other"], topic: ["Custom"] });
+check("visibleNames shows matching condition", visibleOther.has("other_service") && visibleOther.has("other_topic"));
+
+// Hidden conditional fields never reach the canonical payload.
+const condRaw2 = new FormData();
+condRaw2.set("service", "Other");
+condRaw2.set("other_service", "event consulting");
+condRaw2.set("plain", "hello");
+const kept = condFields.filter((f) => visibleNames(condFields, { service: ["Other"], topic: [] }).has(f.name));
+const payloadCond = canonicalData(condRaw2, kept);
+check("payload carries visible conditional field", payloadCond.get("other_service") === "event consulting");
+const dropped = condFields.filter((f) => visibleNames(condFields, { service: ["Web"], topic: [] }).has(f.name));
+const payloadDropped = canonicalData(condRaw2, dropped);
+check("payload drops hidden conditional field", !("other_service" in Object.fromEntries(payloadDropped.entries())));
+
+// A required conditional field is validated like any other when visible.
+const condRules = buildRules(toFieldSpecs([{ type: "email", name: "alt_email", label: "Alt email", required: true, showWhen: { field: "plain", operator: "filled" } }]));
+check("conditional field still builds rules", "alt_email" in condRules && condRules.alt_email.required === true);
 
 // --- 3. parseTime ---
 check("parseTime 12h pm", parseTime("7:00 pm") === "19:00");

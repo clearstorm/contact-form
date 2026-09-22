@@ -195,6 +195,63 @@ passthrough attributes — `placeholder`, `value`, `min`, `max`, `step`,
 
 ---
 
+## Conditional fields (`showWhen`)
+
+Any field can hide and reveal based on the visitor's own input. The condition
+is declared in the spec and evaluated entirely client-side by the shared
+script — no markup changes, no extra JS:
+
+```jsonc
+{
+  "type": "text",
+  "id": "other_service",
+  "name": "other_service",
+  "label": "Describe the service",
+  "required": true,
+  "showWhen": {
+    "field": "service",          // controlling field name
+    "operator": "equals",        // see operators below
+    "value": "Other"
+  }
+}
+```
+
+An **array of conditions means AND** (every one must hold). Operators:
+`equals` / `notEquals` (text, select, radio), `in` / `notIn` (value is/isn't in
+a list), `includes` (a checkbox group contains the value; an array means "all
+of these"), `filled` / `empty`. Unknown operators never match — the field stays
+hidden.
+
+Behaviour:
+
+- **Initial state** is computed in the browser on load (the server renders every
+  field visible; the script hides the ones whose conditions don't hold).
+- Hidden fields are **out of scope**: a hidden `required` field can't block the
+  form, hidden fields aren't validated, and they're **excluded from the
+  payload** — the backend receives only what the visitor saw. A field that
+  becomes hidden never leaks a stale value into a submission, and a hidden
+  field doesn't drive other conditions (chains behave predictably).
+- Controlling fields update visibility live on `input`/`change`.
+- Copy/validation messages work unchanged — a `message` override still applies
+  to a revealed field.
+
+```jsonc
+// kitchen-sink of every operator
+"showWhen": { "field": "service", "operator": "equals",  "value": "Other" }
+"showWhen": { "field": "service", "operator": "notEquals", "value": "Other" }
+"showWhen": { "field": "plan",    "operator": "in",       "value": ["Pro", "Team"] }
+"showWhen": { "field": "plan",    "operator": "notIn",    "value": ["Trial"] }
+"showWhen": { "field": "topics",  "operator": "includes", "value": "News" }        // checkbox group
+"showWhen": { "field": "rush",    "operator": "filled" }                            // single checkbox
+"showWhen": { "field": "notes",   "operator": "empty" }
+"showWhen": [ // AND
+  { "field": "region", "operator": "equals", "value": "US" },
+  { "field": "plan",   "operator": "notEquals", "value": "Trial" }
+]
+```
+
+---
+
 ## Copy (text copy is consumer-driven)
 
 Every visitor-facing string resolves **`field.message` → `copy[key]` →

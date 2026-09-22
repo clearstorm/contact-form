@@ -1,0 +1,56 @@
+---
+import DemoLayout from "../layouts/DemoLayout.astro";
+import ContactForm from "@clearstorm/contact-form/astro/ContactForm.astro";
+import type { FormSpec } from "@clearstorm/contact-form/core";
+import spec from "../../../specs/enquiry.json";
+
+const form = spec as FormSpec;
+---
+<DemoLayout title="Conditional fields demo">
+  <p class="demo-kicker">showWhen conditions</p>
+  <h1>Conditional fields</h1>
+  <p class="lead">
+    Fields hide and reveal from the visitor's own input — declared as JSON
+    (<code>showWhen</code>), evaluated live by the shared client script. No
+    markup changes, no extra JS on the page.
+  </p>
+
+  <div class="demo-card">
+    <ContactForm form={form} />
+  </div>
+
+  <h2>What's conditional here</h2>
+  <table class="demo-table">
+    <thead>
+      <tr><th>Field</th><th>Condition</th><th>Effect</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>other_service</code></td>
+        <td><code>service</code> <em>equals</em> "Other"</td>
+        <td>a required text field appears only when the visitor picks "Other"</td>
+      </tr>
+      <tr>
+        <td><code>deadline</code></td>
+        <td><code>rush</code> <em>filled</em></td>
+        <td>ticking "this is urgent" reveals a required date</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="lead">
+    Both revealed fields are <code>required: true</code> — while hidden they are
+    out of scope, so they can't block submission; once revealed they validate
+    like any other field. And because hidden fields are excluded from the
+    payload, the backend receives only what the visitor actually saw.
+  </p>
+
+  <h2>The spec</h2>
+  <pre>{`"showWhen": { "field": "service", "operator": "equals", "value": "Other" }
+"showWhen": { "field": "rush",    "operator": "filled" }`}</pre>
+  <p class="lead" style="margin-block:0">
+    See <code>examples/specs/enquiry.json</code> for the full spec and the
+    README for all seven operators (<code>notEquals</code>, <code>in</code>,
+    <code>notIn</code>, <code>includes</code>, plus AND-joined arrays).
+  </p>
+</DemoLayout>

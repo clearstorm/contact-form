@@ -238,11 +238,14 @@ if (
 <script>
   import {
     buildRules,
+    evaluateVisibility,
     parseFieldSpec,
     validateValue,
+    visibleNames,
     type FieldSpec,
     type Rule,
     type FormCopy,
+    type VisibilityCondition,
   } from "../core";
   import { getMailer, type MailerConfig } from "../mailers";
 
@@ -279,6 +282,94 @@ if (
       form.querySelectorAll<HTMLInputElement>(`input[name="${name}"]`),
     ).some((el) => el.checked);
     return checked ? "1" : "";
+  };
+
+  /* ---- Conditional fields (showWhen) ---- */
+
+  interface VisibilityEngine {
+    /** Re-evaluate every conditional field against the current control values. */
+    apply: () => void;
+    /** True when the named control is a driving field of some condition. */
+    isController: (name: string) => boolean;
+    /** True when the control sits inside a currently-hidden field wrapper. */
+    isHiddenControl: (control: Control) => boolean;
+    /** The spec fields the visitor currently sees — what gets validated and sent. */
+    visibleFields: () => FieldSpec[];
+  }
+
+  const createVisibilityEngine = (
+    form: HTMLFormElement,
+    fields: FieldSpec[],
+  ): VisibilityEngine => {
+    const visibilityByField = new Map<string, VisibilityCondition[]>();
+    const controllerNames = new Set<string>();
+    for (const field of fields) {
+      if (field.visibility?.length) {
+        visibilityByField.set(field.name, field.visibility);
+        for (const condition of field.visibility) controllerNames.add(condition.field);
+      }
+    }
+
+    // Trimmed, non-empty values of the controls named `name`. Checkbox/radio
+    // groups contribute only their checked option values; controls inside a
+    // currently-hidden wrapper contribute nothing (so chains stay predictable).
+    const valuesOf = (name: string): string[] => {
+      const values: string[] = [];
+      for (const control of form.querySelectorAll<Control>("input, select, textarea")) {
+        if (control.name !== name || isHiddenControl(control)) continue;
+        if (control instanceof HTMLInputElement && control.type === "checkbox") {
+          if (control.checked && control.value.trim()) values.push(control.value.trim());
+        } else {
+          const value = control.value.trim();
+          if (value) values.push(value);
+        }
+      }
+      return values;
+    };
+
+    const currentValues = (): Record<string, string[]> =>
+      Object.fromEntries([...controllerNames].map((name) => [name, valuesOf(name)]));
+
+    // A control is out of scope while its field wrapper is hidden — it is not
+    // validated, not sent, and does not drive other conditions.
+    const isHiddenControl = (control: Control): boolean => {
+      const wrapper = control.closest(".rf-field");
+      return wrapper !== null && (wrapper.hidden || wrapper.classList.contains("rf-field--hidden"));
+    };
+
+    const apply = (): void => {
+      if (visibilityByField.size === 0) return;
+      const values = currentValues();
+      for (const [fieldName, conditions] of visibilityByField) {
+        const control = form.querySelector<Control>(`[name="${CSS.escape(fieldName)}"]`);
+        const wrapper = control?.closest(".rf-field");
+        if (!wrapper) continue;
+        const visible = evaluateVisibility(conditions, values);
+        const wasHidden = wrapper.hidden || wrapper.classList.contains("rf-field--hidden");
+        wrapper.hidden = !visible;
+        wrapper.classList.toggle("rf-field--hidden", !visible);
+        // Freshly hidden — drop any stale error state the visitor is no longer
+        // meant to see (it will re-validate when the field returns).
+        if (!wasHidden && !visible) {
+          for (const fieldControl of Array.from(wrapper.querySelectorAll<Control>("input, select, textarea"))) {
+            clearError(fieldControl);
+          }
+        }
+      }
+    };
+
+    const visibleFields = (): FieldSpec[] => {
+      if (visibilityByField.size === 0) return fields;
+      const visible = visibleNames(fields, currentValues());
+      return fields.filter((field) => visible.has(field.name));
+    };
+
+    return {
+      apply,
+      isController: (name) => controllerNames.has(name),
+      isHiddenControl,
+      visibleFields,
+    };
   };
 
   const validateField = (
@@ -333,6 +424,7 @@ if (
     mailerName: string,
     successMessage: string,
     copy: FormCopy,
+    visibility: VisibilityEngine,
   ): Promise<void> {
     const form = event.currentTarget;
     if (!(form instanceof HTMLFormElement)) return;
@@ -354,6 +446,10 @@ if (
       return;
     }
 
+    // Conditional fields: recompute visibility against the latest values, so
+    // validation and the payload reflect exactly what the visitor sees.
+    visibility.apply();
+
     const controls = Array.from(form.elements).filter(
       (el): el is Control =>
         el instanceof HTMLInputElement ||
@@ -361,7 +457,11 @@ if (
         el instanceof HTMLSelectElement,
     );
 
-    const invalidControls = controls.filter(
+    // Fields inside hidden wrappers are out of scope — a hidden conditional
+    // field can never block the form, and it never reaches the payload.
+    const scopedControls = controls.filter((control) => !visibility.isHiddenControl(control));
+
+    const invalidControls = scopedControls.filter(
       (control) => !validateField(control, rules[control.name], form),
     );
 
@@ -390,7 +490,9 @@ if (
     try {
       const result = await getMailer(mailerName).submit({
         data: new FormData(form),
-        fields,
+        // Only the visible fields travel — mailers build the canonical payload
+        // from this list, so hidden conditional fields are excluded outright.
+        fields: visibility.visibleFields(),
         config,
       });
       if (result.ok) {
@@ -446,9 +548,25 @@ if (
     const status = form.querySelector<HTMLElement>(".rf-status");
     const successMessage = status?.textContent ?? "";
 
+    const visibility = createVisibilityEngine(form, fields);
+
     form.addEventListener("submit", (event) =>
-      handleSubmit(event, fields, mailerName, successMessage, copy),
+      handleSubmit(event, fields, mailerName, successMessage, copy, visibility),
     );
+
+    // Conditional fields: re-evaluate whenever a controlling control changes.
+    const onControllerInput = (event: Event): void => {
+      const target = event.target;
+      if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement)) return;
+      if (visibility.isController(target.name)) visibility.apply();
+    };
+    form.addEventListener("input", onControllerInput);
+    form.addEventListener("change", onControllerInput);
+
+    // Initial visibility — the server renders every field visible; the script
+    // hides the ones whose conditions don't hold yet.
+    visibility.apply();
+
     form
       .querySelectorAll<Control>("input, select, textarea")
       .forEach((control) => {

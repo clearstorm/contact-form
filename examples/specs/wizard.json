@@ -1,13 +1,13 @@
 {
   "name": "wizard",
-  "submit": "Send enquiry",
+  "submit": { "label": "Send enquiry", "variant": "primary" },
+  "next": { "label": "Next", "variant": "primary" },
+  "prev": { "label": "Previous", "variant": "secondary" },
   "status": "Thanks — the multi-step form worked end to end.",
   "mailer": "json",
   "endpoint": "http://localhost:8787/submit",
   "copy": {
     "sending": "Sending…",
-    "back": "Previous",
-    "next": "Next",
     "submitError": "Sending failed (HTTP {status}) — is the echo server running (npm run demo:api)?"
   },
   "fields": [
@@ -49,7 +49,9 @@
     },
     {
       "type": "step",
-      "label": "Project"
+      "label": "Project",
+      "title": "Tell us about your project",
+      "align": "center"
     },
     {
       "type": "select",
@@ -81,6 +83,7 @@
     {
       "type": "step",
       "label": "Details",
+      "align": "full",
       "submit": "Send enquiry"
     },
     {

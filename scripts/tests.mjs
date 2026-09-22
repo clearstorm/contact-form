@@ -7,6 +7,8 @@ import {
 import { jsonMailer } from "../src/mailers/json.ts";
 import {
   buildRules,
+  buttonLabel,
+  buttonVariant,
   canonicalData,
   evaluateVisibility,
   gridSpan,
@@ -283,6 +285,34 @@ check(
   "toFieldSpecs skips step markers",
   wizardSpecNames.length === 4 &&
     wizardSpecNames.sort().join() === "budget,msg,name,referrer",
+);
+
+// --- 2.11. Buttons (submit / next / prev) + step headers ---
+check("buttonLabel: plain string passes through", buttonLabel("Send", "Submit") === "Send");
+check("buttonLabel: object label wins", buttonLabel({ label: "Go", variant: "primary" }, "Submit") === "Go");
+check("buttonLabel: object without label → fallback", buttonLabel({ variant: "primary" }, "Submit") === "Submit");
+check("buttonLabel: undefined → fallback", buttonLabel(undefined, "Submit") === "Submit");
+check("buttonVariant: plain string → fallback variant", buttonVariant("Send", "ghost") === "ghost");
+check("buttonVariant: object variant wins", buttonVariant({ label: "Go", variant: "ghost" }, "primary") === "ghost");
+check("buttonVariant: object without variant → fallback", buttonVariant({ label: "Go" }, "primary") === "primary");
+check("buttonVariant: undefined → fallback", buttonVariant(undefined, "primary") === "primary");
+
+const headerWizard = toSteps([
+  { type: "step", label: "A", title: "Alpha", align: "center", line: false },
+  { type: "text", id: "a", name: "a", label: "A" },
+  { type: "step", label: "B", heading: false, align: "full" },
+  { type: "text", id: "b", name: "b", label: "B" },
+]);
+check(
+  "toSteps: step header keys flow onto FormStep",
+  headerWizard.steps[0].title === "Alpha" &&
+    headerWizard.steps[0].align === "center" &&
+    headerWizard.steps[0].line === false &&
+    headerWizard.steps[0].heading === undefined,
+);
+check(
+  "toSteps: heading:false and full align carried",
+  headerWizard.steps[1].heading === false && headerWizard.steps[1].align === "full",
 );
 
 // --- 3. parseTime ---

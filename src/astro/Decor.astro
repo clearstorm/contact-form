@@ -94,6 +94,21 @@ const descriptionSpan = decor.type === "description" ? gridSpan(decor.size ?? 10
     display: none;
   }
 
+  /* "full" — the title sits on its own line with a full-width rule beneath it
+     (instead of flanking rules), still driven by the --rf-heading-line-* tokens. */
+  .rf-heading--full.rf-heading--rule {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .rf-heading--full.rf-heading--rule::before {
+    display: none;
+  }
+
+  .rf-heading--full.rf-heading--rule::after {
+    width: 100%;
+  }
+
   /* Description spans the row via the shared `.rf-span-{1..12}` classes from
      FormField.astro (span from `gridSpan`, default 100 → 12 columns on
      desktop, full-width below 48rem). */

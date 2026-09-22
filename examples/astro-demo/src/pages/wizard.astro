@@ -9,6 +9,9 @@ const wizardForm = wizard as FormSpec;
 const wizardRows: Array<[string, string, string]> = [
   ["step marker", '{ "type": "step", "label": "Contact" }', "opens a new step — everything below it belongs to that group until the next marker"],
   ["final submit", '{ "type": "step", "label": "Details", "submit": "Send enquiry" }', "only the LAST marker’s <code>submit</code> labels the final button; <code>form.submit</code> is the fallback"],
+  ["step header", '{ "type": "step", "label": "Project", "title": "Tell us about your project", "align": "center" }', "each pane opens with a number chip + heading — the same <code>align</code> / <code>line</code> styling as decorative headings (<code>heading: false</code> opts out)"],
+  ["clickable steps", "stepper items behind the current step", "completed steps become links back (no validation — same semantics as Back; “Next” re-validates on the way forward)"],
+  ["button specs", '"submit": { "label": "Send enquiry", "variant": "primary" }', "<code>submit</code> / <code>next</code> / <code>prev</code> each accept a label or <code>{ label, variant }</code> — <code>primary</code> | <code>secondary</code> | <code>ghost</code>"],
   ["shared prefix", "{fields before the first «step» marker}", "rendered once above the stepper — visible on every step, included in every step’s validation"],
   ["hoisted hidden", '{ "type": "hidden", "name": "referrer", "value": "wizard-demo" }', "hidden fields render once outside the panes and are present on every step’s payload"],
   ["cross-step showWhen", '{ "showWhen": { "field": "rush", "operator": "filled" } }', "a field on a later step whose conditions read a checkbox from an earlier step"],
@@ -46,9 +49,11 @@ const wizardRows: Array<[string, string, string]> = [
   </table>
 
   <p class="lead">
-    See <code>examples/specs/wizard.json</code> for the full spec — three steps,
-    a cross-step conditional field (the kick-off date reveals when “This is
-    urgent” is ticked on the previous step) and a hoisted hidden field. Try
-    leaving a required field empty and pressing “Next”.
+    See <code>examples/specs/wizard.json</code> for the full spec — three steps
+    (step 2 shows a centered pane header with its own <code>title</code>, step 3
+    a full-rule header), a cross-step conditional field (the kick-off date
+    reveals when “This is urgent” is ticked on the previous step) and a hoisted
+    hidden field. Try leaving a required field empty and pressing “Next”, then
+    come back and click a completed chip in the stepper.
   </p>
 </DemoLayout>

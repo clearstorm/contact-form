@@ -243,7 +243,8 @@ marker belongs to that step until the next marker; there is **no top-level
   ...                                                 // shared prefix, shown on every step
   { "type": "step", "label": "Contact" },             // step 1
   { "type": "text", "id": "name", "name": "name", "label": "Name", "required": true },
-  { "type": "step", "label": "Project" },             // step 2
+  { "type": "step", "label": "Project", "title": "Tell us about your project",
+    "align": "center" },                              // step 2 (header styling)
   { "type": "select", "id": "budget", "name": "budget", "label": "Budget", "options": ["…"] },
   { "type": "step", "label": "Details", "submit": "Send enquiry" },  // step 3 (final)
   { "type": "textarea", "id": "message", "name": "message", "label": "Project brief" },
@@ -266,14 +267,26 @@ Behaviour:
 - **Next** validates only the current step's in-scope fields (visibility-aware —
   a hidden conditional field can't block a step); **Back never validates**; the
   **final button** validates the visible form (current step + shared prefix)
-  and submits. Only the **last marker's `submit`** labels that button —
-  `form.submit` is the fallback.
-- Copy keys `back` / `next` (defaults `Back` / `Next`) label the nav; the
+  and submits. Only the **last marker's `submit` label** wins on that button —
+  `form.submit`'s label is the fallback.
+- **Step headers** — every pane opens with a header: a number chip plus the
+  step `label` (or a longer `title`) styled like a decorative heading — the
+  same `align` set (`left` / `center` / `right` / `full`) and `line` (on by
+  default). `"heading": false` on a marker renders a bare pane.
+- **Completed steps are clickable** in the stepper — once a step is behind the
+  current one, its chip becomes a link back to it (no validation, like Back;
+  Next re-validates on the way forward), so the visitor can jump straight back
+  to an earlier step to edit it.
+- Buttons are the form spec's `submit` / `next` / `prev`, each a plain label
+  or `{ "label", "variant" }` with `primary` | `secondary` | `ghost`
+  (defaults: `submit`/`next` → primary, `prev` → secondary). Legacy
+  `copy.back` / `copy.next` labels are still honoured as fallbacks. The
   stepper theme ships with `--rf-step-*` / `--rf-steps-*` tokens (see
   [Theming](#theming-rf-custom-properties)).
 
 > Live demo: `/wizard` renders
-> [`examples/specs/wizard.json`](examples/specs/wizard.json) — three steps, a
+> [`examples/specs/wizard.json`](examples/specs/wizard.json) — three steps (a
+> centered step-2 header with its own `title`, a full-rule step-3 header), a
 > cross-step conditional reveal and a hoisted hidden field.
 
 ---
@@ -380,8 +393,8 @@ built-in default**. Put project-specific copy in the form spec:
 | `textarea` | min length | `Message must be at least 10 characters.` |
 | `checkbox` | checkbox/radio required | `Please select this option.` |
 | `sending` | submit button while in flight | `Sending…` |
-| `back` | wizard Back button | `Back` |
-| `next` | wizard Next button (non-final steps) | `Next` |
+| `back` *(deprecated)* | wizard Previous button — use `form.prev` | `Back` |
+| `next` *(deprecated)* | wizard Next button — use `form.next` | `Next` |
 | `error` | generic submission failure | `Something went wrong. Please try again in a moment.` |
 | `invalidForm` | mailer validation failure, no details | `Some fields need your attention. Please check the form.` |
 | `configError` | missing endpoint config | varies by mailer |
@@ -430,6 +443,13 @@ the form itself:
 | `--rf-step-color` | `#9ca3af` | stepper index bubble + label (pending) |
 | `--rf-step-active-color` | `var(--rf-submit-bg)` | stepper current-step bubble |
 | `--rf-step-done-color` | `var(--rf-success)` | stepper completed-step bubble |
+| `--rf-button-secondary-color` | `var(--rf-submit-bg)` | secondary (outline) button text |
+| `--rf-button-secondary-border` | `var(--rf-submit-bg)` | secondary button border |
+| `--rf-button-secondary-hover-bg` | `var(--rf-submit-bg)` | secondary hover background |
+| `--rf-button-secondary-hover-color` | `var(--rf-submit-text)` | secondary hover text |
+| `--rf-button-ghost-color` | `var(--rf-submit-bg)` | ghost (text-only) button text |
+| `--rf-button-ghost-hover-bg` | `color-mix(in srgb, … 10%, transparent)` | ghost hover background |
+| `--rf-step-header-num-color` | `var(--rf-step-active-color)` | pane header number chip |
 | `--rf-color-scheme` | `light` | native form controls (`color-scheme`) |
 
 ### Spacing tokens
@@ -455,6 +475,8 @@ Every hard-coded size is themeable — compact minimums by default:
 | `--rf-steps-gap` | `0.5rem 1rem` | stepper item gap |
 | `--rf-steps-margin` | `0 0 0.5rem` | stepper margin |
 | `--rf-step-footer-gap` | `0.5rem` | Back/Next footer gap |
+| `--rf-step-header-gap` | `0.5rem` | pane header number↔title gap |
+| `--rf-step-header-num-size` | `1.6rem` | pane header number chip size |
 
 Layout: the form is a 12-column grid — use `size` on each field spec for its
 width (default `50`, any of

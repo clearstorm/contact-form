@@ -31,7 +31,7 @@ demo.
 | `/kitchen-sink` | **All 19 field types** in one spec — rendering and every validation rule; checkbox groups, radio, single consent toggle, hidden passthrough; per-field `message` overrides; column sizes spanning the 12-column grid |
 | `/conditional` | **Conditional fields (`showWhen`)** — a realistic form (`equals` service → other, `filled` rush → deadline), an operator-reference form exercising all seven operators (`equals`, `notEquals`, `in`, `notIn`, `includes`, `filled`, `empty`), and an AND form where a reveal needs two conditions to hold; hidden fields are out of scope and out of the payload |
 | `/structure` | **Form structure** — `heading`, `description` (sized helper text), `divider` (rule or invisible spacer) and `section` (labeled break) interleaved with real fields; structural elements never reach `data-rules` or the payload |
-| `/wizard` | **Multi-step wizard (`step` markers)** — three steps with a stepper and Back/Next footer; a shared prefix, a cross-step `showWhen` reveal (step 2's checkbox drives a step 3 field), a hoisted hidden field, and step-scoped “Next” validation |
+| `/wizard` | **Multi-step wizard (`step` markers)** — three steps with a stepper and Back/Next footer; per-step pane headers (centered title on step 2, full-rule on step 3), completed steps clickable to jump back, a shared prefix, a cross-step `showWhen` reveal (step 2's checkbox drives a step 3 field), a hoisted hidden field, and step-scoped “Next” validation |
 | `/contact` | **`cf7` mailer** — endpoint via `config` prop read from `PUBLIC_API_URL` / `PUBLIC_CF7_FORM_ID`; shows the resolved CF7 endpoint (or a friendly config-error note) |
 | `/booking` | **`prefill="datetime"`** — date/time pre-filled and still optional; required guests select; optional extras that fold into the payload |
 | `/json` | **`json` mailer** — posts the canonical payload to the echo server so you can inspect the exact wire format (honeypot dropped, checkbox groups comma-joined, values trimmed) |
@@ -63,7 +63,7 @@ data — edit a spec and the page changes.
 | `conditions.json` | **Conditional fields (operator reference)** — all seven `showWhen` operators, one self-documenting reveal per row (`equals`, `notEquals`, `in`, `notIn`, `includes`, `filled`, `empty`) |
 | `and.json` | **Conditional fields (AND)** — a reveal driven by an array of two conditions (`service` equals `"Other"` **and** `rush` filled) |
 | `structure.json` | **Form structure** — all four structural elements (`heading`, `description`, `divider`, `section`) interleaved with real fields; none of them reach `data-rules` or the payload |
-| `wizard.json` | **Multi-step wizard** — three `step` markers (only the last carries a `submit` label), a shared prefix, a cross-step `showWhen` field, and a hoisted hidden field |
+| `wizard.json` | **Multi-step wizard** — three `step` markers (only the last carries a `submit` label), `submit`/`next`/`prev` as `{ label, variant }` button specs, per-step pane headers (`title`/`align`), a shared prefix, a cross-step `showWhen` field, and a hoisted hidden field |
 | `contact-cf7.json` | The classic CF7 shape (the reference site's general-enquiry form) — `mailer` omitted, so it defaults to `cf7` |
 | `booking.json` | `prefill="datetime"` companion — optional date/time, required guests, optional message |
 | `json-endpoint.json` | `mailer: "json"` with an `endpoint`; a checkbox group to show multi-value joining |

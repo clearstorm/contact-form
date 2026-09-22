@@ -80,8 +80,15 @@ export interface FormCopy {
   checkbox?: string;
   /** Submit button label while the request is in flight. */
   sending?: string;
-  /** Wizard (multi-step) navigation labels — default "Back" / "Next". */
+  /**
+   * @deprecated Wizard Previous label — use `FormSpec.prev` instead. Kept as
+   * a label-only fallback so existing specs keep working.
+   */
   back?: string;
+  /**
+   * @deprecated Wizard Next label — use `FormSpec.next` instead. Kept as a
+   * label-only fallback so existing specs keep working.
+   */
   next?: string;
   /** Generic submission failure shown to the visitor. */
   error?: string;
@@ -171,8 +178,11 @@ export interface FormFieldSpec {
 export interface HeadingSpec {
   type: "heading";
   text: string;
-  /** Horizontal alignment (defaults to "left"). */
-  align?: "left" | "center" | "right";
+  /**
+   * Horizontal alignment (defaults to "left"). "full" renders the title on its
+   * own line with a full-width rule beneath it (instead of flanking rules).
+   */
+  align?: "left" | "center" | "right" | "full";
   /** Flanking rule — on by default; `false` renders the title text only. */
   line?: boolean;
 }
@@ -201,13 +211,35 @@ export interface SectionSpec {
 export type DecorSpec = HeadingSpec | DescriptionSpec | DividerSpec | SectionSpec;
 
 /**
+ * Header options for a wizard step pane: a number chip plus a title with the
+ * same rule/alignment styling as decorative headings. Rendered above the
+ * step's fields by default; `heading: false` opts out.
+ */
+export interface StepHeaderSpec {
+  /** Render the pane header (number + title + rule). Defaults to true. */
+  heading?: boolean;
+  /**
+   * Pane header title — falls back to `label`, which stays short for the
+   * stepper (e.g. label "Details", title "Tell us about your details").
+   */
+  title?: string;
+  /**
+   * Header alignment (defaults to "left") — the heading set, including "full"
+   * (title on its own line, full-width rule beneath).
+   */
+  align?: "left" | "center" | "right" | "full";
+  /** Header rule — on by default; `false` hides it. */
+  line?: boolean;
+}
+
+/**
  * A wizard step boundary (`{ "type": "step", "label": "…" }`). Everything in
  * `FormSpec.fields` below a marker belongs to that step's group until the next
  * marker; elements before the first marker are shared across every step. Like
  * all structural elements it carries no `name`, so it never validates, never
  * serialises into `data-rules`, and never reaches the payload.
  */
-export interface StepSpec {
+export interface StepSpec extends StepHeaderSpec {
   type: "step";
   /** Short label shown in the stepper (e.g. "Contact details"). */
   label: string;
@@ -232,10 +264,44 @@ export function isFieldSpec(element: FormElement): element is FormFieldSpec {
   return typeof (element as FormFieldSpec).name === "string";
 }
 
+/* ---- Buttons (submit / next / prev) ---- */
+
+/** A button's look — themeable via the `--rf-button-*` tokens. */
+export type ButtonVariant = "primary" | "secondary" | "ghost";
+
+/**
+ * A visitor-facing button: a plain label shorthand, or `{ label, variant }`
+ * when styling control is needed. Strings keep working — the object form only
+ * adds the variant (labelled buttons fall back to these defaults per role:
+ * submit/next → "primary", prev → "secondary").
+ */
+export type ButtonSpec =
+  | string
+  | { label?: string; variant?: ButtonVariant };
+
+/** Resolve a button spec to its label, falling back when absent. */
+export function buttonLabel(spec: ButtonSpec | undefined, fallback: string): string {
+  return typeof spec === "string" ? spec : (spec?.label ?? fallback);
+}
+
+/** Resolve a button spec to its variant, falling back when absent. */
+export function buttonVariant(spec: ButtonSpec | undefined, fallback: ButtonVariant): ButtonVariant {
+  return typeof spec === "string" ? fallback : (spec?.variant ?? fallback);
+}
+
 export interface FormSpec {
   /** Baked form identity (e.g. "enquiry" | "booking") — keys data-mail-form, the form id and the JS hooks. */
   name: string;
-  submit: string;
+  /**
+   * Final submit button: a plain label, or `{ label, variant }`. `variant`
+   * defaults to "primary". In a wizard, a final marker's `submit` label
+   * overrides this label.
+   */
+  submit: string | ButtonSpec;
+  /** Wizard Next button — label (default "Next") + optional variant (default "primary"). */
+  next?: ButtonSpec;
+  /** Wizard Previous button — the Back control (default "secondary"). */
+  prev?: ButtonSpec;
   status: string;
   /**
    * Transport adapter used on submit (defaults to "cf7"). "json" posts the
@@ -321,7 +387,7 @@ export function parseFieldSpec(json: string): FieldSpec[] {
 /* ---- Multi-step (wizard) layout ---- */
 
 /** One wizard step: its stepper label and the elements it groups. */
-export interface FormStep {
+export interface FormStep extends StepHeaderSpec {
   label: string;
   /** Submit label for this step's button — kept only on the final step. */
   submit?: string;
@@ -343,9 +409,10 @@ export interface FormLayout {
  * `step` marker become the shared prefix (shown on every step); everything
  * below a marker belongs to that step's group until the next marker.
  * `type: "hidden"` fields are hoisted outside the panes. Only the LAST
- * marker keeps its `submit` label. With no markers the result is a
- * single-page layout — the elements unchanged, hidden fields left in place —
- * so the renderer stays fully backwards compatible.
+ * marker keeps its `submit` label. Step header options (`heading`, `title`,
+ * `align`, `line`) flow through onto each `FormStep`. With no markers the
+ * result is a single-page layout — the elements unchanged, hidden fields left
+ * in place — so the renderer stays fully backwards compatible.
  */
 export function toSteps(elements: FormElement[]): FormLayout {
   const hasMarkers = elements.some((element) => element.type === "step");
@@ -358,7 +425,15 @@ export function toSteps(elements: FormElement[]): FormLayout {
 
   for (const element of elements) {
     if (element.type === "step") {
-      current = { label: element.label, submit: element.submit, elements: [] };
+      current = {
+        label: element.label,
+        submit: element.submit,
+        heading: element.heading,
+        title: element.title,
+        align: element.align,
+        line: element.line,
+        elements: [],
+      };
       steps.push(current);
       continue;
     }

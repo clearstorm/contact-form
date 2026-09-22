@@ -19,6 +19,8 @@
  */
 import FormElements from "./FormElements.astro";
 import {
+  buttonLabel,
+  buttonVariant,
   serializeRules,
   toFieldSpecs,
   toSteps,
@@ -60,11 +62,22 @@ const flatElements =
   layout.steps.length <= 1
     ? [...layout.shared, ...(layout.steps[0]?.elements ?? []), ...layout.hoisted]
     : [];
-// Only the last marker's submit label is honoured (enforced in `toSteps`);
-// `form.submit` is the fallback for the final button.
-const finalSubmitLabel = layout.steps[layout.steps.length - 1]?.submit ?? form.submit;
-const stepsMeta = layout.steps.map((step) => ({ label: step.label, submit: step.submit }));
-const backLabel = form.copy?.back ?? "Back";
+// Buttons: form.submit / form.next / form.prev accept a plain label or
+// `{ label?, variant? }`. Only the last marker's submit label is honoured
+// (enforced in `toSteps`) and overrides the final button's label; legacy
+// copy.back / copy.next stay as label-only fallbacks.
+const singleSubmitLabel = buttonLabel(form.submit, "Submit");
+const finalSubmitLabel =
+  layout.steps[layout.steps.length - 1]?.submit ?? singleSubmitLabel;
+const nextLabel = buttonLabel(form.next, form.copy?.next ?? "Next");
+const prevLabel = buttonLabel(form.prev, form.copy?.back ?? "Back");
+const submitVariant = buttonVariant(form.submit, "primary");
+const nextVariant = buttonVariant(form.next, "primary");
+const prevVariant = buttonVariant(form.prev, "secondary");
+const stepsMeta = layout.steps.map((step) => ({
+  label: step.label,
+  submit: step.submit,
+}));
 
 // Endpoint config — explicit props win, else the form spec's own block.
 const wpUrl = config.apiUrl ?? form.cf7?.apiUrl;
@@ -96,7 +109,14 @@ if (
   data-rules={serializeRules(fieldConfig)}
   data-copy={form.copy ? JSON.stringify(form.copy) : undefined}
   data-steps={
-    isWizard ? JSON.stringify({ steps: stepsMeta, submit: finalSubmitLabel }) : undefined
+    isWizard
+      ? JSON.stringify({
+          steps: stepsMeta,
+          next: { label: nextLabel, variant: nextVariant },
+          prev: { label: prevLabel, variant: prevVariant },
+          submit: { label: finalSubmitLabel, variant: submitVariant },
+        })
+      : undefined
   }
   novalidate
 >
@@ -109,9 +129,22 @@ if (
       )}
       <ol class="rf-steps" data-steps-nav aria-label="Form progress">
         {layout.steps.map((step, i) => (
-          <li class="rf-step" data-step={i} aria-current={i === 0 ? "step" : undefined}>
-            <span class="rf-step-index" aria-hidden="true">{i + 1}</span>
-            <span class="rf-step-label">{step.label}</span>
+          <li
+            class="rf-step"
+            data-step={i}
+            aria-current={i === 0 ? "step" : undefined}
+          >
+            <button
+              class="rf-step-btn"
+              type="button"
+              data-step-jump={i}
+              disabled
+              aria-disabled="true"
+              aria-label={`Go to step ${i + 1}: ${step.label}`}
+            >
+              <span class="rf-step-index" aria-hidden="true">{i + 1}</span>
+              <span class="rf-step-label">{step.label}</span>
+            </button>
           </li>
         ))}
       </ol>
@@ -122,16 +155,37 @@ if (
           hidden={i !== 0}
           inert={i !== 0 ? "true" : undefined}
         >
+          {step.heading !== false && (
+            <header class="rf-step-header" tabindex="-1">
+              <span class="rf-step-header-num" aria-hidden="true">{i + 1}</span>
+              <h3
+                class={`rf-heading rf-heading--${step.align ?? "left"}${
+                  step.line !== false ? " rf-heading--rule" : ""
+                }`}
+              >
+                {step.title ?? step.label}
+              </h3>
+            </header>
+          )}
           <FormElements elements={step.elements} />
         </section>
       ))}
       {layout.hoisted.length > 0 && <FormElements elements={layout.hoisted} />}
       <div class="rf-step-footer" data-step-footer>
-        <button class="rf-submit" type="button" data-step-back hidden>
-          ← {backLabel}
+        <button
+          class={`rf-submit rf-submit--${prevVariant}`}
+          type="button"
+          data-step-back
+          hidden
+        >
+          <span aria-hidden="true">←</span> {prevLabel}
         </button>
-        <button class="rf-submit" type="submit" data-step-next>
-          {finalSubmitLabel} <span aria-hidden="true">→</span>
+        <button
+          class={`rf-submit rf-submit--${nextVariant}`}
+          type="submit"
+          data-step-next
+        >
+          <span data-next-label>{nextLabel}</span> <span aria-hidden="true">→</span>
         </button>
       </div>
     </>
@@ -139,7 +193,12 @@ if (
     <>
       <FormElements elements={flatElements} />
       <div class="rf-submit-row">
-        <button class="rf-submit" type="submit">{form.submit} <span aria-hidden="true">→</span></button>
+        <button
+          class={`rf-submit rf-submit--${submitVariant}`}
+          type="submit"
+        >
+          {singleSubmitLabel} <span aria-hidden="true">→</span>
+        </button>
       </div>
     </>
   )}
@@ -187,6 +246,13 @@ if (
     --rf-submit-padding-x: 1.1rem;
     --rf-submit-gap: 0.5rem;
     --rf-submit-margin-top: 0.25rem;
+    /* buttons — secondary (outline) and ghost (text-only) variants */
+    --rf-button-secondary-color: var(--rf-submit-bg);
+    --rf-button-secondary-border: var(--rf-submit-bg);
+    --rf-button-secondary-hover-bg: var(--rf-submit-bg);
+    --rf-button-secondary-hover-color: var(--rf-submit-text);
+    --rf-button-ghost-color: var(--rf-submit-bg);
+    --rf-button-ghost-hover-bg: color-mix(in srgb, var(--rf-submit-bg) 10%, transparent);
     --rf-status-padding: 0.75rem;
     /* wizard (multi-step) — stepper, panes and nav footer */
     --rf-step-color: #9ca3af;
@@ -197,6 +263,9 @@ if (
     --rf-steps-gap: 0.5rem 1rem;
     --rf-steps-margin: 0 0 0.5rem;
     --rf-step-footer-gap: 0.5rem;
+    --rf-step-header-gap: 0.5rem;
+    --rf-step-header-num-size: 1.6rem;
+    --rf-step-header-num-color: var(--rf-step-active-color);
     /* structural elements (headings, descriptions, dividers, sections) */
     --rf-heading-size: 1rem;
     --rf-heading-weight: 700;
@@ -250,7 +319,7 @@ if (
     letter-spacing: 0.09em;
     line-height: 1;
     text-transform: uppercase;
-    transition: background-color 150ms, color 150ms;
+    transition: background-color 150ms, color 150ms, border-color 150ms;
     cursor: pointer;
   }
 
@@ -261,6 +330,32 @@ if (
 
   .rf-submit:disabled {
     cursor: default;
+  }
+
+  /* Variants (default = "primary", above). Specificity equal to
+     `.rf-submit:hover`, so declared after it to win on hover. */
+  .rf-submit--secondary {
+    background: transparent;
+    border-color: var(--rf-button-secondary-border);
+    color: var(--rf-button-secondary-color);
+  }
+
+  .rf-submit--secondary:hover {
+    background: var(--rf-button-secondary-hover-bg);
+    border-color: var(--rf-button-secondary-hover-bg);
+    color: var(--rf-button-secondary-hover-color);
+  }
+
+  .rf-submit--ghost {
+    background: transparent;
+    border-color: transparent;
+    color: var(--rf-button-ghost-color);
+  }
+
+  .rf-submit--ghost:hover {
+    background: var(--rf-button-ghost-hover-bg);
+    border-color: transparent;
+    color: var(--rf-button-ghost-color);
   }
 
   /* Status box — success colours by default; .rf-status--error switches them. */
@@ -331,6 +426,31 @@ if (
     gap: 0.45rem;
   }
 
+  /* The stepper content is a button so completed steps are clickable;
+     disabled until the visit passes that step (no forward jumps). */
+  .rf-step-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    color: inherit;
+    cursor: default;
+  }
+
+  .rf-step-btn:disabled {
+    color: inherit; /* the step tokens decide the look — don't let the UA grey it */
+    opacity: 1;
+  }
+
+  .rf-step-btn:focus-visible {
+    outline: 2px solid var(--rf-focus);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
   .rf-step-index {
     display: inline-flex;
     align-items: center;
@@ -363,6 +483,44 @@ if (
   .rf-step--done .rf-step-index {
     border-color: var(--rf-step-done-color, var(--rf-success));
     color: var(--rf-step-done-color, var(--rf-success));
+  }
+
+  .rf-step--done .rf-step-btn {
+    cursor: pointer;
+  }
+
+  .rf-step--done .rf-step-btn:hover .rf-step-index {
+    background: var(--rf-step-done-color, var(--rf-success));
+    color: var(--rf-submit-text);
+  }
+
+  /* Step pane header — number chip + heading, reuse the heading rule tokens. */
+  .rf-step-header {
+    grid-column: span 12;
+    display: flex;
+    align-items: center;
+    gap: var(--rf-step-header-gap, 0.5rem);
+    margin: var(--rf-heading-margin, 0.25rem 0 0);
+  }
+
+  .rf-step-header-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: var(--rf-step-header-num-size, 1.6rem);
+    height: var(--rf-step-header-num-size, 1.6rem);
+    border: 1px solid var(--rf-step-header-num-color, var(--rf-step-active-color));
+    border-radius: 50%;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--rf-step-header-num-color, var(--rf-step-active-color));
+  }
+
+  .rf-step-header .rf-heading {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
   }
 
   .rf-step-footer {
@@ -410,6 +568,7 @@ if (
     parseFieldSpec,
     validateValue,
     visibleNames,
+    type ButtonVariant,
     type FieldSpec,
     type Rule,
     type FormCopy,
@@ -732,7 +891,12 @@ if (
        every step's fields travel in the payload. "Next" validates only the
        current step's in-scope fields; the final button validates the visible
        form (current step + shared prefix) and submits. */
-    let stepsMeta: { steps: { label: string; submit?: string }[]; submit: string } | null = null;
+    let stepsMeta: {
+      steps: { label: string; submit?: string }[];
+      next: { label: string; variant: ButtonVariant };
+      prev: { label: string; variant: ButtonVariant };
+      submit: { label: string; variant: ButtonVariant };
+    } | null = null;
     if (form.dataset.steps) {
       try {
         stepsMeta = JSON.parse(form.dataset.steps) as typeof stepsMeta;
@@ -752,7 +916,7 @@ if (
           return pane === null || Number(pane.dataset.pane) === step;
         });
 
-    const goTo = (step: number): void => {
+    const goTo = (step: number, options?: { focus?: boolean }): void => {
       currentStep = step;
       form.querySelectorAll<HTMLElement>("[data-pane]").forEach((pane, i) => {
         const active = i === step;
@@ -761,18 +925,45 @@ if (
         else pane.setAttribute("inert", "");
       });
       form.querySelectorAll<HTMLElement>("[data-step]").forEach((item, i) => {
-        item.classList.toggle("rf-step--done", i < step);
+        const done = i < step;
+        item.classList.toggle("rf-step--done", done);
         if (i === step) item.setAttribute("aria-current", "step");
         else item.removeAttribute("aria-current");
+      });
+      // Completed steps become clickable to jump back (no validation — the
+      // forward path always re-validates, so order is never bypassed).
+      form.querySelectorAll<HTMLButtonElement>("[data-step-jump]").forEach((btn) => {
+        const done = Number(btn.dataset.stepJump) < step;
+        btn.disabled = !done;
+        btn.setAttribute("aria-disabled", String(!done));
       });
       const back = form.querySelector<HTMLButtonElement>("[data-step-back]");
       if (back) back.hidden = step === 0;
       const next = form.querySelector<HTMLButtonElement>("[data-step-next]");
-      if (next) {
-        next.textContent =
-          step < stepCount - 1 ? copy.next ?? "Next" : (stepsMeta?.submit ?? "");
+      const nextLabel = next?.querySelector<HTMLElement>("[data-next-label]");
+      if (nextLabel) {
+        nextLabel.textContent =
+          step < stepCount - 1
+            ? (stepsMeta?.next.label ?? copy.next ?? "Next")
+            : (stepsMeta?.submit.label ?? "");
+      }
+      // On the final step the button also takes the submit button's variant.
+      if (next && stepsMeta) {
+        next.classList.toggle(
+          `rf-submit--${stepsMeta.next.variant}`,
+          step < stepCount - 1,
+        );
+        next.classList.toggle(
+          `rf-submit--${stepsMeta.submit.variant}`,
+          step === stepCount - 1,
+        );
       }
       visibility.apply();
+      if (options?.focus) {
+        form
+          .querySelector<HTMLElement>(`[data-pane="${step}"] .rf-step-header`)
+          ?.focus();
+      }
     };
 
     form.addEventListener("submit", (event) => {
@@ -799,6 +990,15 @@ if (
         return;
       }
       void handleSubmit(event, fields, mailerName, successMessage, copy, visibility, stepControls);
+    });
+
+    // Stepper: completed steps are clickable and jump back without validation
+    // (same semantics as Back — Next re-validates whatever it crosses).
+    form.querySelectorAll<HTMLButtonElement>("[data-step-jump]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const target = Number(btn.dataset.stepJump);
+        if (!btn.disabled && target < currentStep) goTo(target, { focus: true });
+      });
     });
 
     // Conditional fields: re-evaluate whenever a controlling control changes.

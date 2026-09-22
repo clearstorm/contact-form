@@ -210,19 +210,10 @@ export interface SectionSpec {
 
 export type DecorSpec = HeadingSpec | DescriptionSpec | DividerSpec | SectionSpec;
 
-/**
- * Header options for a wizard step pane: a number chip plus a title with the
- * same rule/alignment styling as decorative headings. Rendered above the
- * step's fields by default; `heading: false` opts out.
- */
-export interface StepHeaderSpec {
-  /** Render the pane header (number + title + rule). Defaults to true. */
-  heading?: boolean;
-  /**
-   * Pane header title — falls back to `label`, which stays short for the
-   * stepper (e.g. label "Details", title "Tell us about your details").
-   */
-  title?: string;
+/** Global defaults for a wizard step pane's header (see `StepHeaderSpec`). */
+export interface StepHeaderDefaults {
+  /** Render the pane header (number + title + rule) — default true. */
+  show?: boolean;
   /**
    * Header alignment (defaults to "left") — the heading set, including "full"
    * (title on its own line, full-width rule beneath).
@@ -230,6 +221,20 @@ export interface StepHeaderSpec {
   align?: "left" | "center" | "right" | "full";
   /** Header rule — on by default; `false` hides it. */
   line?: boolean;
+}
+
+/**
+ * Header options for a wizard step pane: a number chip plus a title with the
+ * same rule/alignment styling as decorative headings. Rendered above the
+ * step's fields by default; `show: false` opts out. A marker's own keys
+ * override the global `stepper.header` defaults.
+ */
+export interface StepHeaderSpec extends StepHeaderDefaults {
+  /**
+   * Pane header title — falls back to `label`, which stays short for the
+   * stepper (e.g. label "Details", title "Tell us about your details").
+   */
+  title?: string;
 }
 
 /**
@@ -289,28 +294,50 @@ export function buttonVariant(spec: ButtonSpec | undefined, fallback: ButtonVari
   return typeof spec === "string" ? fallback : (spec?.variant ?? fallback);
 }
 
-/* ---- Stepper (wizard navigation strip) ---- */
+/* ---- Stepper (wizard chrome: navigation strip + pane headers) ---- */
 
 /**
- * Opt-in styling for the wizard stepper (`<ol class="rf-steps">`). Defaults
- * (`align: "left"`, no line) reproduce the plain flex row. `line` flanks the
- * step chips like a pane header — left → rule fills the right of the row,
- * right → rule on the left, center → rules both sides; with `space-evenly` a
- * flank can't flex, so the rule runs full-width beneath the row instead.
+ * The wizard navigation strip itself (the `<ol class="rf-steps">`). Every key
+ * is optional — defaults reproduce the plain left-aligned strip with numbered
+ * labelled chips and clickable completed steps.
+ */
+export interface StepperNavSpec {
+  /** Show the step number chip — default true. */
+  number?: boolean;
+  /** Show the step label — default true. */
+  label?: boolean;
+  /** Horizontal alignment of the strip — default "left". */
+  variant?: "left" | "center" | "right" | "even";
+  /**
+   * Rule position — default "none". "top" / "bottom" draw a full-width rule
+   * above / below the strip. "center" flanks the chips like a pane header,
+   * weighted by `variant` (left → rule fills the right of the row, right →
+   * rule on the left, center → both sides); with `variant: "even"` a flank
+   * can't flex, so the rule runs full-width beneath the row instead.
+   */
+  line?: "none" | "top" | "bottom" | "center";
+  /** Completed steps clickable to jump back — default true. */
+  clickable?: boolean;
+}
+
+/**
+ * Opt-in configuration for the wizard chrome. Defaults reproduce the plain
+ * wizard — a left-aligned step strip, and a number-chip header on each pane.
  */
 export interface StepperSpec {
-  /** Horizontal alignment (defaults to "left"). */
-  align?: "left" | "center" | "right" | "space-evenly";
-  /** Flanking rule — off by default. */
-  line?: boolean;
+  /** The navigation strip. */
+  nav?: StepperNavSpec;
+  /** Global pane-header defaults; per-marker keys override them per step. */
+  header?: StepHeaderDefaults;
 }
 
 /** Modifier classes for the stepper ("rf-steps--…"), empty when default. */
 export function stepperModifiers(stepper: StepperSpec | undefined): string {
-  if (!stepper) return "";
+  const nav = stepper?.nav;
+  if (!nav) return "";
   const parts: string[] = [];
-  if (stepper.align && stepper.align !== "left") parts.push(`rf-steps--${stepper.align}`);
-  if (stepper.line) parts.push("rf-steps--line");
+  if (nav.variant && nav.variant !== "left") parts.push(`rf-steps--${nav.variant}`);
+  if (nav.line && nav.line !== "none") parts.push(`rf-steps--line-${nav.line}`);
   return parts.join(" ");
 }
 
@@ -327,7 +354,7 @@ export interface FormSpec {
   next?: ButtonSpec;
   /** Wizard Previous button — the Back control (default "secondary"). */
   prev?: ButtonSpec;
-  /** Opt-in wizard stepper styling (alignment + flanking line). */
+  /** Opt-in wizard chrome config (stepper strip + pane-header defaults). */
   stepper?: StepperSpec;
   status: string;
   /**
@@ -436,7 +463,7 @@ export interface FormLayout {
  * `step` marker become the shared prefix (shown on every step); everything
  * below a marker belongs to that step's group until the next marker.
  * `type: "hidden"` fields are hoisted outside the panes. Only the LAST
- * marker keeps its `submit` label. Step header options (`heading`, `title`,
+ * marker keeps its `submit` label. Step header options (`show`, `title`,
  * `align`, `line`) flow through onto each `FormStep`. With no markers the
  * result is a single-page layout — the elements unchanged, hidden fields left
  * in place — so the renderer stays fully backwards compatible.
@@ -455,7 +482,7 @@ export function toSteps(elements: FormElement[]): FormLayout {
       current = {
         label: element.label,
         submit: element.submit,
-        heading: element.heading,
+        show: element.show,
         title: element.title,
         align: element.align,
         line: element.line,

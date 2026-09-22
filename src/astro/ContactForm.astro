@@ -79,8 +79,29 @@ const stepsMeta = layout.steps.map((step) => ({
   label: step.label,
   submit: step.submit,
 }));
-// Stepper styling — opt-in; empty by default (plain left-aligned row).
-const stepperMods = stepperModifiers(form.stepper);
+// Wizard chrome (opt-in `stepper` form key): nav strip flags and the
+// pane-header defaults. Marker-level keys override the header defaults per
+// step; the nav defaults (numbers + labels, clickable) preserve the plain
+// wizard unless a consumer opts out.
+const stepper = form.stepper;
+const stepsNav = stepper?.nav ?? {};
+const navNumber = stepsNav.number !== false;
+const navLabel = stepsNav.label !== false;
+const navClickable = stepsNav.clickable !== false;
+const headerDefaults = stepper?.header ?? {};
+const stepHeader = (
+  step: { show?: boolean; align?: "left" | "center" | "right" | "full"; line?: boolean },
+) => ({
+  show: step.show ?? headerDefaults.show ?? true,
+  align: (step.align ?? headerDefaults.align ?? "left") as
+    | "left"
+    | "center"
+    | "right"
+    | "full",
+  line: step.line ?? headerDefaults.line ?? true,
+});
+// Stepper modifier classes — empty when default (plain left-aligned row).
+const stepperMods = stepperModifiers(stepper);
 
 // Endpoint config — explicit props win, else the form spec's own block.
 const wpUrl = config.apiUrl ?? form.cf7?.apiUrl;
@@ -141,33 +162,49 @@ if (
             data-step={i}
             aria-current={i === 0 ? "step" : undefined}
           >
-            <button
-              class="rf-step-btn"
-              type="button"
-              data-step-jump={i}
-              disabled
-              aria-disabled="true"
-              aria-label={`Go to step ${i + 1}: ${step.label}`}
-            >
-              <span class="rf-step-index" aria-hidden="true">{i + 1}</span>
-              <span class="rf-step-label">{step.label}</span>
-            </button>
+            {navClickable ? (
+              <button
+                class="rf-step-btn"
+                type="button"
+                data-step-jump={i}
+                disabled
+                aria-disabled="true"
+                aria-label={`Go to step ${i + 1}: ${step.label}`}
+              >
+                {navNumber && (
+                  <span class="rf-step-index" aria-hidden="true">{i + 1}</span>
+                )}
+                {navLabel && <span class="rf-step-label">{step.label}</span>}
+              </button>
+            ) : (
+              <span
+                class="rf-step-btn"
+                aria-label={`Step ${i + 1}: ${step.label}`}
+              >
+                {navNumber && (
+                  <span class="rf-step-index" aria-hidden="true">{i + 1}</span>
+                )}
+                {navLabel && <span class="rf-step-label">{step.label}</span>}
+              </span>
+            )}
           </li>
         ))}
       </ol>
-      {layout.steps.map((step, i) => (
+      {layout.steps.map((step, i) => {
+        const header = stepHeader(step);
+        return (
         <section
           class="rf-pane"
           data-pane={i}
           hidden={i !== 0}
           inert={i !== 0 ? "true" : undefined}
         >
-          {step.heading !== false && (
+          {header.show && (
             <header class="rf-step-header" tabindex="-1">
               <span class="rf-step-header-num" aria-hidden="true">{i + 1}</span>
               <h3
-                class={`rf-heading rf-heading--${step.align ?? "left"}${
-                  step.line !== false ? " rf-heading--rule" : ""
+                class={`rf-heading rf-heading--${header.align}${
+                  header.line ? " rf-heading--rule" : ""
                 }`}
               >
                 {step.title ?? step.label}
@@ -176,7 +213,8 @@ if (
           )}
           <FormElements elements={step.elements} />
         </section>
-      ))}
+        );
+      })}
       {layout.hoisted.length > 0 && <FormElements elements={layout.hoisted} />}
       <div class="rf-step-footer" data-step-footer>
         <button
@@ -430,7 +468,8 @@ if (
     list-style: none;
   }
 
-  /* Alignment — opt-in via `FormSpec.stepper.align` (default left). */
+  /* Alignment — opt-in via `StepperSpec.nav.variant` (default left),
+     `even` = space-evenly. */
   .rf-steps--center {
     justify-content: center;
   }
@@ -439,43 +478,56 @@ if (
     justify-content: flex-end;
   }
 
-  .rf-steps--space-evenly {
+  .rf-steps--even {
     justify-content: space-evenly;
   }
 
-  /* Line — flank the strip like a pane header: left → rule right of the row,
-     right → rule on the left, center → rules both sides. With space-evenly a
-     flank can't flex, so the rule runs full-width beneath the row instead. */
-  .rf-steps--line {
-    align-items: center;
+  /* Lines — opt-in via `StepperSpec.nav.line`. top/bottom draw a full-width
+     rule above/below the strip; center flanks the chips like a pane header,
+     weighted by the variant (left → rule right of the row, right → rule on
+     the left, center → both sides). With variant "even" a flank can't flex,
+     so center falls back to a rule beneath the row. */
+  .rf-steps--line-top {
+    border-top: var(--rf-steps-line-thickness, 1px) solid
+      var(--rf-steps-line-color, #d1d5db);
+    padding-top: var(--rf-steps-line-gap, 0.75rem);
+  }
+
+  .rf-steps--line-bottom {
+    border-bottom: var(--rf-steps-line-thickness, 1px) solid
+      var(--rf-steps-line-color, #d1d5db);
+    padding-bottom: var(--rf-steps-line-gap, 0.75rem);
+  }
+
+  .rf-steps--line-center {
     gap: var(--rf-steps-line-gap, 0.75rem);
   }
 
-  .rf-steps--line::before,
-  .rf-steps--line::after {
+  .rf-steps--line-center::before,
+  .rf-steps--line-center::after {
     content: "";
     flex: 1;
     border-top: var(--rf-steps-line-thickness, 1px) solid
       var(--rf-steps-line-color, #d1d5db);
   }
 
-  .rf-steps--left.rf-steps--line::before {
+  .rf-steps--left.rf-steps--line-center::before {
     display: none;
   }
 
-  .rf-steps--right.rf-steps--line::after {
+  .rf-steps--right.rf-steps--line-center::after {
     display: none;
   }
 
-  .rf-steps--space-evenly.rf-steps--line {
+  .rf-steps--even.rf-steps--line-center {
     gap: var(--rf-steps-gap, 0.5rem 1rem);
     padding-bottom: calc(var(--rf-steps-line-thickness, 1px) * 2);
     border-bottom: var(--rf-steps-line-thickness, 1px) solid
       var(--rf-steps-line-color, #d1d5db);
   }
 
-  .rf-steps--space-evenly.rf-steps--line::before,
-  .rf-steps--space-evenly.rf-steps--line::after {
+  .rf-steps--even.rf-steps--line-center::before,
+  .rf-steps--even.rf-steps--line-center::after {
     display: none;
   }
 

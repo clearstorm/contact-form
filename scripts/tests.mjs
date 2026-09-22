@@ -301,7 +301,7 @@ check("buttonVariant: undefined → fallback", buttonVariant(undefined, "primary
 const headerWizard = toSteps([
   { type: "step", label: "A", title: "Alpha", align: "center", line: false },
   { type: "text", id: "a", name: "a", label: "A" },
-  { type: "step", label: "B", heading: false, align: "full" },
+  { type: "step", label: "B", show: false, align: "full" },
   { type: "text", id: "b", name: "b", label: "B" },
 ]);
 check(
@@ -309,29 +309,41 @@ check(
   headerWizard.steps[0].title === "Alpha" &&
     headerWizard.steps[0].align === "center" &&
     headerWizard.steps[0].line === false &&
-    headerWizard.steps[0].heading === undefined,
+    headerWizard.steps[0].show === undefined,
 );
 check(
-  "toSteps: heading:false and full align carried",
-  headerWizard.steps[1].heading === false && headerWizard.steps[1].align === "full",
+  "toSteps: show:false and full align carried",
+  headerWizard.steps[1].show === false && headerWizard.steps[1].align === "full",
 );
 
-// --- 2.12. Stepper styling (align + line) ---
+// --- 2.12. Stepper chrome (nav strip modifiers) ---
 check("stepperModifiers: undefined → none", stepperModifiers(undefined) === "");
 check(
-  "stepperModifiers: defaults (left, no line) → none",
-  stepperModifiers({}) === "" && stepperModifiers({ align: "left" }) === "",
+  "stepperModifiers: no nav / left+none → none",
+  stepperModifiers({}) === "" &&
+    stepperModifiers({ nav: {} }) === "" &&
+    stepperModifiers({ nav: { variant: "left", line: "none" } }) === "",
 );
-check("stepperModifiers: center", stepperModifiers({ align: "center" }) === "rf-steps--center");
-check("stepperModifiers: right", stepperModifiers({ align: "right" }) === "rf-steps--right");
 check(
-  "stepperModifiers: space-evenly",
-  stepperModifiers({ align: "space-evenly" }) === "rf-steps--space-evenly",
+  "stepperModifiers: variants",
+  stepperModifiers({ nav: { variant: "center" } }) === "rf-steps--center" &&
+    stepperModifiers({ nav: { variant: "right" } }) === "rf-steps--right" &&
+    stepperModifiers({ nav: { variant: "even" } }) === "rf-steps--even",
 );
-check("stepperModifiers: line adds class", stepperModifiers({ line: true }) === "rf-steps--line");
 check(
-  "stepperModifiers: combined",
-  stepperModifiers({ align: "center", line: true }) === "rf-steps--center rf-steps--line",
+  "stepperModifiers: line positions",
+  stepperModifiers({ nav: { line: "top" } }) === "rf-steps--line-top" &&
+    stepperModifiers({ nav: { line: "bottom" } }) === "rf-steps--line-bottom" &&
+    stepperModifiers({ nav: { line: "center" } }) === "rf-steps--line-center",
+);
+check(
+  "stepperModifiers: combined variant + line",
+  stepperModifiers({ nav: { variant: "center", line: "center" } }) ===
+    "rf-steps--center rf-steps--line-center",
+);
+check(
+  "stepperModifiers: header-only stepper → none",
+  stepperModifiers({ header: { align: "center", line: false } }) === "",
 );
 
 // --- 3. parseTime ---

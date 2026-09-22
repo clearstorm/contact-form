@@ -238,15 +238,20 @@ marker belongs to that step until the next marker; there is **no top-level
 `steps` key and no per-field step index** — the markers are the layout:
 
 ```jsonc
+"stepper": {
+  "nav":    { "variant": "center", "line": "center" },  // opt-in strip styling
+  "header": { "align": "center" }                       // pane-header defaults
+},
 "fields": [
   { "type": "heading", "text": "Project enquiry" },   // before the 1st marker →
   ...                                                 // shared prefix, shown on every step
   { "type": "step", "label": "Contact" },             // step 1
   { "type": "text", "id": "name", "name": "name", "label": "Name", "required": true },
-  { "type": "step", "label": "Project", "title": "Tell us about your project",
-    "align": "center" },                              // step 2 (header styling)
+  { "type": "step", "label": "Project",
+    "title": "Tell us about your project" },          // step 2 (title overrides label)
   { "type": "select", "id": "budget", "name": "budget", "label": "Budget", "options": ["…"] },
-  { "type": "step", "label": "Details", "submit": "Send enquiry" },  // step 3 (final)
+  { "type": "step", "label": "Details", "align": "right",
+    "submit": "Send enquiry" },                       // step 3 (per-marker override)
   { "type": "textarea", "id": "message", "name": "message", "label": "Project brief" },
   { "type": "hidden", "id": "referrer", "name": "referrer", "value": "wizard-demo" }
 ]
@@ -269,19 +274,23 @@ Behaviour:
   **final button** validates the visible form (current step + shared prefix)
   and submits. Only the **last marker's `submit` label** wins on that button —
   `form.submit`'s label is the fallback.
-- **Step headers** — every pane opens with a header: a number chip plus the
-  step `label` (or a longer `title`) styled like a decorative heading — the
-  same `align` set (`left` / `center` / `right` / `full`) and `line` (on by
-  default). `"heading": false` on a marker renders a bare pane.
+- **Step headers + stepper chrome (opt-in `stepper` key)** — a top-level
+  `stepper` form key is the one place wizard chrome lives: `nav` styles the
+  strip (`variant`: `left` / `center` / `right` / `even`; `line`:
+  `none` / `top` / `bottom` / `center`; `number` / `label` toggle the chip
+  and text; `clickable` toggles the jump-back links), and `header` sets the
+  pane-header defaults (`show` / `align` / `line`). Every pane opens with a
+  header by default — a number chip plus the step `label` (or a longer
+  `title`) styled like a decorative heading. A marker's own `show` /
+  `title` / `align` / `line` override the `header` defaults per step
+  (`"show": false` on a marker renders a bare pane). Without a `stepper`
+  key the wizard renders its plain defaults — left-aligned strip, no rules,
+  numbered+labelled clickable steps, numeric pane headers.
 - **Completed steps are clickable** in the stepper — once a step is behind the
   current one, its chip becomes a link back to it (no validation, like Back;
   Next re-validates on the way forward), so the visitor can jump straight back
-  to an earlier step to edit it.
-- **Stepper styling (opt-in)** — a top-level `stepper` form key aligns the
-  navigation strip (`align`: `left` / `center` / `right` / `space-evenly`) and
-  optionally flanks it with a rule (`line: true`, like a pane header;
-  `space-evenly` falls back to a rule beneath the row). Defaults reproduce a
-  plain left-aligned strip.
+  to an earlier step to edit it. `stepper.nav.clickable: false` turns the
+  strip into the plain informational stepper.
 - Buttons are the form spec's `submit` / `next` / `prev`, each a plain label
   or `{ "label", "variant" }` with `primary` | `secondary` | `ghost`
   (defaults: `submit`/`next` → primary, `prev` → secondary). Legacy
@@ -291,8 +300,10 @@ Behaviour:
 
 > Live demo: `/wizard` renders
 > [`examples/specs/wizard.json`](examples/specs/wizard.json) — three steps (a
-> centered step-2 header with its own `title`, a full-rule step-3 header), a
-> cross-step conditional reveal and a hoisted hidden field.
+> centered, rule-flanked stepper; step 2 centers its pane header via the
+> `stepper.header` default with its own `title`; step 3 overrides to a
+> rule-left / title-right header), a cross-step conditional reveal and a
+> hoisted hidden field.
 
 ---
 
@@ -481,7 +492,7 @@ Every hard-coded size is themeable — compact minimums by default:
 | `--rf-steps-margin` | `0 0 0.5rem` | stepper margin |
 | `--rf-steps-line-color` | `var(--rf-field-border)` | stepper flanking rule colour |
 | `--rf-steps-line-thickness` | `1px` | stepper flanking rule thickness |
-| `--rf-steps-line-gap` | `0.75rem` | stepper flanking rule gap (`space-evenly` uses the item gap instead) |
+| `--rf-steps-line-gap` | `0.75rem` | stepper rule gap (`top`/`bottom` lines; `even` + `center` uses the item gap instead) |
 | `--rf-step-footer-gap` | `0.5rem` | Back/Next footer gap |
 | `--rf-step-header-gap` | `0.5rem` | pane header number↔title gap |
 | `--rf-step-header-num-size` | `1.6rem` | pane header number chip size |

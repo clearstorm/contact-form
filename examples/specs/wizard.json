@@ -3,7 +3,10 @@
   "submit": { "label": "Send enquiry", "variant": "primary" },
   "next": { "label": "Next", "variant": "primary" },
   "prev": { "label": "Previous", "variant": "secondary" },
-  "stepper": { "align": "center", "line": true },
+  "stepper": {
+    "nav": { "variant": "center", "line": "center" },
+    "header": { "align": "center" }
+  },
   "status": "Thanks — the multi-step form worked end to end.",
   "mailer": "json",
   "endpoint": "http://localhost:8787/submit",
@@ -51,8 +54,7 @@
     {
       "type": "step",
       "label": "Project",
-      "title": "Tell us about your project",
-      "align": "center"
+      "title": "Tell us about your project"
     },
     {
       "type": "select",

@@ -313,7 +313,7 @@ export interface StepperNavSpec {
    * above / below the strip. "center" flanks the chips like a pane header,
    * weighted by `variant` (left → rule fills the right of the row, right →
    * rule on the left, center → both sides); with `variant: "even"` a flank
-   * can't flex, so the rule runs full-width beneath the row instead.
+   * can't flex, so the rules run vertically between the chips instead.
    */
   line?: "none" | "top" | "bottom" | "center";
   /** Completed steps clickable to jump back — default true. */

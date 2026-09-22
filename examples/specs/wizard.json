@@ -4,7 +4,7 @@
   "next": { "label": "Next", "variant": "primary" },
   "prev": { "label": "Previous", "variant": "secondary" },
   "stepper": {
-    "nav": { "variant": "center", "line": "center" },
+    "nav": { "variant": "even", "line": "center" },
     "header": { "align": "center" }
   },
   "status": "Thanks — the multi-step form worked end to end.",

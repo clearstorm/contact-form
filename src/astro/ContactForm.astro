@@ -486,7 +486,7 @@ if (
      rule above/below the strip; center flanks the chips like a pane header,
      weighted by the variant (left → rule right of the row, right → rule on
      the left, center → both sides). With variant "even" a flank can't flex,
-     so center falls back to a rule beneath the row. */
+     so the rules run vertically BETWEEN the chips instead. */
   .rf-steps--line-top {
     border-top: var(--rf-steps-line-thickness, 1px) solid
       var(--rf-steps-line-color, #d1d5db);
@@ -520,15 +520,22 @@ if (
   }
 
   .rf-steps--even.rf-steps--line-center {
-    gap: var(--rf-steps-gap, 0.5rem 1rem);
-    padding-bottom: calc(var(--rf-steps-line-thickness, 1px) * 2);
-    border-bottom: var(--rf-steps-line-thickness, 1px) solid
-      var(--rf-steps-line-color, #d1d5db);
+    column-gap: 0; /* separators own the rhythm; space-evenly still lays the strip out */
   }
 
   .rf-steps--even.rf-steps--line-center::before,
   .rf-steps--even.rf-steps--line-center::after {
     display: none;
+  }
+
+  /* Vertical rules run BETWEEN the chips (never past the first/last) */
+  .rf-steps--even.rf-steps--line-center .rf-step {
+    padding: 0 calc(var(--rf-steps-line-gap, 0.75rem) / 2);
+  }
+
+  .rf-steps--even.rf-steps--line-center .rf-step + .rf-step {
+    border-left: var(--rf-steps-line-thickness, 1px) solid
+      var(--rf-steps-line-color, #d1d5db);
   }
 
   .rf-step {

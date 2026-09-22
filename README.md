@@ -277,7 +277,8 @@ Behaviour:
 - **Step headers + stepper chrome (opt-in `stepper` key)** — a top-level
   `stepper` form key is the one place wizard chrome lives: `nav` styles the
   strip (`variant`: `left` / `center` / `right` / `even`; `line`:
-  `none` / `top` / `bottom` / `center`; `number` / `label` toggle the chip
+  `none` / `top` / `bottom` / `center` — with `even`, `center` draws the
+  rules vertically between the chips; `number` / `label` toggle the chip
   and text; `clickable` toggles the jump-back links), and `header` sets the
   pane-header defaults (`show` / `align` / `line`). Every pane opens with a
   header by default — a number chip plus the step `label` (or a longer
@@ -492,7 +493,7 @@ Every hard-coded size is themeable — compact minimums by default:
 | `--rf-steps-margin` | `0 0 0.5rem` | stepper margin |
 | `--rf-steps-line-color` | `var(--rf-field-border)` | stepper flanking rule colour |
 | `--rf-steps-line-thickness` | `1px` | stepper flanking rule thickness |
-| `--rf-steps-line-gap` | `0.75rem` | stepper rule gap (`top`/`bottom` lines; `even` + `center` uses the item gap instead) |
+| `--rf-steps-line-gap` | `0.75rem` | stepper rule gap (`top`/`bottom` lines; `even` + `center` separator spacing around each chip) |
 | `--rf-step-footer-gap` | `0.5rem` | Back/Next footer gap |
 | `--rf-step-header-gap` | `0.5rem` | pane header number↔title gap |
 | `--rf-step-header-num-size` | `1.6rem` | pane header number chip size |

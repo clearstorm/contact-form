@@ -3,8 +3,9 @@ import DemoLayout from "../layouts/DemoLayout.astro";
 import ContactForm from "@clearstorm/contact-form/astro/ContactForm.astro";
 import type { FormSpec } from "@clearstorm/contact-form/core";
 import spec from "../../../specs/booking.json";
+import { getForms } from "../lib/forms";
 
-const form = spec as FormSpec;
+const [, form] = getForms(spec)[0];
 ---
 <DemoLayout title="Booking — prefill datetime demo">
   <p class="demo-kicker">Opt-in prefill</p>

@@ -24,9 +24,12 @@ per-field `message` overrides, with built-in defaults.
 Zero runtime dependencies. No Tailwind required.
 
 > **Want to see it working?** `examples/` holds a runnable Astro demo site (all
-> 19 field types, both mailers, `prefill="datetime"`, CSS-only theming) plus
-> copy-paste-ready JSON form specs it renders directly. See
-> [`examples/README.md`](examples/README.md).
+> 19 field types, both mailers, `prefill="datetime"`, CSS-only theming, a
+> multi-form wizard) plus copy-paste-ready JSON form specs it renders directly.
+> Each spec file is a **map of named forms** — `{ "Name": FormSpec, … }` — so
+> one file can hold several examples and a single page can render them all
+> (the demo's `/wizard`, `/conditional` and `/theming` pages do exactly that).
+> See [`examples/README.md`](examples/README.md).
 
 ---
 
@@ -193,6 +196,12 @@ delivery adapter for this package is planned.
 passthrough attributes — `placeholder`, `value`, `min`, `max`, `step`,
 `maxlength`, `pattern` — flow through to the rendered control.
 
+Every type can be required or optional. `required: false` (the default)
+never blocks submit; `optional: true` additionally renders a muted
+“(optional)” suffix on the label so visitors know they can skip it.
+`/kitchen-sink` and the wizard's “Every field type” form pair required and
+`optional: true` instances of every optional-capable type side by side.
+
 ---
 
 ## Form structure (headings, descriptions, dividers, sections)
@@ -277,9 +286,11 @@ Behaviour:
 - **Step headers + stepper chrome (opt-in `stepper` key)** — a top-level
   `stepper` form key is the one place wizard chrome lives: `nav` styles the
   strip (`variant`: `left` / `center` / `right` / `even`; `line`:
-  `none` / `top` / `bottom` / `center` — with `even`, `center` draws the
-  rules vertically between the chips; `number` / `label` toggle the chip
-  and text; `clickable` toggles the jump-back links), and `header` sets the
+  `none` / `top` / `bottom` / `center` — with `even`, `center` splits the
+  strip into equal full-width slices with a rule running between the chips,
+  never a centred cluster; `number` / `label` toggle the chip and text;
+  `clickable` toggles the jump-back links; `background` fills the whole
+  strip with a colour band), and `header` sets the
   pane-header defaults (`show` / `align` / `line`). Every pane opens with a
   header by default — a number chip plus the step `label` (or a longer
   `title`) styled like a decorative heading. A marker's own `show` /
@@ -299,12 +310,14 @@ Behaviour:
   stepper theme ships with `--rf-step-*` / `--rf-steps-*` tokens (see
   [Theming](#theming-rf-custom-properties)).
 
-> Live demo: `/wizard` renders
-> [`examples/specs/wizard.json`](examples/specs/wizard.json) — three steps (a
-> centered, rule-flanked stepper; step 2 centers its pane header via the
-> `stepper.header` default with its own `title`; step 3 overrides to a
-> rule-left / title-right header), a cross-step conditional reveal and a
-> hoisted hidden field.
+> Live demo: `/wizard` renders all three named forms in
+> [`examples/specs/wizard.json`](examples/specs/wizard.json) on one page —
+> the flagship wizard (three steps, a centered rule-flanked stepper,
+> pane-header defaults with per-marker overrides, a cross-step conditional
+> reveal and a hoisted hidden field), every field type with required +
+> `optional: true` twins on an `even`-slice stepper with a `background` band,
+> and the compact chrome options (no numbers, no jump-backs, custom button
+> labels, a `full` header rule and a bare `show: false` pane).
 
 ---
 
@@ -363,11 +376,11 @@ Behaviour:
 ]
 ```
 
-> Run every operator live: the demo's `/conditional` page renders
-> [`examples/specs/conditions.json`](examples/specs/conditions.json) — one
-> self-documenting reveal per operator — alongside the realistic
-> [`examples/specs/enquiry.json`](examples/specs/enquiry.json) and an AND
-> example ([`examples/specs/and.json`](examples/specs/and.json)).
+> Run every operator live: the demo's `/conditional` page renders all three
+> named forms in
+> [`examples/specs/conditional.json`](examples/specs/conditional.json) — an
+> operator-reference form with one self-documenting reveal per operator,
+> alongside a realistic enquiry and an AND example.
 
 ---
 
@@ -457,9 +470,13 @@ the form itself:
 | `--rf-success` | `#16a34a` | status box success border |
 | `--rf-success-text` | `#14532d` | status box success text |
 | `--rf-danger` | `#dc2626` | status box error border/text |
-| `--rf-step-color` | `#9ca3af` | stepper index bubble + label (pending) |
-| `--rf-step-active-color` | `var(--rf-submit-bg)` | stepper current-step bubble |
+| `--rf-step-color` | `#9ca3af` | stepper chip text + index bubble (pending) |
+| `--rf-step-active-color` | `var(--rf-submit-bg)` | stepper current-step bubble + text |
 | `--rf-step-done-color` | `var(--rf-success)` | stepper completed-step bubble |
+| `--rf-step-bg` | `transparent` | stepper chip pill background |
+| `--rf-step-active-bg` | `var(--rf-step-bg)` | current-step chip background |
+| `--rf-step-done-bg` | `var(--rf-step-bg)` | completed-step chip background |
+| `--rf-steps-bg` | `transparent` | nav strip band background (`nav.background`) |
 | `--rf-button-secondary-color` | `var(--rf-submit-bg)` | secondary (outline) button text |
 | `--rf-button-secondary-border` | `var(--rf-submit-bg)` | secondary button border |
 | `--rf-button-secondary-hover-bg` | `var(--rf-submit-bg)` | secondary hover background |
@@ -491,6 +508,7 @@ Every hard-coded size is themeable — compact minimums by default:
 | `--rf-step-label-size` | `0.78rem` | stepper label font-size |
 | `--rf-steps-gap` | `0.5rem 1rem` | stepper item gap |
 | `--rf-steps-margin` | `0 0 0.5rem` | stepper margin |
+| `--rf-steps-padding` | `0.25rem 0.5rem` | nav strip band padding (`nav.background`) |
 | `--rf-steps-line-color` | `var(--rf-field-border)` | stepper flanking rule colour |
 | `--rf-steps-line-thickness` | `1px` | stepper flanking rule thickness |
 | `--rf-steps-line-gap` | `0.75rem` | stepper rule gap (`top`/`bottom` lines; `even` + `center` separator spacing around each chip) |

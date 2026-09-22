@@ -3,8 +3,9 @@ import DemoLayout from "../layouts/DemoLayout.astro";
 import ContactForm from "@clearstorm/contact-form/astro/ContactForm.astro";
 import type { FormSpec } from "@clearstorm/contact-form/core";
 import structure from "../../../specs/structure.json";
+import { getForms } from "../lib/forms";
 
-const structureForm = structure as FormSpec;
+const [, structureForm] = getForms(structure)[0];
 
 const structureRows: Array<[string, string, string]> = [
   ["heading", '{ "type": "heading", "text": "…", "line": false }', "a full-width <code>&lt;h3&gt;</code> title; its rule is on by default (left → line on the right, right → line on the left, center → both sides), <code>line: false</code> renders text only"],

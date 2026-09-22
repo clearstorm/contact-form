@@ -318,6 +318,13 @@ export interface StepperNavSpec {
   line?: "none" | "top" | "bottom" | "center";
   /** Completed steps clickable to jump back — default true. */
   clickable?: boolean;
+  /**
+   * Background colour for the whole strip (any CSS colour). Renders as a
+   * `--rf-steps-bg` inline token (plus a pill band); the chips themselves
+   * stay uncoloured unless the `--rf-step-bg` / `-active-bg` / `-done-bg`
+   * tokens are themed.
+   */
+  background?: string;
 }
 
 /**

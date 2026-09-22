@@ -1,19 +1,73 @@
 {
-  "name": "contact",
-  "submit": "Send message",
-  "status": "Thanks — we'll reply shortly.",
-  "mailer": "cf7",
-  "copy": {
-    "sending": "Sending message…",
-    "invalidForm": "Some fields need your attention. Please check the form.",
-    "submitError": "Submission failed (HTTP {status}). Please try again."
-  },
-  "fields": [
-    { "type": "text", "id": "first_name", "name": "first_name", "label": "First name", "required": true, "size": 50, "autocomplete": "given-name" },
-    { "type": "text", "id": "last_name", "name": "last_name", "label": "Last name", "required": true, "size": 50, "autocomplete": "family-name" },
-    { "type": "email", "id": "email", "name": "email", "label": "Email address", "required": true, "size": 50, "autocomplete": "email" },
-    { "type": "tel", "id": "contact", "name": "contact", "label": "Phone", "required": true, "size": 50, "autocomplete": "tel" },
-    { "type": "select", "id": "subject", "name": "subject", "label": "Subject", "required": true, "size": 100, "options": ["General enquiry", "Feedback"], "message": "Choose a subject." },
-    { "type": "textarea", "id": "message", "name": "message", "label": "Message", "required": true, "size": 100, "rows": 6 }
-  ]
+  "Contact — CF7 mailer": {
+    "name": "contact",
+    "submit": "Send message",
+    "status": "Thanks — we'll reply shortly.",
+    "mailer": "cf7",
+    "copy": {
+      "sending": "Sending message…",
+      "invalidForm": "Some fields need your attention. Please check the form.",
+      "submitError": "Submission failed (HTTP {status}). Please try again."
+    },
+    "fields": [
+      {
+        "type": "text",
+        "id": "first_name",
+        "name": "first_name",
+        "label": "First name",
+        "required": true,
+        "size": 50,
+        "autocomplete": "given-name"
+      },
+      {
+        "type": "text",
+        "id": "last_name",
+        "name": "last_name",
+        "label": "Last name",
+        "required": true,
+        "size": 50,
+        "autocomplete": "family-name"
+      },
+      {
+        "type": "email",
+        "id": "email",
+        "name": "email",
+        "label": "Email address",
+        "required": true,
+        "size": 50,
+        "autocomplete": "email"
+      },
+      {
+        "type": "tel",
+        "id": "contact",
+        "name": "contact",
+        "label": "Phone",
+        "required": true,
+        "size": 50,
+        "autocomplete": "tel"
+      },
+      {
+        "type": "select",
+        "id": "subject",
+        "name": "subject",
+        "label": "Subject",
+        "required": true,
+        "size": 100,
+        "options": [
+          "General enquiry",
+          "Feedback"
+        ],
+        "message": "Choose a subject."
+      },
+      {
+        "type": "textarea",
+        "id": "message",
+        "name": "message",
+        "label": "Message",
+        "required": true,
+        "size": 100,
+        "rows": 6
+      }
+    ]
+  }
 }

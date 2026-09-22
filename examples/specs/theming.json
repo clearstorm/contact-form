@@ -1,0 +1,92 @@
+{
+  "Light — default + brand accent": {
+    "name": "theme-light",
+    "submit": "Send",
+    "status": "Thanks — that's the light theme speaking.",
+    "mailer": "json",
+    "endpoint": "http://localhost:8787/submit",
+    "copy": {
+      "submitError": "Sending failed (HTTP {status}) — is the echo server running (npm run demo:api)?"
+    },
+    "fields": [
+      {
+        "type": "text",
+        "id": "first_name",
+        "name": "first_name",
+        "label": "First name",
+        "required": true,
+        "size": 50
+      },
+      {
+        "type": "text",
+        "id": "last_name",
+        "name": "last_name",
+        "label": "Last name",
+        "required": true,
+        "size": 50
+      },
+      {
+        "type": "email",
+        "id": "email",
+        "name": "email",
+        "label": "Email address",
+        "required": true,
+        "size": 100
+      },
+      {
+        "type": "textarea",
+        "id": "message",
+        "name": "message",
+        "label": "Message",
+        "required": true,
+        "size": 100,
+        "rows": 5
+      }
+    ]
+  },
+  "Dark — full override": {
+    "name": "theme-dark",
+    "submit": "Send",
+    "status": "Thanks — that's the dark theme speaking.",
+    "mailer": "json",
+    "endpoint": "http://localhost:8787/submit",
+    "copy": {
+      "submitError": "Sending failed (HTTP {status}) — is the echo server running (npm run demo:api)?"
+    },
+    "fields": [
+      {
+        "type": "text",
+        "id": "first_name",
+        "name": "first_name",
+        "label": "First name",
+        "required": true,
+        "size": 50
+      },
+      {
+        "type": "text",
+        "id": "last_name",
+        "name": "last_name",
+        "label": "Last name",
+        "required": true,
+        "size": 50
+      },
+      {
+        "type": "email",
+        "id": "email",
+        "name": "email",
+        "label": "Email address",
+        "required": true,
+        "size": 100
+      },
+      {
+        "type": "textarea",
+        "id": "message",
+        "name": "message",
+        "label": "Message",
+        "required": true,
+        "size": 100,
+        "rows": 5
+      }
+    ]
+  }
+}

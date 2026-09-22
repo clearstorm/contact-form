@@ -3,8 +3,9 @@ import DemoLayout from "../layouts/DemoLayout.astro";
 import ContactForm from "@clearstorm/contact-form/astro/ContactForm.astro";
 import type { FormSpec } from "@clearstorm/contact-form/core";
 import spec from "../../../specs/all-fields.json";
+import { getForms } from "../lib/forms";
 
-const form = spec as FormSpec;
+const [, form] = getForms(spec)[0];
 
 const fieldTypes = [
   "text", "email", "tel", "url", "password", "search", "number",
@@ -19,9 +20,11 @@ const fieldTypes = [
     Every type the core renders and validates in a single spec — including a
     checkbox <em>group</em> (multi-value, joined into one payload field), a
     radio group, a single consent checkbox, hidden passthrough and per-field
-    <code>message</code> overrides. The fields below span 50 / 66 / 33 / 100
-    to show the 12-column row. Submit posts to the local echo server — start it
-    with <code>npm run demo:api</code>.
+    <code>message</code> overrides. Every optional-capable type is shown as
+    <code>optional: true</code> here (renders a muted “(optional)” suffix and
+    never blocks submit) alongside the required twins. The fields below span
+    50 / 66 / 33 / 100 to show the 12-column row. Submit posts to the local
+    echo server — start it with <code>npm run demo:api</code>.
   </p>
 
   <h2>Try it</h2>
@@ -37,19 +40,19 @@ const fieldTypes = [
     <tbody>
       <tr><td><code>text</code></td><td>text input</td><td>required (2+ chars applies only to <code>first_name</code>/<code>last_name</code>)</td></tr>
       <tr><td><code>email</code></td><td>email input</td><td>email format</td></tr>
-      <tr><td><code>tel</code></td><td>tel input</td><td>7–15 chars of digits/<code>+()- </code></td></tr>
-      <tr><td><code>url</code></td><td>url input</td><td>scheme-ful URL</td></tr>
-      <tr><td><code>password</code></td><td>password input</td><td>required only</td></tr>
-      <tr><td><code>search</code></td><td>search input</td><td>required only</td></tr>
+      <tr><td><code>tel</code></td><td>tel input</td><td>optional here; 7–15 chars of digits/<code>+()- </code></td></tr>
+      <tr><td><code>url</code></td><td>url input</td><td>optional here; scheme-ful URL</td></tr>
+      <tr><td><code>password</code></td><td>password input</td><td>optional here (required only when required)</td></tr>
+      <tr><td><code>search</code></td><td>search input</td><td>optional here (required only when required)</td></tr>
       <tr><td><code>number</code></td><td>number input</td><td>numeric, min 1 / max 10</td></tr>
-      <tr><td><code>date</code> / <code>time</code> / <code>datetime-local</code> / <code>month</code> / <code>week</code></td><td>native inputs</td><td>required only</td></tr>
+      <tr><td><code>date</code> / <code>time</code> / <code>datetime-local</code> / <code>month</code> / <code>week</code></td><td>native inputs</td><td>optional here (required only when required)</td></tr>
       <tr><td><code>textarea</code></td><td>textarea (rows 6)</td><td>min length 10, maxlength 500</td></tr>
       <tr><td><code>select</code></td><td>select</td><td>required only</td></tr>
       <tr><td><code>checkbox</code></td><td>group or single toggle</td><td>group: at least one checked; single: must be checked</td></tr>
       <tr><td><code>radio</code></td><td>radio group</td><td>one option required</td></tr>
       <tr><td><code>hidden</code></td><td>hidden input</td><td>never validated, forwarded as-is</td></tr>
       <tr><td><code>range</code></td><td>range input</td><td>within min 0 / max 100 (step 5)</td></tr>
-      <tr><td><code>color</code></td><td>color input</td><td>hex <code>#rrggbb</code></td></tr>
+      <tr><td><code>color</code></td><td>color input</td><td>optional here; hex <code>#rrggbb</code></td></tr>
     </tbody>
   </table>
 </DemoLayout>

@@ -3,8 +3,9 @@ import DemoLayout from "../layouts/DemoLayout.astro";
 import ContactForm from "@clearstorm/contact-form/astro/ContactForm.astro";
 import type { FormSpec } from "@clearstorm/contact-form/core";
 import spec from "../../../specs/contact-cf7.json";
+import { getForms } from "../lib/forms";
 
-const form = spec as FormSpec;
+const [, form] = getForms(spec)[0];
 
 // Endpoint config is the consumer's business — the component never reads env.
 // The demo reads the same PUBLIC_* convention as the reference site.

@@ -2,13 +2,12 @@
 import DemoLayout from "../layouts/DemoLayout.astro";
 import ContactForm from "@clearstorm/contact-form/astro/ContactForm.astro";
 import type { FormSpec } from "@clearstorm/contact-form/core";
-import enquiry from "../../../specs/enquiry.json";
-import conditions from "../../../specs/conditions.json";
-import and from "../../../specs/and.json";
+import conditionalSpec from "../../../specs/conditional.json";
+import { getForm } from "../lib/forms";
 
-const enquiryForm = enquiry as FormSpec;
-const conditionsForm = conditions as FormSpec;
-const andForm = and as FormSpec;
+const enquiryForm = getForm(conditionalSpec, "Realistic enquiry");
+const conditionsForm = getForm(conditionalSpec, "All seven operators");
+const andForm = getForm(conditionalSpec, "AND — every condition must hold");
 
 const operatorRows: Array<[string, string, string]> = [
   ["equals", '{ "operator": "equals", "value": "Other" }', "<code>svc</code> is exactly “Other” → <code>svc_other</code>"],
@@ -93,10 +92,9 @@ const operatorRows: Array<[string, string, string]> = [
   </div>
 
   <p class="lead">
-    Unknown operators never match (the field stays hidden). See
-    <code>examples/specs/enquiry.json</code>,
-    <code>examples/specs/conditions.json</code> and
-    <code>examples/specs/and.json</code> for the full specs, or the README
-    for the complete operator reference.
+    Unknown operators never match (the field stays hidden). All three forms
+    live in one spec file — <code>examples/specs/conditional.json</code> is a
+    map of named forms — for the full specs, or the README for the complete
+    operator reference.
   </p>
 </DemoLayout>

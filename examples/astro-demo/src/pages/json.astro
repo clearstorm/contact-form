@@ -3,8 +3,9 @@ import DemoLayout from "../layouts/DemoLayout.astro";
 import ContactForm from "@clearstorm/contact-form/astro/ContactForm.astro";
 import type { FormSpec } from "@clearstorm/contact-form/core";
 import spec from "../../../specs/json-endpoint.json";
+import { getForms } from "../lib/forms";
 
-const form = spec as FormSpec;
+const [, form] = getForms(spec)[0];
 
 // The payload the `json` mailer sends is governed by the *client* field spec
 // (the data-rules serialised from the JSON), not by however the browser wired

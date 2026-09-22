@@ -12,15 +12,28 @@ import { isFieldSpec, gridSpan, type FormElement } from "../core";
 
 interface Props {
   elements: FormElement[];
+  /**
+   * Scopes every rendered element `id` (plus derived ids) under this prefix so
+   * several forms on one page can share field names without colliding. Only
+   * the `id` attribute is prefixed — `name` attributes (and therefore
+   * payloads) are untouched. Defaults to no prefix.
+   */
+  idPrefix?: string;
 }
 
-const { elements } = Astro.props;
+const { elements, idPrefix = "" } = Astro.props;
+
+/** Element `id` → attribute value, scoped under `idPrefix` when set. */
+const scopedId = (element: { id?: string; name: string }) => {
+  const raw = element.id ?? element.name;
+  return idPrefix ? `${idPrefix}__${raw}` : raw;
+};
 ---
 {elements.map((element) =>
   isFieldSpec(element) ? (
     <FormField
       label={element.label}
-      id={element.id}
+      id={scopedId(element)}
       name={element.name}
       type={element.type}
       autocomplete={element.autocomplete}

@@ -1,68 +1,92 @@
 {
-  "name": "structure",
-  "submit": "Send",
-  "status": "Thanks — the structured form worked end to end.",
-  "mailer": "json",
-  "endpoint": "http://localhost:8787/submit",
-  "copy": {
-    "sending": "Sending…",
-    "submitError": "Sending failed (HTTP {status}) — is the echo server running (npm run demo:api)?"
-  },
-  "fields": [
-    { "type": "heading", "text": "Get in touch" },
-    {
-      "type": "description",
-      "text": "Use this form for project enquiries — we reply within one working day."
+  "Structure + decor": {
+    "name": "structure",
+    "submit": "Send",
+    "status": "Thanks — the structured form worked end to end.",
+    "mailer": "json",
+    "endpoint": "http://localhost:8787/submit",
+    "copy": {
+      "sending": "Sending…",
+      "submitError": "Sending failed (HTTP {status}) — is the echo server running (npm run demo:api)?"
     },
-    {
-      "type": "text",
-      "id": "name",
-      "name": "name",
-      "label": "Name",
-      "required": true,
-      "size": 50
-    },
-    {
-      "type": "email",
-      "id": "email",
-      "name": "email",
-      "label": "Email address",
-      "required": true,
-      "size": 50
-    },
-    { "type": "section", "label": "Project details" },
-    {
-      "type": "select",
-      "id": "service",
-      "name": "service",
-      "label": "Service",
-      "required": true,
-      "size": 100,
-      "options": ["Website", "Brand identity", "Marketing", "Other"],
-      "message": "Choose a service."
-    },
-    {
-      "type": "description",
-      "text": "Tell us the essentials — we'll ask for the rest on a call.",
-      "size": 50
-    },
-    {
-      "type": "textarea",
-      "id": "message",
-      "name": "message",
-      "label": "Project brief",
-      "required": true,
-      "size": 50
-    },
-    { "type": "divider" },
-    {
-      "type": "checkbox",
-      "id": "updates",
-      "name": "updates",
-      "label": "Send me occasional project updates",
-      "size": 100
-    },
-    { "type": "heading", "text": "Anything else?", "line": false, "align": "center" },
-    { "type": "divider", "visible": false, "min": "2rem" }
-  ]
+    "fields": [
+      {
+        "type": "heading",
+        "text": "Get in touch"
+      },
+      {
+        "type": "description",
+        "text": "Use this form for project enquiries — we reply within one working day."
+      },
+      {
+        "type": "text",
+        "id": "name",
+        "name": "name",
+        "label": "Name",
+        "required": true,
+        "size": 50
+      },
+      {
+        "type": "email",
+        "id": "email",
+        "name": "email",
+        "label": "Email address",
+        "required": true,
+        "size": 50
+      },
+      {
+        "type": "section",
+        "label": "Project details"
+      },
+      {
+        "type": "select",
+        "id": "service",
+        "name": "service",
+        "label": "Service",
+        "required": true,
+        "size": 100,
+        "options": [
+          "Website",
+          "Brand identity",
+          "Marketing",
+          "Other"
+        ],
+        "message": "Choose a service."
+      },
+      {
+        "type": "description",
+        "text": "Tell us the essentials — we'll ask for the rest on a call.",
+        "size": 50
+      },
+      {
+        "type": "textarea",
+        "id": "message",
+        "name": "message",
+        "label": "Project brief",
+        "required": true,
+        "size": 50
+      },
+      {
+        "type": "divider"
+      },
+      {
+        "type": "checkbox",
+        "id": "updates",
+        "name": "updates",
+        "label": "Send me occasional project updates",
+        "size": 100
+      },
+      {
+        "type": "heading",
+        "text": "Anything else?",
+        "line": false,
+        "align": "center"
+      },
+      {
+        "type": "divider",
+        "visible": false,
+        "min": "2rem"
+      }
+    ]
+  }
 }

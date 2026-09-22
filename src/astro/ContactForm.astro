@@ -88,6 +88,7 @@ const stepsNav = stepper?.nav ?? {};
 const navNumber = stepsNav.number !== false;
 const navLabel = stepsNav.label !== false;
 const navClickable = stepsNav.clickable !== false;
+const navBackground = stepper?.nav?.background;
 const headerDefaults = stepper?.header ?? {};
 const stepHeader = (
   step: { show?: boolean; align?: "left" | "center" | "right" | "full"; line?: boolean },
@@ -148,13 +149,16 @@ if (
     <>
       {layout.shared.length > 0 && (
         <div class="rf-shared" data-shared>
-          <FormElements elements={layout.shared} />
+          <FormElements elements={layout.shared} idPrefix={form.name} />
         </div>
       )}
       <ol
-        class={`rf-steps${stepperMods ? ` ${stepperMods}` : ""}`}
+        class={`rf-steps${stepperMods ? ` ${stepperMods}` : ""}${
+          navBackground ? " rf-steps--band" : ""
+        }`}
         data-steps-nav
         aria-label="Form progress"
+        style={navBackground ? `--rf-steps-bg: ${navBackground}` : undefined}
       >
         {layout.steps.map((step, i) => (
           <li
@@ -211,11 +215,13 @@ if (
               </h3>
             </header>
           )}
-          <FormElements elements={step.elements} />
+          <FormElements elements={step.elements} idPrefix={form.name} />
         </section>
         );
       })}
-      {layout.hoisted.length > 0 && <FormElements elements={layout.hoisted} />}
+      {layout.hoisted.length > 0 && (
+        <FormElements elements={layout.hoisted} idPrefix={form.name} />
+      )}
       <div class="rf-step-footer" data-step-footer>
         <button
           class={`rf-submit rf-submit--${prevVariant}`}
@@ -236,7 +242,7 @@ if (
     </>
   ) : (
     <>
-      <FormElements elements={flatElements} />
+      <FormElements elements={flatElements} idPrefix={form.name} />
       <div class="rf-submit-row">
         <button
           class={`rf-submit rf-submit--${submitVariant}`}
@@ -303,10 +309,15 @@ if (
     --rf-step-color: #9ca3af;
     --rf-step-active-color: var(--rf-submit-bg);
     --rf-step-done-color: var(--rf-success);
+    --rf-step-bg: transparent;
+    --rf-step-active-bg: var(--rf-step-bg);
+    --rf-step-done-bg: var(--rf-step-bg);
     --rf-step-size: 1.5rem;
     --rf-step-label-size: 0.78rem;
     --rf-steps-gap: 0.5rem 1rem;
     --rf-steps-margin: 0 0 0.5rem;
+    --rf-steps-bg: transparent;
+    --rf-steps-padding: 0.25rem 0.5rem;
     --rf-steps-line-color: var(--rf-field-border, #d1d5db);
     --rf-steps-line-thickness: 1px;
     --rf-steps-line-gap: 0.75rem;
@@ -466,6 +477,13 @@ if (
     margin: var(--rf-steps-margin, 0 0 0.5rem);
     padding: 0;
     list-style: none;
+    background: var(--rf-steps-bg, transparent);
+  }
+
+  /* Strip band — applied when `nav.background` fills the whole strip. */
+  .rf-steps--band {
+    padding: var(--rf-steps-padding, 0.25rem 0.5rem);
+    border-radius: 999px;
   }
 
   /* Alignment — opt-in via `StepperSpec.nav.variant` (default left),
@@ -528,9 +546,14 @@ if (
     display: none;
   }
 
-  /* Vertical rules run BETWEEN the chips (never past the first/last) */
+  /* Every step owns an equal slice of the strip's full width; the chip sits
+     centred inside it, and the rule at each slice boundary lands exactly
+     halfway between neighbouring chips. */
   .rf-steps--even.rf-steps--line-center .rf-step {
-    padding: 0 calc(var(--rf-steps-line-gap, 0.75rem) / 2);
+    flex: 1 1 0;
+    min-width: 0;
+    justify-content: center;
+    padding-inline: calc(var(--rf-steps-line-gap, 0.75rem) / 2);
   }
 
   .rf-steps--even.rf-steps--line-center .rf-step + .rf-step {
@@ -545,14 +568,17 @@ if (
   }
 
   /* The stepper content is a button so completed steps are clickable;
-     disabled until the visit passes that step (no forward jumps). */
+     disabled until the visit passes that step (no forward jumps). The chip
+     is a pill: transparent by default (current look) — background tokens
+     colour it via `--rf-step-bg` / `-active-bg` / `-done-bg`. */
   .rf-step-btn {
     display: inline-flex;
     align-items: center;
     gap: 0.45rem;
-    padding: 0;
+    padding: 0.15rem 0.5rem;
     border: 0;
-    background: none;
+    border-radius: 999px;
+    background: var(--rf-step-bg, transparent);
     font: inherit;
     color: inherit;
     cursor: default;
@@ -598,6 +624,10 @@ if (
     font-weight: 600;
   }
 
+  .rf-step[aria-current="step"] .rf-step-btn {
+    background: var(--rf-step-active-bg, transparent);
+  }
+
   .rf-step--done .rf-step-index {
     border-color: var(--rf-step-done-color, var(--rf-success));
     color: var(--rf-step-done-color, var(--rf-success));
@@ -605,6 +635,7 @@ if (
 
   .rf-step--done .rf-step-btn {
     cursor: pointer;
+    background: var(--rf-step-done-bg, transparent);
   }
 
   .rf-step--done .rf-step-btn:hover .rf-step-index {

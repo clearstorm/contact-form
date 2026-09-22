@@ -1,117 +1,520 @@
 {
-  "name": "wizard",
-  "submit": { "label": "Send enquiry", "variant": "primary" },
-  "next": { "label": "Next", "variant": "primary" },
-  "prev": { "label": "Previous", "variant": "secondary" },
-  "stepper": {
-    "nav": { "variant": "even", "line": "center" },
-    "header": { "align": "center" }
+  "Flagship wizard": {
+    "name": "wizard",
+    "submit": {
+      "label": "Send enquiry",
+      "variant": "primary"
+    },
+    "next": {
+      "label": "Next",
+      "variant": "primary"
+    },
+    "prev": {
+      "label": "Previous",
+      "variant": "secondary"
+    },
+    "stepper": {
+      "nav": {
+        "variant": "even",
+        "line": "center"
+      },
+      "header": {
+        "align": "center"
+      }
+    },
+    "status": "Thanks — the multi-step form worked end to end.",
+    "mailer": "json",
+    "endpoint": "http://localhost:8787/submit",
+    "copy": {
+      "sending": "Sending…",
+      "submitError": "Sending failed (HTTP {status}) — is the echo server running (npm run demo:api)?"
+    },
+    "fields": [
+      {
+        "type": "heading",
+        "text": "Project enquiry wizard"
+      },
+      {
+        "type": "description",
+        "text": "Three quick steps. This prefix lives before the first step marker, so it stays visible on every step."
+      },
+      {
+        "type": "step",
+        "label": "Contact"
+      },
+      {
+        "type": "text",
+        "id": "name",
+        "name": "name",
+        "label": "Your name",
+        "required": true,
+        "size": 50
+      },
+      {
+        "type": "email",
+        "id": "email",
+        "name": "email",
+        "label": "Email address",
+        "required": true,
+        "size": 50
+      },
+      {
+        "type": "tel",
+        "id": "phone",
+        "name": "phone",
+        "label": "Phone (optional)",
+        "optional": true,
+        "size": 50
+      },
+      {
+        "type": "step",
+        "label": "Project",
+        "title": "Tell us about your project"
+      },
+      {
+        "type": "select",
+        "id": "budget",
+        "name": "budget",
+        "label": "Budget",
+        "required": true,
+        "size": 50,
+        "options": [
+          "Under R20k",
+          "R20k–R60k",
+          "Over R60k"
+        ],
+        "message": "Choose a budget."
+      },
+      {
+        "type": "select",
+        "id": "timeline",
+        "name": "timeline",
+        "label": "Timeline",
+        "required": true,
+        "size": 50,
+        "options": [
+          "ASAP",
+          "This quarter",
+          "Flexible"
+        ],
+        "message": "Choose a timeline."
+      },
+      {
+        "type": "checkbox",
+        "id": "rush",
+        "name": "rush",
+        "label": "This is urgent",
+        "size": 50
+      },
+      {
+        "type": "step",
+        "label": "Details",
+        "align": "right",
+        "submit": "Send enquiry"
+      },
+      {
+        "type": "date",
+        "id": "deadline",
+        "name": "deadline",
+        "label": "Ideal kick-off date (needed when urgent)",
+        "required": true,
+        "size": 50,
+        "showWhen": {
+          "field": "rush",
+          "operator": "filled"
+        }
+      },
+      {
+        "type": "textarea",
+        "id": "message",
+        "name": "message",
+        "label": "Project brief",
+        "required": true,
+        "size": 100
+      },
+      {
+        "type": "hidden",
+        "id": "referrer",
+        "name": "referrer",
+        "label": "Referrer",
+        "value": "wizard-demo"
+      }
+    ]
   },
-  "status": "Thanks — the multi-step form worked end to end.",
-  "mailer": "json",
-  "endpoint": "http://localhost:8787/submit",
-  "copy": {
-    "sending": "Sending…",
-    "submitError": "Sending failed (HTTP {status}) — is the echo server running (npm run demo:api)?"
+  "Every field type": {
+    "name": "wizard-options",
+    "submit": {
+      "label": "Send details",
+      "variant": "primary"
+    },
+    "next": {
+      "label": "Next",
+      "variant": "primary"
+    },
+    "prev": {
+      "label": "Previous",
+      "variant": "secondary"
+    },
+    "stepper": {
+      "nav": {
+        "variant": "even",
+        "line": "center",
+        "background": "#eef2f7"
+      },
+      "header": {
+        "align": "left"
+      }
+    },
+    "status": "Thanks — every field type made it through the wizard.",
+    "mailer": "json",
+    "endpoint": "http://localhost:8787/submit",
+    "copy": {
+      "sending": "Sending…",
+      "submitError": "Sending failed (HTTP {status}) — is the echo server running (npm run demo:api)?"
+    },
+    "fields": [
+      {
+        "type": "heading",
+        "text": "Wizard with every field type"
+      },
+      {
+        "type": "description",
+        "text": "All 19 field types, spread across three panes — each optional-capable type ships a required twin here and an `optional: true` one. The stepper uses `variant: \"even\"` + `line: \"center\"` (equal full-width slices with rules between the chips) and a `background` band."
+      },
+      {
+        "type": "step",
+        "label": "Contact"
+      },
+      {
+        "type": "text",
+        "id": "name",
+        "name": "name",
+        "label": "Your name",
+        "required": true,
+        "size": 50,
+        "placeholder": "Plain text"
+      },
+      {
+        "type": "email",
+        "id": "email",
+        "name": "email",
+        "label": "Email address",
+        "required": true,
+        "size": 50,
+        "placeholder": "you@example.com",
+        "message": "Please enter a valid email address."
+      },
+      {
+        "type": "tel",
+        "id": "phone",
+        "name": "phone",
+        "label": "Phone",
+        "optional": true,
+        "size": 50,
+        "placeholder": "+27 00 000 0000"
+      },
+      {
+        "type": "url",
+        "id": "website",
+        "name": "website",
+        "label": "Website",
+        "optional": true,
+        "size": 50,
+        "placeholder": "https://example.com"
+      },
+      {
+        "type": "password",
+        "id": "passphrase",
+        "name": "passphrase",
+        "label": "Project passphrase",
+        "optional": true,
+        "size": 50,
+        "autocomplete": "new-password",
+        "placeholder": "••••••••"
+      },
+      {
+        "type": "search",
+        "id": "keywords",
+        "name": "keywords",
+        "label": "Search terms",
+        "optional": true,
+        "size": 50,
+        "placeholder": "Search your brief…"
+      },
+      {
+        "type": "step",
+        "label": "Project",
+        "title": "Tell us about your project",
+        "align": "center"
+      },
+      {
+        "type": "number",
+        "id": "guests",
+        "name": "guests",
+        "label": "Guests (1–12)",
+        "required": true,
+        "size": 33,
+        "min": 1,
+        "max": 12,
+        "step": 1,
+        "message": "Pick a whole number from 1 to 12."
+      },
+      {
+        "type": "range",
+        "id": "priority",
+        "name": "priority",
+        "label": "Priority (0–100)",
+        "required": true,
+        "size": 66,
+        "min": 0,
+        "max": 100,
+        "step": 5,
+        "value": 60
+      },
+      {
+        "type": "date",
+        "id": "kickoff",
+        "name": "kickoff",
+        "label": "Kick-off date",
+        "required": true,
+        "size": 33
+      },
+      {
+        "type": "time",
+        "id": "preferred_time",
+        "name": "preferred_time",
+        "label": "Preferred time",
+        "optional": true,
+        "size": 33
+      },
+      {
+        "type": "datetime-local",
+        "id": "visit",
+        "name": "visit",
+        "label": "Site visit",
+        "optional": true,
+        "size": 33
+      },
+      {
+        "type": "month",
+        "id": "quarter",
+        "name": "quarter",
+        "label": "Target month",
+        "optional": true,
+        "size": 33
+      },
+      {
+        "type": "week",
+        "id": "week",
+        "name": "week",
+        "label": "Draft week",
+        "optional": true,
+        "size": 33
+      },
+      {
+        "type": "color",
+        "id": "brand",
+        "name": "brand",
+        "label": "Brand colour",
+        "optional": true,
+        "size": 33,
+        "value": "#c46f48"
+      },
+      {
+        "type": "select",
+        "id": "budget",
+        "name": "budget",
+        "label": "Budget",
+        "required": true,
+        "size": 100,
+        "options": [
+          "Under R20k",
+          "R20k–R60k",
+          "Over R60k"
+        ],
+        "message": "Choose a budget."
+      },
+      {
+        "type": "radio",
+        "id": "contact_method",
+        "name": "contact_method",
+        "label": "Preferred contact method",
+        "required": true,
+        "size": 50,
+        "options": [
+          "Email",
+          "Phone",
+          "WhatsApp"
+        ]
+      },
+      {
+        "type": "checkbox",
+        "id": "extras",
+        "name": "extras",
+        "label": "Project extras",
+        "optional": true,
+        "size": 50,
+        "options": [
+          "Copywriting",
+          "Photography",
+          "Hosting"
+        ]
+      },
+      {
+        "type": "checkbox",
+        "id": "rush",
+        "name": "rush",
+        "label": "This is urgent",
+        "size": 50
+      },
+      {
+        "type": "step",
+        "label": "Details"
+      },
+      {
+        "type": "date",
+        "id": "deadline",
+        "name": "deadline",
+        "label": "Ideal kick-off (needed when urgent)",
+        "required": true,
+        "size": 50,
+        "showWhen": {
+          "field": "rush",
+          "operator": "filled"
+        }
+      },
+      {
+        "type": "textarea",
+        "id": "brief",
+        "name": "brief",
+        "label": "Project brief",
+        "required": true,
+        "size": 100,
+        "rows": 6,
+        "maxlength": 500
+      },
+      {
+        "type": "checkbox",
+        "id": "consent",
+        "name": "consent",
+        "label": "I agree to the demo terms",
+        "required": true,
+        "size": 100,
+        "message": "Please accept the terms to continue."
+      },
+      {
+        "type": "hidden",
+        "id": "source",
+        "name": "source",
+        "label": "Source",
+        "value": "wizard-options-demo"
+      }
+    ]
   },
-  "fields": [
-    {
-      "type": "heading",
-      "text": "Project enquiry wizard"
+  "Compact chrome": {
+    "name": "wizard-compact",
+    "submit": {
+      "label": "Submit",
+      "variant": "primary"
     },
-    {
-      "type": "description",
-      "text": "Three quick steps. This prefix lives before the first step marker, so it stays visible on every step."
+    "next": {
+      "label": "Continue",
+      "variant": "primary"
     },
-    {
-      "type": "step",
-      "label": "Contact"
+    "prev": {
+      "label": "Back",
+      "variant": "ghost"
     },
-    {
-      "type": "text",
-      "id": "name",
-      "name": "name",
-      "label": "Your name",
-      "required": true,
-      "size": 50
+    "stepper": {
+      "nav": {
+        "number": false,
+        "clickable": false
+      },
+      "header": {
+        "show": true,
+        "align": "left"
+      }
     },
-    {
-      "type": "email",
-      "id": "email",
-      "name": "email",
-      "label": "Email address",
-      "required": true,
-      "size": 50
+    "status": "Thanks — the compact wizard worked end to end.",
+    "mailer": "json",
+    "endpoint": "http://localhost:8787/submit",
+    "copy": {
+      "sending": "Sending…",
+      "submitError": "Sending failed (HTTP {status}) — is the echo server running (npm run demo:api)?"
     },
-    {
-      "type": "tel",
-      "id": "phone",
-      "name": "phone",
-      "label": "Phone (optional)",
-      "optional": true,
-      "size": 50
-    },
-    {
-      "type": "step",
-      "label": "Project",
-      "title": "Tell us about your project"
-    },
-    {
-      "type": "select",
-      "id": "budget",
-      "name": "budget",
-      "label": "Budget",
-      "required": true,
-      "size": 50,
-      "options": ["Under R20k", "R20k–R60k", "Over R60k"],
-      "message": "Choose a budget."
-    },
-    {
-      "type": "select",
-      "id": "timeline",
-      "name": "timeline",
-      "label": "Timeline",
-      "required": true,
-      "size": 50,
-      "options": ["ASAP", "This quarter", "Flexible"],
-      "message": "Choose a timeline."
-    },
-    {
-      "type": "checkbox",
-      "id": "rush",
-      "name": "rush",
-      "label": "This is urgent",
-      "size": 50
-    },
-    {
-      "type": "step",
-      "label": "Details",
-      "align": "right",
-      "submit": "Send enquiry"
-    },
-    {
-      "type": "date",
-      "id": "deadline",
-      "name": "deadline",
-      "label": "Ideal kick-off date (needed when urgent)",
-      "required": true,
-      "size": 50,
-      "showWhen": { "field": "rush", "operator": "filled" }
-    },
-    {
-      "type": "textarea",
-      "id": "message",
-      "name": "message",
-      "label": "Project brief",
-      "required": true,
-      "size": 100
-    },
-    {
-      "type": "hidden",
-      "id": "referrer",
-      "name": "referrer",
-      "label": "Referrer",
-      "value": "wizard-demo"
-    }
-  ]
+    "fields": [
+      {
+        "type": "heading",
+        "text": "Compact wizard"
+      },
+      {
+        "type": "description",
+        "text": "The chrome options: no number chips, no jump-back links (plain informational stepper), a custom “Continue” label and a ghost “Back”. Step 2 swaps its pane header to `align: \"full\"` (title on its own line with a full rule beneath) and step 3 renders a bare pane (`show: false`)."
+      },
+      {
+        "type": "step",
+        "label": "Contact"
+      },
+      {
+        "type": "text",
+        "id": "name",
+        "name": "name",
+        "label": "Your name",
+        "required": true,
+        "size": 50
+      },
+      {
+        "type": "email",
+        "id": "email",
+        "name": "email",
+        "label": "Email address",
+        "required": true,
+        "size": 50
+      },
+      {
+        "type": "tel",
+        "id": "phone",
+        "name": "phone",
+        "label": "Phone (optional)",
+        "optional": true,
+        "size": 50
+      },
+      {
+        "type": "step",
+        "label": "Details",
+        "title": "Anything else we should know?",
+        "align": "full"
+      },
+      {
+        "type": "textarea",
+        "id": "notes",
+        "name": "notes",
+        "label": "Notes for the team",
+        "optional": true,
+        "size": 100,
+        "rows": 5
+      },
+      {
+        "type": "step",
+        "label": "Done",
+        "show": false
+      },
+      {
+        "type": "checkbox",
+        "id": "consent",
+        "name": "consent",
+        "label": "I confirm the details above",
+        "required": true,
+        "size": 100,
+        "message": "Please confirm to continue."
+      },
+      {
+        "type": "hidden",
+        "id": "source",
+        "name": "source",
+        "label": "Source",
+        "value": "wizard-compact-demo"
+      }
+    ]
+  }
 }

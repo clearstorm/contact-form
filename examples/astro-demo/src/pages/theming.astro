@@ -2,11 +2,11 @@
 import DemoLayout from "../layouts/DemoLayout.astro";
 import ContactForm from "@clearstorm/contact-form/astro/ContactForm.astro";
 import type { FormSpec } from "@clearstorm/contact-form/core";
-import lightSpec from "../../../specs/themed-light.json";
-import darkSpec from "../../../specs/themed-dark.json";
+import themingSpec from "../../../specs/theming.json";
+import { getForm } from "../lib/forms";
 
-const light = lightSpec as FormSpec;
-const dark = darkSpec as FormSpec;
+const light = getForm(themingSpec, "Light — default + brand accent");
+const dark = getForm(themingSpec, "Dark — full override");
 ---
 <DemoLayout title="Theming — CSS-only re-theme">
   <p class="demo-kicker">--rf-* custom properties</p>

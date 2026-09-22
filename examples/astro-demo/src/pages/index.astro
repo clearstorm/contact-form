@@ -1,0 +1,46 @@
+---
+import DemoLayout from "../layouts/DemoLayout.astro";
+
+const pages = [
+  { href: "/kitchen-sink", title: "All 19 field types", blurb: "One form with every field the core can render and validate, plus per-field message overrides and a copy bag." },
+  { href: "/contact", title: "CF7 mailer", blurb: "The default transport — posts to a WordPress Contact Form 7 endpoint, env-configurable via PUBLIC_API_URL / PUBLIC_CF7_FORM_ID." },
+  { href: "/booking", title: "Booking (prefill)", blurb: "DateTime prefill, optional date/time, guests select — extra fields fold into the canonical payload." },
+  { href: "/json", title: "JSON mailer", blurb: "Generic endpoint transport — watch the exact payload the mailer sends on a local echo server." },
+  { href: "/theming", title: "Theming", blurb: "The same markup rendered with the default light theme and a full CSS-only dark override." },
+];
+---
+<DemoLayout title="Home — @clearstorm/contact-form demo">
+  <p class="demo-kicker">Reference deployment</p>
+  <h1>@clearstorm/contact-form demo</h1>
+  <p class="lead">
+    A minimal Astro site exercising the package end to end: the JSON form spec,
+    all field types and validation rules, both transport mailers, the
+    <code>prefill="datetime"</code> opt-in, consumer-driven copy and
+    CSS-only theming.
+  </p>
+
+  <nav class="demo-grid" aria-label="Demo pages">
+    {pages.map((page) => (
+      <a class="demo-tile" href={page.href}>
+        <h3>{page.title}</h3>
+        <p>{page.blurb}</p>
+      </a>
+    ))}
+  </nav>
+
+  <div class="demo-card">
+    <h2>Quickstart</h2>
+    <p class="lead" style="margin-block:0 1rem">
+      The forms are live in this repo — no WordPress or backend required unless
+      you open the CF7 page. Forms using the <code>json</code> mailer post to a
+      local echo server.
+    </p>
+    <pre>{`# terminal 1 — payload inspector for the json-mailer forms
+cd examples/astro-demo
+npm install
+npm run demo:api
+
+# terminal 2 — the demo site
+npm run dev           # http://localhost:4321`}</pre>
+  </div>
+</DemoLayout>

@@ -1,0 +1,34 @@
+{
+  "name": "all-fields",
+  "submit": "Send",
+  "status": "Thanks — the demo received your submission.",
+  "mailer": "json",
+  "endpoint": "http://localhost:8787/submit",
+  "copy": {
+    "sending": "Sending…",
+    "invalidForm": "Some fields need your attention. Please check the form.",
+    "submitError": "Sending failed (HTTP {status}) — is the echo server running (npm run demo:api)?"
+  },
+  "fields": [
+    { "type": "text", "id": "text", "name": "text", "label": "Text", "required": true, "size": 50, "placeholder": "Plain text" },
+    { "type": "email", "id": "email", "name": "email", "label": "Email address", "required": true, "size": 50, "placeholder": "you@example.com", "message": "Please enter a valid email address." },
+    { "type": "tel", "id": "tel", "name": "tel", "label": "Phone", "required": false, "optional": true, "size": 50, "placeholder": "+27 00 000 0000" },
+    { "type": "url", "id": "url", "name": "url", "label": "Website", "required": false, "optional": true, "size": 50, "placeholder": "https://example.com" },
+    { "type": "password", "id": "password", "name": "password", "label": "Password", "required": false, "optional": true, "size": 50, "autocomplete": "new-password", "placeholder": "••••••••" },
+    { "type": "search", "id": "search", "name": "search", "label": "Search", "required": false, "optional": true, "size": 50, "placeholder": "Search…" },
+    { "type": "number", "id": "number", "name": "number", "label": "Number (1–10)", "required": true, "size": 33, "min": 1, "max": 10, "step": 1, "message": "Pick a whole number from 1 to 10." },
+    { "type": "range", "id": "range", "name": "range", "label": "Range (0–100)", "required": true, "size": 66, "min": 0, "max": 100, "step": 5, "value": 50 },
+    { "type": "date", "id": "date", "name": "date", "label": "Date", "required": false, "optional": true, "size": 33 },
+    { "type": "time", "id": "time", "name": "time", "label": "Time", "required": false, "optional": true, "size": 33 },
+    { "type": "datetime-local", "id": "datetime", "name": "datetime", "label": "Date & time", "required": false, "optional": true, "size": 33 },
+    { "type": "month", "id": "month", "name": "month", "label": "Month", "required": false, "optional": true, "size": 33 },
+    { "type": "week", "id": "week", "name": "week", "label": "Week", "required": false, "optional": true, "size": 33 },
+    { "type": "color", "id": "color", "name": "color", "label": "Colour", "required": false, "optional": true, "size": 33, "value": "#c46f48" },
+    { "type": "select", "id": "select", "name": "select", "label": "Select", "required": true, "size": 100, "options": ["Option one", "Option two", "Option three"], "message": "Choose an option." },
+    { "type": "checkbox", "id": "preferences", "name": "preferences", "label": "Preferences", "required": true, "size": 100, "options": ["Newsletter", "Events", "Offers"], "message": "Choose at least one preference." },
+    { "type": "radio", "id": "contact_method", "name": "contact_method", "label": "Preferred contact method", "required": true, "size": 100, "options": ["Email", "Phone", "WhatsApp"] },
+    { "type": "checkbox", "id": "consent", "name": "consent", "label": "I agree to the demo terms", "required": true, "size": 100, "message": "Please accept the terms to continue." },
+    { "type": "textarea", "id": "message", "name": "message", "label": "Message", "required": true, "size": 100, "rows": 6, "maxlength": 500, "message": "Your message must be at least 10 characters." },
+    { "type": "hidden", "id": "hidden", "name": "hidden", "label": "Hidden source", "value": "static-hidden-field-value" }
+  ]
+}

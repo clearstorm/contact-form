@@ -1,0 +1,36 @@
+---
+import DemoLayout from "../layouts/DemoLayout.astro";
+import ContactForm from "@clearstorm/contact-form/astro/ContactForm.astro";
+import type { FormSpec } from "@clearstorm/contact-form/core";
+import spec from "../../../specs/booking.json";
+
+const form = spec as FormSpec;
+---
+<DemoLayout title="Booking — prefill datetime demo">
+  <p class="demo-kicker">Opt-in prefill</p>
+  <h1>Booking form + <code>prefill="datetime"</code></h1>
+  <p class="lead">
+    Rendered with <code>prefill="datetime"</code>: the date/time inputs start
+    at today / near-now (the script also raises the date picker's
+    <code>min</code> to today) while <em>both stay optional in the spec</em>.
+    Date, time and the required guests select are spec fields outside the CF7
+    core set — on submit they fold into the payload as labelled lines.
+  </p>
+
+  <div class="demo-card">
+    <ContactForm form={form} prefill="datetime" />
+  </div>
+
+  <h2>What the spec controls</h2>
+  <table class="demo-table">
+    <thead>
+      <tr><th>Field</th><th>Spec</th><th>Result</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>date</code></td><td><code>required: false</code>, size 33</td><td>pre-filled, optional</td></tr>
+      <tr><td><code>time</code></td><td><code>required: false</code>, size 33</td><td>pre-filled, optional</td></tr>
+      <tr><td><code>guests</code></td><td><code>required: true</code>, size 33</td><td>required select, 1–8</td></tr>
+      <tr><td><code>message</code></td><td><code>required: false</code></td><td>optional — folded into the payload only when filled</td></tr>
+    </tbody>
+  </table>
+</DemoLayout>

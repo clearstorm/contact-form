@@ -1,0 +1,21 @@
+{
+  "name": "contact-form-astro-demo",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "demo:api": "node scripts/echo-server.mjs"
+  },
+  "dependencies": {
+    "@clearstorm/contact-form": "file:../.."
+  },
+  "devDependencies": {
+    "astro": "^7.3.2"
+  }
+}

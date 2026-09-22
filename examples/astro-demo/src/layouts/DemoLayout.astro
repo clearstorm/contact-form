@@ -1,0 +1,50 @@
+---
+import "../styles/demo.css";
+
+interface Props {
+  title: string;
+}
+
+const { title } = Astro.props;
+
+const links = [
+  { href: "/", label: "Home" },
+  { href: "/kitchen-sink", label: "All field types" },
+  { href: "/contact", label: "CF7" },
+  { href: "/booking", label: "Booking (prefill)" },
+  { href: "/json", label: "JSON mailer" },
+  { href: "/theming", label: "Theming" },
+];
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+  </head>
+  <body>
+    <header class="demo-header">
+      <div class="demo-shell demo-header__inner">
+        <span class="demo-brand">@clearstorm/contact-form · demo</span>
+        <nav class="demo-nav" aria-label="Demo pages">
+          {links.map((link) => <a href={link.href}>{link.label}</a>)}
+        </nav>
+      </div>
+    </header>
+
+    <main class="demo-shell demo-main">
+      <slot />
+    </main>
+
+    <footer class="demo-footer">
+      <div class="demo-shell">
+        <p>
+          Example app inside the package repo — the form engine is linked live
+          from <code>../src</code> (a <code>file:</code> dependency), so editing
+          the package's source hot-reloads these pages.
+        </p>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -23,6 +23,11 @@ per-field `message` overrides, with built-in defaults.
 
 Zero runtime dependencies. No Tailwind required.
 
+> **Want to see it working?** `examples/` holds a runnable Astro demo site (all
+> 19 field types, both mailers, `prefill="datetime"`, CSS-only theming) plus
+> copy-paste-ready JSON form specs it renders directly. See
+> [`examples/README.md`](examples/README.md).
+
 ---
 
 ## Install

@@ -1,0 +1,45 @@
+---
+import DemoLayout from "../layouts/DemoLayout.astro";
+import ContactForm from "@clearstorm/contact-form/astro/ContactForm.astro";
+import type { FormSpec } from "@clearstorm/contact-form/core";
+import spec from "../../../specs/json-endpoint.json";
+
+const form = spec as FormSpec;
+
+// The payload the `json` mailer sends is governed by the *client* field spec
+// (the data-rules serialised from the JSON), not by however the browser wired
+// the DOM — honeypot excluded, checkbox groups joined, values trimmed.
+const payloadPreview = `POST /submit  (multipart/form-data)
+  first_name : Jane
+  last_name  : Doe
+  email      : jane@example.com
+  interests  : Newsletter, Events      ← checkbox group, comma-joined
+  message    : Hello from the demo
+  # honeypot field (name="website") is dropped by canonicalData()`;
+const responsePreview = `200 OK  application/json
+  { "ok": true, "message": "Payload received by the demo echo server." }`;
+---
+<DemoLayout title="JSON mailer demo">
+  <p class="demo-kicker">Generic endpoint transport</p>
+  <h1>Mailer: <code>json</code></h1>
+  <p class="lead">
+    The <code>json</code> mailer posts the <strong>canonical payload</strong> —
+    exactly the spec fields, trimmed, honeypot excluded — to any endpoint.
+    Run the bundled echo server and submit this form to watch the wire format
+    appear in your terminal. A 2xx response is success; on failure the mailer
+    surfaces a <code>message</code>/<code>error</code> field from the JSON body.
+  </p>
+
+  <div class="demo-note">
+    <p><code>npm run demo:api</code> in a second terminal, then submit the form below.
+    The canonical payload is printed to that server's console.</p>
+  </div>
+
+  <div class="demo-card">
+    <ContactForm form={form} />
+  </div>
+
+  <h2>What travels over the wire</h2>
+  <pre>{payloadPreview}</pre>
+  <pre>{responsePreview}</pre>
+</DemoLayout>

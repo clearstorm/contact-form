@@ -37,8 +37,22 @@ export type FieldType =
   | "range"
   | "color";
 
-/** Field width as a percentage of the (12-column) form row. */
-export type FieldSize = 100 | 66 | 50 | 33 | 25;
+/**
+ * Field/description width as a percentage of the 12-column form row. Every
+ * value maps to its nearest column span (see `gridSpan`) — no per-size CSS
+ * required. `66` is a legacy alias of `67` (both round to 8 columns).
+ */
+export type FieldSize = 100 | 90 | 80 | 75 | 70 | 67 | 66 | 60 | 50 | 40 | 33 | 30 | 25 | 20 | 10;
+
+/**
+ * Map a percentage width onto the 12-column grid as its nearest span
+ * (clamped 1..12). `undefined` defaults to 50% → 6 columns; this is the one
+ * mapping the components use, so any FieldSize renders without extra CSS.
+ */
+export function gridSpan(size?: number): number {
+  if (size === undefined) return 6;
+  return Math.min(12, Math.max(1, Math.round((size / 100) * 12)));
+}
 
 /** Transport adapters shipped with the form solution. */
 export type MailerName = "cf7" | "json";

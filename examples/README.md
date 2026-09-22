@@ -28,7 +28,7 @@ demo.
 | Route | Demonstrates |
 | --- | --- |
 | `/` | Index + quickstart |
-| `/kitchen-sink` | **All 19 field types** in one spec — rendering and every validation rule; checkbox groups, radio, single consent toggle, hidden passthrough; per-field `message` overrides; 50/66/33/100 column spans |
+| `/kitchen-sink` | **All 19 field types** in one spec — rendering and every validation rule; checkbox groups, radio, single consent toggle, hidden passthrough; per-field `message` overrides; column sizes spanning the 12-column grid |
 | `/conditional` | **Conditional fields (`showWhen`)** — a realistic form (`equals` service → other, `filled` rush → deadline), an operator-reference form exercising all seven operators (`equals`, `notEquals`, `in`, `notIn`, `includes`, `filled`, `empty`), and an AND form where a reveal needs two conditions to hold; hidden fields are out of scope and out of the payload |
 | `/structure` | **Form structure** — `heading`, `description` (sized helper text), `divider` (rule or invisible spacer) and `section` (labeled break) interleaved with real fields; structural elements never reach `data-rules` or the payload |
 | `/contact` | **`cf7` mailer** — endpoint via `config` prop read from `PUBLIC_API_URL` / `PUBLIC_CF7_FORM_ID`; shows the resolved CF7 endpoint (or a friendly config-error note) |

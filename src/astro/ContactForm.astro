@@ -19,7 +19,7 @@
  */
 import FormField from "./FormField.astro";
 import Decor from "./Decor.astro";
-import { serializeRules, toFieldSpecs, isFieldSpec, type FormSpec } from "../core";
+import { serializeRules, toFieldSpecs, isFieldSpec, gridSpan, type FormSpec } from "../core";
 
 interface Props {
   form: FormSpec;
@@ -90,7 +90,7 @@ if (
         optional={element.optional}
         rows={element.rows}
         options={element.options}
-        span={element.size ?? 50}
+        span={gridSpan(element.size)}
         placeholder={element.placeholder}
         value={element.value}
         min={element.min}

@@ -205,8 +205,8 @@ payload, and never reach the shared script.
 
 ```jsonc
 "fields": [
-  { "type": "heading",    "text": "Project details", "align": "center" },  // full-width <h3> title
-  { "type": "description", "text": "We reply within a day.", "size": 66 },  // muted helper text (sized)
+  { "type": "heading",    "text": "Project details", "align": "center" },  // full-width <h3> title + rule
+  { "type": "description", "text": "We reply within a day.", "size": 67 },  // muted helper text (sized)
   { "type": "section",    "label": "Contact details" },                     // section break, centered label
   { "type": "text",       "id": "name", "name": "name", "label": "Name" },  // real field
   { "type": "divider" },                                                     // thin rule
@@ -216,8 +216,8 @@ payload, and never reach the shared script.
 
 | Type | Keys | Renders |
 | --- | --- | --- |
-| `heading` | `text`, optional `align` (`left` \| `center`) | full-width section title (`<h3 class="rf-heading">`) |
-| `description` | `text`, optional `size` (100 \| 66 \| 50 \| 33 \| 25, default 100) | muted helper text sharing the field grid spans |
+| `heading` | `text`, optional `align` (`left` \| `center`), optional `line` (default `true`) | full-width section title (`<h3 class="rf-heading">`); the rule follows the alignment — `left` keeps the line on the right of the text, `right` on the left, `center` on both sides — and `line: false` renders text only |
+| `description` | `text`, optional `size` (100 \| 90 \| 80 \| 75 \| 70 \| 67 \| 66 \| 60 \| 50 \| 40 \| 33 \| 30 \| 25 \| 20 \| 10, default 100) | muted helper text sharing the field grid spans |
 | `divider` | optional `visible` (default `true`), optional `min` (CSS length) | thin rule, or with `visible: false` an invisible spacer |
 | `section` | optional `label` | section break; the label sits centered on the rule |
 
@@ -399,9 +399,11 @@ Every hard-coded size is themeable — compact minimums by default:
 | `--rf-submit-margin-top` | `0.25rem` | submit-row top margin |
 | `--rf-status-padding` | `0.75rem` | status box padding |
 
-Layout: the form is a 12-column grid — use `size` (`100 | 66 | 50 | 33 | 25`)
-on each field spec for its width (default `50`). Fields collapse to a single
-column below `48rem`.
+Layout: the form is a 12-column grid — use `size` on each field spec for its
+width (default `50`, any of
+`100 | 90 | 80 | 75 | 70 | 67 | 66 | 60 | 50 | 40 | 33 | 30 | 25 | 20 | 10`).
+Sizes map to the nearest column span. Fields and `description` elements
+collapse to a single column below `48rem`.
 
 **Opt-in defaults:** `prefill="datetime"` on the component pre-fills `date` /
 `time` inputs with the current local date and near-now time (handy for booking

@@ -62,6 +62,7 @@
       "label": "Send me occasional project updates",
       "size": 100
     },
+    { "type": "heading", "text": "Anything else?", "line": false, "align": "center" },
     { "type": "divider", "visible": false, "min": "2rem" }
   ]
 }

@@ -9,6 +9,7 @@ import {
   buildRules,
   canonicalData,
   evaluateVisibility,
+  gridSpan,
   isFieldSpec,
   parseFieldSpec,
   parseTime,
@@ -211,6 +212,13 @@ const structSerialized = serializeRules(structSpecs);
 check("serialized rules are field-only (no decor keys)", !structSerialized.includes('"text":') && !structSerialized.includes('"align"') && !structSerialized.includes('"visible"'), structSerialized);
 check("round-trip carries only fields", parseFieldSpec(structSerialized).length === 2);
 check("buildRules only sees fields", Object.keys(buildRules(structSpecs)).sort().join(",") === "email2,full_name");
+
+// --- 2.9. gridSpan: percentage size → nearest 12-column span ---
+const gridSpans = [[100, 12], [90, 11], [80, 10], [75, 9], [70, 8], [67, 8], [66, 8], [60, 7], [50, 6], [40, 5], [33, 4], [30, 4], [25, 3], [20, 2], [10, 1]];
+check("gridSpan maps the full 12-grid size set", gridSpans.every(([size, span]) => gridSpan(size) === span), JSON.stringify(gridSpans.map(([s]) => [s, gridSpan(s)])));
+check("gridSpan default (undefined) → 6", gridSpan(undefined) === 6);
+check("gridSpan clamps out-of-range high", gridSpan(150) === 12 && gridSpan(1000) === 12);
+check("gridSpan clamps out-of-range low", gridSpan(0) === 1 && gridSpan(-20) === 1);
 
 // --- 3. parseTime ---
 check("parseTime 12h pm", parseTime("7:00 pm") === "19:00");

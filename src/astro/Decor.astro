@@ -8,7 +8,7 @@
  *
  * Styling follows the same `rf-*` + `--rf-*` theming pattern as fields.
  */
-import type { DecorSpec } from "../core";
+import { gridSpan, type DecorSpec } from "../core";
 
 interface Props {
   decor: DecorSpec;
@@ -16,15 +16,23 @@ interface Props {
 
 const { decor } = Astro.props;
 const headingAlign = decor.type === "heading" ? decor.align ?? "left" : "left";
-const descriptionSize = decor.type === "description" ? decor.size ?? 100 : 100;
+const descriptionSpan = decor.type === "description" ? gridSpan(decor.size ?? 100) : 12;
 ---
 
 {decor.type === "heading" && (
-  <h3 class={`rf-heading rf-heading--${headingAlign}`}>{decor.text}</h3>
+  <h3
+    class={`rf-heading rf-heading--${headingAlign}${
+      decor.line !== false ? " rf-heading--rule" : ""
+    }`}
+  >
+    {decor.text}
+  </h3>
 )}
 
 {decor.type === "description" && (
-  <p class={`rf-description rf-span-${descriptionSize}`}>{decor.text}</p>
+  <p class="rf-description" style={`--rf-span: ${descriptionSpan}`}>
+    {decor.text}
+  </p>
 )}
 
 {decor.type === "divider" &&
@@ -61,14 +69,44 @@ const descriptionSize = decor.type === "description" ? decor.size ?? 100 : 100;
     text-align: center;
   }
 
-  /* Description spans reuse the shared .rf-span-* grid classes from
-     FormField.astro (100 → full row on desktop, every span full-width on
-     mobile) — no grid-column set here so the span class wins. */
+  /* Heading rule (default on; `line: false` hides it) — a flex row whose
+     pseudo-elements draw rules on the left and/or right of the text:
+     left → rule on the right · right → rule on the left · center → both. */
+  .rf-heading--rule {
+    display: flex;
+    align-items: center;
+    gap: var(--rf-heading-line-gap, 0.75rem);
+  }
+
+  .rf-heading--rule::before,
+  .rf-heading--rule::after {
+    content: "";
+    flex: 1;
+    border-top: var(--rf-heading-line-thickness, 1px) solid
+      var(--rf-heading-line-color, var(--rf-field-border, #d1d5db));
+  }
+
+  .rf-heading--left.rf-heading--rule::before {
+    display: none;
+  }
+
+  .rf-heading--right.rf-heading--rule::after {
+    display: none;
+  }
+
+  /* Description spans the row via the inline `--rf-span` (from `gridSpan`,
+     default 100 → 12 columns on desktop, full-width on mobile). */
   .rf-description {
     margin: var(--rf-description-margin, 0.125rem 0 0);
     font-size: var(--rf-description-size, 0.82rem);
     line-height: 1.5;
     color: var(--rf-description-color, var(--rf-muted, #6b7280));
+  }
+
+  @media (min-width: 48rem) {
+    .rf-description {
+      grid-column: span var(--rf-span, 12);
+    }
   }
 
   .rf-divider {

@@ -7,8 +7,8 @@ import structure from "../../../specs/structure.json";
 const structureForm = structure as FormSpec;
 
 const structureRows: Array<[string, string, string]> = [
-  ["heading", '{ "type": "heading", "text": "…", "align": "center" }', "a full-width <code>&lt;h3&gt;</code> section title (left or center)"],
-  ["description", '{ "type": "description", "text": "…", "size": 66 }', "muted helper text; <code>size</code> spans 100/66/50/33/25 of the row"],
+  ["heading", '{ "type": "heading", "text": "…", "line": false }', "a full-width <code>&lt;h3&gt;</code> title; its rule is on by default (left → line on the right, right → line on the left, center → both sides), <code>line: false</code> renders text only"],
+  ["description", '{ "type": "description", "text": "…", "size": 75 }', "muted helper text; <code>size</code> maps onto the 12-column grid (100/75/67/50/40/33/…)"],
   ["divider", '{ "type": "divider", "visible": false, "min": "2rem" }', "a thin rule, or with <code>visible: false</code> an invisible spacer"],
   ["section", '{ "type": "section", "label": "Contact details" }', "a section break; the optional <code>label</code> sits centered on the rule"],
 ];

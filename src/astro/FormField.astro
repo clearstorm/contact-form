@@ -10,7 +10,7 @@ interface Props {
   rows?: number;
   /** Select options, or the choices of a checkbox/radio group. */
   options?: string[];
-  /** Grid span within the 12-column row (defaults to 50 → 6 columns on desktop). */
+  /** Grid span in 12-column columns (from `gridSpan`; 50% → 6). */
   span?: number;
   /** Input passthrough attributes. */
   placeholder?: string;
@@ -47,7 +47,8 @@ const isSingleCheckbox = type === "checkbox" && !((options?.length ?? 0) > 0);
 ---
 
 <div
-  class={`rf-field rf-span-${span}${type === "hidden" ? " rf-field--hidden" : ""}`}
+  class={`rf-field${type === "hidden" ? " rf-field--hidden" : ""}`}
+  style={`--rf-span: ${span}`}
 >
   {type !== "hidden" &&
     (isGroup ? (
@@ -235,13 +236,12 @@ const isSingleCheckbox = type === "checkbox" && !((options?.length ?? 0) > 0);
     line-height: 1.4;
   }
 
-  /* 12-column row spans on desktop — field `size` is the width percentage,
-     mapped to a 12-column span (100→12, 66→8, 50→6, 33→4, 25→3). */
+  /* 12-column row spans on desktop — the field wrapper carries its span as an
+     inline `--rf-span` (set from `gridSpan` in the renderer). Below 48rem the
+     grid is a single column and every element stacks full-width. */
   @media (min-width: 48rem) {
-    .rf-span-100 { grid-column: span 12; }
-    .rf-span-66 { grid-column: span 8; }
-    .rf-span-50 { grid-column: span 6; }
-    .rf-span-33 { grid-column: span 4; }
-    .rf-span-25 { grid-column: span 3; }
+    .rf-field {
+      grid-column: span var(--rf-span, 6);
+    }
   }
 </style>

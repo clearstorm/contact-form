@@ -17,9 +17,13 @@
  * controls, and `--rf-*` spacing tokens). Defaults are a generic, compact
  * light scheme — override any variable on your own scope to re-theme.
  */
-import FormField from "./FormField.astro";
-import Decor from "./Decor.astro";
-import { serializeRules, toFieldSpecs, isFieldSpec, gridSpan, type FormSpec } from "../core";
+import FormElements from "./FormElements.astro";
+import {
+  serializeRules,
+  toFieldSpecs,
+  toSteps,
+  type FormSpec,
+} from "../core";
 
 interface Props {
   form: FormSpec;
@@ -46,6 +50,21 @@ const mailerName = form.mailer ?? "cf7";
 // fields are folded into the message. The shared bundle rebuilds per-form
 // behaviour from this serialised spec; the format tests stay in the core.
 const fieldConfig = toFieldSpecs(form.fields);
+
+// Wizard layout — `step` markers split the fields into step panes; everything
+// before the first marker is a shared prefix shown on every step. With zero
+// or one marker the form renders as a single page (backwards compatible).
+const layout = toSteps(form.fields);
+const isWizard = layout.steps.length > 1;
+const flatElements =
+  layout.steps.length <= 1
+    ? [...layout.shared, ...(layout.steps[0]?.elements ?? []), ...layout.hoisted]
+    : [];
+// Only the last marker's submit label is honoured (enforced in `toSteps`);
+// `form.submit` is the fallback for the final button.
+const finalSubmitLabel = layout.steps[layout.steps.length - 1]?.submit ?? form.submit;
+const stepsMeta = layout.steps.map((step) => ({ label: step.label, submit: step.submit }));
+const backLabel = form.copy?.back ?? "Back";
 
 // Endpoint config — explicit props win, else the form spec's own block.
 const wpUrl = config.apiUrl ?? form.cf7?.apiUrl;
@@ -76,32 +95,53 @@ if (
   data-form-id={cf7FormId}
   data-rules={serializeRules(fieldConfig)}
   data-copy={form.copy ? JSON.stringify(form.copy) : undefined}
+  data-steps={
+    isWizard ? JSON.stringify({ steps: stepsMeta, submit: finalSubmitLabel }) : undefined
+  }
   novalidate
 >
-  {form.fields.map((element) =>
-    isFieldSpec(element) ? (
-      <FormField
-        label={element.label}
-        id={element.id}
-        name={element.name}
-        type={element.type}
-        autocomplete={element.autocomplete}
-        required={element.required}
-        optional={element.optional}
-        rows={element.rows}
-        options={element.options}
-        span={gridSpan(element.size)}
-        placeholder={element.placeholder}
-        value={element.value}
-        min={element.min}
-        max={element.max}
-        step={element.step}
-        maxlength={element.maxlength}
-        pattern={element.pattern}
-      />
-    ) : (
-      <Decor decor={element} />
-    ),
+  {isWizard ? (
+    <>
+      {layout.shared.length > 0 && (
+        <div class="rf-shared" data-shared>
+          <FormElements elements={layout.shared} />
+        </div>
+      )}
+      <ol class="rf-steps" data-steps-nav aria-label="Form progress">
+        {layout.steps.map((step, i) => (
+          <li class="rf-step" data-step={i} aria-current={i === 0 ? "step" : undefined}>
+            <span class="rf-step-index" aria-hidden="true">{i + 1}</span>
+            <span class="rf-step-label">{step.label}</span>
+          </li>
+        ))}
+      </ol>
+      {layout.steps.map((step, i) => (
+        <section
+          class="rf-pane"
+          data-pane={i}
+          hidden={i !== 0}
+          inert={i !== 0 ? "true" : undefined}
+        >
+          <FormElements elements={step.elements} />
+        </section>
+      ))}
+      {layout.hoisted.length > 0 && <FormElements elements={layout.hoisted} />}
+      <div class="rf-step-footer" data-step-footer>
+        <button class="rf-submit" type="button" data-step-back hidden>
+          ← {backLabel}
+        </button>
+        <button class="rf-submit" type="submit" data-step-next>
+          {finalSubmitLabel} <span aria-hidden="true">→</span>
+        </button>
+      </div>
+    </>
+  ) : (
+    <>
+      <FormElements elements={flatElements} />
+      <div class="rf-submit-row">
+        <button class="rf-submit" type="submit">{form.submit} <span aria-hidden="true">→</span></button>
+      </div>
+    </>
   )}
   <input
     type="text"
@@ -112,9 +152,6 @@ if (
     aria-hidden="true"
     class="rf-honeypot"
   />
-  <div class="rf-submit-row">
-    <button class="rf-submit" type="submit">{form.submit} <span aria-hidden="true">→</span></button>
-  </div>
   <p class="rf-status" role="status" hidden>{form.status}</p>
 </form>
 
@@ -151,6 +188,15 @@ if (
     --rf-submit-gap: 0.5rem;
     --rf-submit-margin-top: 0.25rem;
     --rf-status-padding: 0.75rem;
+    /* wizard (multi-step) — stepper, panes and nav footer */
+    --rf-step-color: #9ca3af;
+    --rf-step-active-color: var(--rf-submit-bg);
+    --rf-step-done-color: var(--rf-success);
+    --rf-step-size: 1.5rem;
+    --rf-step-label-size: 0.78rem;
+    --rf-steps-gap: 0.5rem 1rem;
+    --rf-steps-margin: 0 0 0.5rem;
+    --rf-step-footer-gap: 0.5rem;
     /* structural elements (headings, descriptions, dividers, sections) */
     --rf-heading-size: 1rem;
     --rf-heading-weight: 700;
@@ -241,6 +287,93 @@ if (
     pointer-events: none;
   }
 
+  /* ---- Wizard (multi-step) layout ----
+     The shared prefix and each step pane are their own 12-column grid inside
+     the form grid, so fields keep their `rf-span-{n}` widths; panes stay in
+     the DOM (hidden + inert) so cross-step showWhen conditions keep reading
+     earlier steps' values. */
+
+  .rf-shared,
+  .rf-steps,
+  .rf-pane,
+  .rf-step-footer {
+    grid-column: span 1;
+  }
+
+  .rf-shared,
+  .rf-pane {
+    display: grid;
+    grid-template-columns: 1fr;
+    column-gap: var(--rf-gap-x);
+    row-gap: var(--rf-gap-y);
+    min-width: 0;
+  }
+
+  .rf-shared[hidden],
+  .rf-pane[hidden],
+  [data-step-back][hidden] {
+    display: none;
+  }
+
+  .rf-steps {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--rf-steps-gap, 0.5rem 1rem);
+    margin: var(--rf-steps-margin, 0 0 0.5rem);
+    padding: 0;
+    list-style: none;
+  }
+
+  .rf-step {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+  }
+
+  .rf-step-index {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--rf-step-size, 1.5rem);
+    height: var(--rf-step-size, 1.5rem);
+    border: 1px solid var(--rf-step-color, #9ca3af);
+    border-radius: 50%;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--rf-step-color, #9ca3af);
+  }
+
+  .rf-step-label {
+    font-size: var(--rf-step-label-size, 0.78rem);
+    color: var(--rf-step-color, #9ca3af);
+  }
+
+  .rf-step[aria-current="step"] .rf-step-index {
+    border-color: var(--rf-step-active-color, var(--rf-submit-bg));
+    background: var(--rf-step-active-color, var(--rf-submit-bg));
+    color: var(--rf-submit-text);
+  }
+
+  .rf-step[aria-current="step"] .rf-step-label {
+    color: inherit;
+    font-weight: 600;
+  }
+
+  .rf-step--done .rf-step-index {
+    border-color: var(--rf-step-done-color, var(--rf-success));
+    color: var(--rf-step-done-color, var(--rf-success));
+  }
+
+  .rf-step-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--rf-step-footer-gap, 0.5rem);
+    margin-top: var(--rf-submit-margin-top);
+  }
+
   @media (min-width: 48rem) {
     .rf-form {
       grid-template-columns: repeat(12, 1fr);
@@ -254,6 +387,18 @@ if (
 
     .rf-status {
       grid-column: span 12;
+    }
+
+    .rf-shared,
+    .rf-steps,
+    .rf-pane,
+    .rf-step-footer {
+      grid-column: span 12;
+    }
+
+    .rf-shared,
+    .rf-pane {
+      grid-template-columns: repeat(12, 1fr);
     }
   }
 </style>
@@ -448,6 +593,7 @@ if (
     successMessage: string,
     copy: FormCopy,
     visibility: VisibilityEngine,
+    scopedControls?: Control[],
   ): Promise<void> {
     const form = event.currentTarget;
     if (!(form instanceof HTMLFormElement)) return;
@@ -473,18 +619,20 @@ if (
     // validation and the payload reflect exactly what the visitor sees.
     visibility.apply();
 
-    const controls = Array.from(form.elements).filter(
-      (el): el is Control =>
-        el instanceof HTMLInputElement ||
-        el instanceof HTMLTextAreaElement ||
-        el instanceof HTMLSelectElement,
-    );
+    const controls =
+      scopedControls ??
+      Array.from(form.elements).filter(
+        (el): el is Control =>
+          el instanceof HTMLInputElement ||
+          el instanceof HTMLTextAreaElement ||
+          el instanceof HTMLSelectElement,
+      );
 
     // Fields inside hidden wrappers are out of scope — a hidden conditional
     // field can never block the form, and it never reaches the payload.
-    const scopedControls = controls.filter((control) => !visibility.isHiddenControl(control));
+    const scoped = controls.filter((control) => !visibility.isHiddenControl(control));
 
-    const invalidControls = scopedControls.filter(
+    const invalidControls = scoped.filter(
       (control) => !validateField(control, rules[control.name], form),
     );
 
@@ -573,9 +721,85 @@ if (
 
     const visibility = createVisibilityEngine(form, fields);
 
-    form.addEventListener("submit", (event) =>
-      handleSubmit(event, fields, mailerName, successMessage, copy, visibility),
-    );
+    const isControl = (el: Element): el is Control =>
+      el instanceof HTMLInputElement ||
+      el instanceof HTMLTextAreaElement ||
+      el instanceof HTMLSelectElement;
+
+    /* ---- Wizard (multi-step) state ----
+       Panes and the shared prefix all stay in the DOM (hidden + inert), so
+       cross-step showWhen conditions keep reading earlier steps' values and
+       every step's fields travel in the payload. "Next" validates only the
+       current step's in-scope fields; the final button validates the visible
+       form (current step + shared prefix) and submits. */
+    let stepsMeta: { steps: { label: string; submit?: string }[]; submit: string } | null = null;
+    if (form.dataset.steps) {
+      try {
+        stepsMeta = JSON.parse(form.dataset.steps) as typeof stepsMeta;
+      } catch {
+        /* malformed steps — treat as single-page */
+      }
+    }
+    const stepCount = stepsMeta?.steps.length ?? 0;
+    const isWizard = stepCount > 1;
+    let currentStep = 0;
+
+    const paneScopeFor = (step: number): Control[] =>
+      Array.from(form.elements)
+        .filter(isControl)
+        .filter((control) => {
+          const pane = control.closest<HTMLElement>("[data-pane]");
+          return pane === null || Number(pane.dataset.pane) === step;
+        });
+
+    const goTo = (step: number): void => {
+      currentStep = step;
+      form.querySelectorAll<HTMLElement>("[data-pane]").forEach((pane, i) => {
+        const active = i === step;
+        pane.hidden = !active;
+        if (active) pane.removeAttribute("inert");
+        else pane.setAttribute("inert", "");
+      });
+      form.querySelectorAll<HTMLElement>("[data-step]").forEach((item, i) => {
+        item.classList.toggle("rf-step--done", i < step);
+        if (i === step) item.setAttribute("aria-current", "step");
+        else item.removeAttribute("aria-current");
+      });
+      const back = form.querySelector<HTMLButtonElement>("[data-step-back]");
+      if (back) back.hidden = step === 0;
+      const next = form.querySelector<HTMLButtonElement>("[data-step-next]");
+      if (next) {
+        next.textContent =
+          step < stepCount - 1 ? copy.next ?? "Next" : (stepsMeta?.submit ?? "");
+      }
+      visibility.apply();
+    };
+
+    form.addEventListener("submit", (event) => {
+      if (!isWizard) {
+        void handleSubmit(event, fields, mailerName, successMessage, copy, visibility);
+        return;
+      }
+      // Wizard: the submit button advances the current step; the last step
+      // submits. Latest visibility always applies first.
+      visibility.apply();
+      const stepControls = paneScopeFor(currentStep).filter(
+        (control) => !visibility.isHiddenControl(control),
+      );
+      if (currentStep < stepCount - 1) {
+        event.preventDefault();
+        const invalid = stepControls.filter(
+          (control) => !validateField(control, rules[control.name], form),
+        );
+        if (invalid.length > 0) {
+          invalid[0].focus();
+          return;
+        }
+        goTo(currentStep + 1);
+        return;
+      }
+      void handleSubmit(event, fields, mailerName, successMessage, copy, visibility, stepControls);
+    });
 
     // Conditional fields: re-evaluate whenever a controlling control changes.
     const onControllerInput = (event: Event): void => {
@@ -602,5 +826,9 @@ if (
         control.addEventListener("input", onInput);
         control.addEventListener("change", onInput);
       });
+
+    // Step forms start on the first step: normalise the stepper state, the
+    // footer labels ("Next" until the final step) and any conditional fields.
+    if (isWizard) goTo(0);
   });
 </script>

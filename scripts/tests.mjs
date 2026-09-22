@@ -15,6 +15,7 @@ import {
   parseTime,
   serializeRules,
   toFieldSpecs,
+  toSteps,
   validateValue,
   visibleNames,
 } from "../src/core.ts";
@@ -219,6 +220,70 @@ check("gridSpan maps the full 12-grid size set", gridSpans.every(([size, span]) 
 check("gridSpan default (undefined) → 6", gridSpan(undefined) === 6);
 check("gridSpan clamps out-of-range high", gridSpan(150) === 12 && gridSpan(1000) === 12);
 check("gridSpan clamps out-of-range low", gridSpan(0) === 1 && gridSpan(-20) === 1);
+
+// --- 2.10. toSteps: wizard step markers ---
+const wizardFixture = {
+  name: "wizard",
+  submit: "Send",
+  status: "ok",
+  fields: [
+    { type: "heading", text: "Enquiry" },
+    { type: "step", label: "Contact", submit: "Go" },
+    { type: "text", id: "name", name: "name", label: "Name", required: true },
+    { type: "step", label: "Project" },
+    { type: "select", id: "budget", name: "budget", label: "Budget", options: ["a"] },
+    { type: "step", label: "Details", submit: "Send enquiry" },
+    { type: "textarea", id: "msg", name: "msg", label: "Message" },
+    { type: "hidden", id: "ref", name: "referrer", label: "Referrer", value: "demo" },
+  ],
+};
+const wizardLayout = toSteps(wizardFixture.fields);
+check("toSteps: 3 markers → 3 steps", wizardLayout.steps.length === 3);
+check(
+  "toSteps: steps keep their labels in order",
+  wizardLayout.steps.map((s) => s.label).join() === "Contact,Project,Details",
+);
+check(
+  "toSteps: prefix before first marker is the shared zone",
+  wizardLayout.shared.length === 1 && wizardLayout.shared[0].type === "heading",
+);
+check(
+  "toSteps: elements group under their marker",
+  wizardLayout.steps[1].elements.length === 1 &&
+    wizardLayout.steps[1].elements[0].type === "select" &&
+    wizardLayout.steps[2].elements.length === 1,
+);
+check(
+  "toSteps: hidden fields hoist outside the panes",
+  wizardLayout.hoisted.length === 1 &&
+    wizardLayout.steps.every((s) => !s.elements.some((e) => e.type === "hidden")),
+);
+check(
+  "toSteps: only the last marker keeps its submit label",
+  wizardLayout.steps[0].submit === undefined &&
+    wizardLayout.steps[1].submit === undefined &&
+    wizardLayout.steps[2].submit === "Send enquiry",
+);
+const flatLayout = toSteps([
+  { type: "heading", text: "Hi" },
+  { type: "text", id: "x", name: "x", label: "X" },
+  { type: "hidden", id: "h", name: "h", label: "H" },
+]);
+check(
+  "toSteps: no markers → flat single-page layout",
+  flatLayout.steps.length === 0 && flatLayout.shared.length === 3 && flatLayout.hoisted.length === 0,
+);
+check(
+  "toSteps: no markers leaves hidden fields in place",
+  flatLayout.shared[2].type === "hidden",
+);
+check("step markers are never fields", !isFieldSpec({ type: "step", label: "S" }));
+const wizardSpecNames = toFieldSpecs(wizardFixture.fields).map((f) => f.name);
+check(
+  "toFieldSpecs skips step markers",
+  wizardSpecNames.length === 4 &&
+    wizardSpecNames.sort().join() === "budget,msg,name,referrer",
+);
 
 // --- 3. parseTime ---
 check("parseTime 12h pm", parseTime("7:00 pm") === "19:00");

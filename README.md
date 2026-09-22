@@ -231,6 +231,53 @@ Styling follows the same theme system with dedicated tokens —
 
 ---
 
+## Multi-step wizard (`step` markers)
+
+A `step` marker splits the form into groups — a wizard. Everything below a
+marker belongs to that step until the next marker; there is **no top-level
+`steps` key and no per-field step index** — the markers are the layout:
+
+```jsonc
+"fields": [
+  { "type": "heading", "text": "Project enquiry" },   // before the 1st marker →
+  ...                                                 // shared prefix, shown on every step
+  { "type": "step", "label": "Contact" },             // step 1
+  { "type": "text", "id": "name", "name": "name", "label": "Name", "required": true },
+  { "type": "step", "label": "Project" },             // step 2
+  { "type": "select", "id": "budget", "name": "budget", "label": "Budget", "options": ["…"] },
+  { "type": "step", "label": "Details", "submit": "Send enquiry" },  // step 3 (final)
+  { "type": "textarea", "id": "message", "name": "message", "label": "Project brief" },
+  { "type": "hidden", "id": "referrer", "name": "referrer", "value": "wizard-demo" }
+]
+```
+
+Behaviour:
+
+- **Stepper + Back/Next footer** appear only with **≥ 2 markers**. One marker
+  (or none) renders a plain single-page form — fully backwards compatible.
+- **Shared prefix** — elements before the first marker render once above the
+  stepper, stay visible on every step, and are included in every step's
+  validation.
+- **Hoisted hidden fields** — `type: "hidden"` fields render once outside the
+  panes and are present on every step's payload (both fit the honeypot and
+  tracking-parameter use-cases).
+- **Panes stay in the DOM** (hidden + inert). Cross-step `showWhen` conditions
+  keep reading earlier steps' values, and the payload keeps every step's data.
+- **Next** validates only the current step's in-scope fields (visibility-aware —
+  a hidden conditional field can't block a step); **Back never validates**; the
+  **final button** validates the visible form (current step + shared prefix)
+  and submits. Only the **last marker's `submit`** labels that button —
+  `form.submit` is the fallback.
+- Copy keys `back` / `next` (defaults `Back` / `Next`) label the nav; the
+  stepper theme ships with `--rf-step-*` / `--rf-steps-*` tokens (see
+  [Theming](#theming-rf-custom-properties)).
+
+> Live demo: `/wizard` renders
+> [`examples/specs/wizard.json`](examples/specs/wizard.json) — three steps, a
+> cross-step conditional reveal and a hoisted hidden field.
+
+---
+
 ## Conditional fields (`showWhen`)
 
 Any field can hide and reveal based on the visitor's own input. The condition
@@ -333,6 +380,8 @@ built-in default**. Put project-specific copy in the form spec:
 | `textarea` | min length | `Message must be at least 10 characters.` |
 | `checkbox` | checkbox/radio required | `Please select this option.` |
 | `sending` | submit button while in flight | `Sending…` |
+| `back` | wizard Back button | `Back` |
+| `next` | wizard Next button (non-final steps) | `Next` |
 | `error` | generic submission failure | `Something went wrong. Please try again in a moment.` |
 | `invalidForm` | mailer validation failure, no details | `Some fields need your attention. Please check the form.` |
 | `configError` | missing endpoint config | varies by mailer |
@@ -378,6 +427,9 @@ the form itself:
 | `--rf-success` | `#16a34a` | status box success border |
 | `--rf-success-text` | `#14532d` | status box success text |
 | `--rf-danger` | `#dc2626` | status box error border/text |
+| `--rf-step-color` | `#9ca3af` | stepper index bubble + label (pending) |
+| `--rf-step-active-color` | `var(--rf-submit-bg)` | stepper current-step bubble |
+| `--rf-step-done-color` | `var(--rf-success)` | stepper completed-step bubble |
 | `--rf-color-scheme` | `light` | native form controls (`color-scheme`) |
 
 ### Spacing tokens
@@ -398,6 +450,11 @@ Every hard-coded size is themeable — compact minimums by default:
 | `--rf-submit-gap` | `0.5rem` | submit button icon gap |
 | `--rf-submit-margin-top` | `0.25rem` | submit-row top margin |
 | `--rf-status-padding` | `0.75rem` | status box padding |
+| `--rf-step-size` | `1.5rem` | stepper index bubble size |
+| `--rf-step-label-size` | `0.78rem` | stepper label font-size |
+| `--rf-steps-gap` | `0.5rem 1rem` | stepper item gap |
+| `--rf-steps-margin` | `0 0 0.5rem` | stepper margin |
+| `--rf-step-footer-gap` | `0.5rem` | Back/Next footer gap |
 
 Layout: the form is a 12-column grid — use `size` on each field spec for its
 width (default `50`, any of

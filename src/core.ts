@@ -80,6 +80,9 @@ export interface FormCopy {
   checkbox?: string;
   /** Submit button label while the request is in flight. */
   sending?: string;
+  /** Wizard (multi-step) navigation labels — default "Back" / "Next". */
+  back?: string;
+  next?: string;
   /** Generic submission failure shown to the visitor. */
   error?: string;
   /** Mailer says the form failed validation but gave no per-field details. */
@@ -169,7 +172,9 @@ export interface HeadingSpec {
   type: "heading";
   text: string;
   /** Horizontal alignment (defaults to "left"). */
-  align?: "left" | "center";
+  align?: "left" | "center" | "right";
+  /** Flanking rule — on by default; `false` renders the title text only. */
+  line?: boolean;
 }
 
 export interface DescriptionSpec {
@@ -195,15 +200,33 @@ export interface SectionSpec {
 
 export type DecorSpec = HeadingSpec | DescriptionSpec | DividerSpec | SectionSpec;
 
-/** A field or a structural element — the members of `FormSpec.fields`. */
-export type FormElement = FormFieldSpec | DecorSpec;
+/**
+ * A wizard step boundary (`{ "type": "step", "label": "…" }`). Everything in
+ * `FormSpec.fields` below a marker belongs to that step's group until the next
+ * marker; elements before the first marker are shared across every step. Like
+ * all structural elements it carries no `name`, so it never validates, never
+ * serialises into `data-rules`, and never reaches the payload.
+ */
+export interface StepSpec {
+  type: "step";
+  /** Short label shown in the stepper (e.g. "Contact details"). */
+  label: string;
+  /**
+   * Submit-button label for the final step. Only the LAST marker's `submit` is
+   * honoured — earlier ones are ignored (`form.submit` is the fallback).
+   */
+  submit?: string;
+}
+
+/** A field, structural element, or step marker — the members of `FormSpec.fields`. */
+export type FormElement = FormFieldSpec | DecorSpec | StepSpec;
 
 /**
  * True when a fields-array entry is a real field rather than a structural
  * element. Every field carries a `name`; structural elements
- * (`heading`, `description`, `divider`, `section`) never do — that single
- * check is the discriminator used everywhere a field is required
- * (serialisation, rules, payload).
+ * (`heading`, `description`, `divider`, `section`) and wizard `step` markers
+ * never do — that single check is the discriminator used everywhere a field
+ * is required (serialisation, rules, payload).
  */
 export function isFieldSpec(element: FormElement): element is FormFieldSpec {
   return typeof (element as FormFieldSpec).name === "string";
@@ -228,7 +251,8 @@ export interface FormSpec {
   copy?: FormCopy;
   /**
    * The ordered layout of the form: real fields plus (optionally) structural
-   * elements — `heading`, `description`, `divider`, `section`.
+   * elements — `heading`, `description`, `divider`, `section` — and wizard
+   * `step` markers that group the fields after them into multi-step panes.
    */
   fields: FormElement[];
 }
@@ -292,6 +316,66 @@ export function parseFieldSpec(json: string): FieldSpec[] {
   } catch {
     return [];
   }
+}
+
+/* ---- Multi-step (wizard) layout ---- */
+
+/** One wizard step: its stepper label and the elements it groups. */
+export interface FormStep {
+  label: string;
+  /** Submit label for this step's button — kept only on the final step. */
+  submit?: string;
+  elements: FormElement[];
+}
+
+/** The layout a form's fields resolve into. */
+export interface FormLayout {
+  /** Rendered once above the panes — visible on every step. */
+  shared: FormElement[];
+  /** Hidden-type fields hoisted outside the panes (active on every step). */
+  hoisted: FormElement[];
+  /** Ordered groups opened by `step` markers. Empty = single-page form. */
+  steps: FormStep[];
+}
+
+/**
+ * Split a form's elements into wizard layout. Elements before the first
+ * `step` marker become the shared prefix (shown on every step); everything
+ * below a marker belongs to that step's group until the next marker.
+ * `type: "hidden"` fields are hoisted outside the panes. Only the LAST
+ * marker keeps its `submit` label. With no markers the result is a
+ * single-page layout — the elements unchanged, hidden fields left in place —
+ * so the renderer stays fully backwards compatible.
+ */
+export function toSteps(elements: FormElement[]): FormLayout {
+  const hasMarkers = elements.some((element) => element.type === "step");
+  if (!hasMarkers) return { shared: [...elements], hoisted: [], steps: [] };
+
+  const shared: FormElement[] = [];
+  const hoisted: FormElement[] = [];
+  const steps: FormStep[] = [];
+  let current: FormStep | undefined;
+
+  for (const element of elements) {
+    if (element.type === "step") {
+      current = { label: element.label, submit: element.submit, elements: [] };
+      steps.push(current);
+      continue;
+    }
+    if (element.type === "hidden") {
+      hoisted.push(element);
+      continue;
+    }
+    if (current) current.elements.push(element);
+    else shared.push(element);
+  }
+
+  // Only the final step's submit label is honoured.
+  const last = steps[steps.length - 1];
+  for (const step of steps) {
+    if (step !== last) step.submit = undefined;
+  }
+  return { shared, hoisted, steps };
 }
 
 /* ---- Conditional visibility evaluation ---- */

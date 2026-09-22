@@ -1,0 +1,111 @@
+{
+  "name": "wizard",
+  "submit": "Send enquiry",
+  "status": "Thanks — the multi-step form worked end to end.",
+  "mailer": "json",
+  "endpoint": "http://localhost:8787/submit",
+  "copy": {
+    "sending": "Sending…",
+    "back": "Previous",
+    "next": "Next",
+    "submitError": "Sending failed (HTTP {status}) — is the echo server running (npm run demo:api)?"
+  },
+  "fields": [
+    {
+      "type": "heading",
+      "text": "Project enquiry wizard"
+    },
+    {
+      "type": "description",
+      "text": "Three quick steps. This prefix lives before the first step marker, so it stays visible on every step."
+    },
+    {
+      "type": "step",
+      "label": "Contact"
+    },
+    {
+      "type": "text",
+      "id": "name",
+      "name": "name",
+      "label": "Your name",
+      "required": true,
+      "size": 50
+    },
+    {
+      "type": "email",
+      "id": "email",
+      "name": "email",
+      "label": "Email address",
+      "required": true,
+      "size": 50
+    },
+    {
+      "type": "tel",
+      "id": "phone",
+      "name": "phone",
+      "label": "Phone (optional)",
+      "optional": true,
+      "size": 50
+    },
+    {
+      "type": "step",
+      "label": "Project"
+    },
+    {
+      "type": "select",
+      "id": "budget",
+      "name": "budget",
+      "label": "Budget",
+      "required": true,
+      "size": 50,
+      "options": ["Under R20k", "R20k–R60k", "Over R60k"],
+      "message": "Choose a budget."
+    },
+    {
+      "type": "select",
+      "id": "timeline",
+      "name": "timeline",
+      "label": "Timeline",
+      "required": true,
+      "size": 50,
+      "options": ["ASAP", "This quarter", "Flexible"],
+      "message": "Choose a timeline."
+    },
+    {
+      "type": "checkbox",
+      "id": "rush",
+      "name": "rush",
+      "label": "This is urgent",
+      "size": 50
+    },
+    {
+      "type": "step",
+      "label": "Details",
+      "submit": "Send enquiry"
+    },
+    {
+      "type": "date",
+      "id": "deadline",
+      "name": "deadline",
+      "label": "Ideal kick-off date (needed when urgent)",
+      "required": true,
+      "size": 50,
+      "showWhen": { "field": "rush", "operator": "filled" }
+    },
+    {
+      "type": "textarea",
+      "id": "message",
+      "name": "message",
+      "label": "Project brief",
+      "required": true,
+      "size": 100
+    },
+    {
+      "type": "hidden",
+      "id": "referrer",
+      "name": "referrer",
+      "label": "Referrer",
+      "value": "wizard-demo"
+    }
+  ]
+}

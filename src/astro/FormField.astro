@@ -136,10 +136,10 @@ const isSingleCheckbox = type === "checkbox" && !((options?.length ?? 0) > 0);
   }
 
   .rf-label {
-    font-size: 0.82rem;
-    font-weight: 600;
+    font-size: var(--rf-label-size, 0.82rem);
+    font-weight: var(--rf-label-weight, 600);
     letter-spacing: 0.06em;
-    color: inherit;
+    color: var(--rf-label-color, inherit);
   }
 
   .rf-label .rf-optional {
@@ -198,6 +198,7 @@ const isSingleCheckbox = type === "checkbox" && !((options?.length ?? 0) > 0);
     align-items: center;
     gap: 0.5rem;
     font-size: 0.9rem;
+    color: var(--rf-label-color, inherit);
     cursor: pointer;
   }
 

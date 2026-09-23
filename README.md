@@ -471,6 +471,9 @@ the form itself:
   --rf-field-text: #111827;
   --rf-focus: #2563eb;
   --rf-muted: #6b7280;
+  --rf-label-color: inherit;
+  --rf-label-size: 0.82rem;
+  --rf-label-weight: 600;
   --rf-submit-bg: #111827;
   --rf-submit-text: #ffffff;
   --rf-success: #16a34a;
@@ -489,7 +492,8 @@ the form itself:
 | `--rf-field-border` | `#d1d5db` | input border |
 | `--rf-field-text` | `#111827` | input text |
 | `--rf-focus` | `#2563eb` | focus ring, checkbox accent |
-| `--rf-muted` | `#6b7280` | labels, placeholders |
+| `--rf-muted` | `#6b7280` | optional “(optional)” markers, muted `description`/`section` label fallback |
+| `--rf-label-color` | `inherit` | field labels + checkbox/radio option text |
 | `--rf-submit-bg` | `#111827` | submit button background |
 | `--rf-submit-text` | `#ffffff` | submit button text |
 | `--rf-success` | `#16a34a` | status box success border |
@@ -510,6 +514,17 @@ the form itself:
 | `--rf-button-ghost-hover-bg` | `color-mix(in srgb, … 10%, transparent)` | ghost hover background |
 | `--rf-step-header-num-color` | `var(--rf-step-active-color)` | pane header number chip |
 | `--rf-color-scheme` | `light` | native form controls (`color-scheme`) |
+
+### Label tokens
+
+| Variable | Default | Used by |
+| --- | --- | --- |
+| `--rf-label-color` | `inherit` | field labels, checkbox/radio option text & the single-consent label |
+| `--rf-label-size` | `0.82rem` | field label font-size |
+| `--rf-label-weight` | `600` | field label font-weight |
+
+The single-consent checkbox keeps its deliberate body-text sizing
+(`0.9rem` / `400`); it still follows `--rf-label-color`.
 
 ### Spacing tokens
 

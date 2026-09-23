@@ -201,7 +201,7 @@ passthrough attributes — `placeholder`, `value`, `min`, `max`, `step`,
 Every type can be required or optional. `required: false` (the default)
 never blocks submit; `optional: true` additionally renders a muted
 “(optional)” suffix on the label so visitors know they can skip it.
-`/kitchen-sink` and the wizard's “Every field type” form pair required and
+`/general`'s “All 19 field types” form and the wizard's “Every field type” form pair required and
 `optional: true` instances of every optional-capable type side by side.
 
 ---
@@ -236,8 +236,8 @@ Styling follows the same theme system with dedicated tokens —
 `--rf-heading-*`, `--rf-description-*`, `--rf-divider-*`, `--rf-section-*`
 (see [Theming](#theming-rf-custom-properties)).
 
-> Live demo: `/structure` renders
-> [`examples/specs/structure.json`](examples/specs/structure.json) — all four
+> Live demo: `/general` renders the “Structure + decor” named form in
+> [`examples/specs/general.json`](examples/specs/general.json) — all four
 > elements in one form.
 
 ---

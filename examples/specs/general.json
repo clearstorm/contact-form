@@ -1,4 +1,100 @@
 {
+  "Booking (prefill)": {
+    "name": "booking",
+    "submit": "Request table",
+    "status": "Thanks — we've noted your booking request.",
+    "mailer": "json",
+    "endpoint": "http://localhost:8787/submit",
+    "copy": {
+      "sending": "Booking…",
+      "invalidForm": "Some fields need your attention. Please check the form."
+    },
+    "fields": [
+      {
+        "type": "text",
+        "id": "first_name",
+        "name": "first_name",
+        "label": "First name",
+        "required": true,
+        "size": 50,
+        "autocomplete": "given-name"
+      },
+      {
+        "type": "text",
+        "id": "last_name",
+        "name": "last_name",
+        "label": "Last name",
+        "required": true,
+        "size": 50,
+        "autocomplete": "family-name"
+      },
+      {
+        "type": "email",
+        "id": "email",
+        "name": "email",
+        "label": "Email address",
+        "required": true,
+        "size": 50,
+        "autocomplete": "email"
+      },
+      {
+        "type": "tel",
+        "id": "contact",
+        "name": "contact",
+        "label": "Phone",
+        "required": true,
+        "size": 50,
+        "autocomplete": "tel"
+      },
+      {
+        "type": "date",
+        "id": "date",
+        "name": "date",
+        "label": "Preferred date",
+        "required": false,
+        "optional": true,
+        "size": 33
+      },
+      {
+        "type": "time",
+        "id": "time",
+        "name": "time",
+        "label": "Preferred time",
+        "required": false,
+        "optional": true,
+        "size": 33
+      },
+      {
+        "type": "select",
+        "id": "guests",
+        "name": "guests",
+        "label": "Number of guests",
+        "required": true,
+        "size": 33,
+        "options": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8"
+        ],
+        "message": "Choose the number of guests."
+      },
+      {
+        "type": "textarea",
+        "id": "message",
+        "name": "message",
+        "label": "Special requests",
+        "required": false,
+        "optional": true,
+        "size": 100,
+        "rows": 4
+      }
+    ]
+  },
   "All 19 field types": {
     "name": "all-fields",
     "submit": "Send",
@@ -217,6 +313,96 @@
         "name": "hidden",
         "label": "Hidden source",
         "value": "static-hidden-field-value"
+      }
+    ]
+  },
+  "Structure + decor": {
+    "name": "structure",
+    "submit": "Send",
+    "status": "Thanks — the structured form worked end to end.",
+    "mailer": "json",
+    "endpoint": "http://localhost:8787/submit",
+    "copy": {
+      "sending": "Sending…",
+      "submitError": "Sending failed (HTTP {status}) — is the echo server running (npm run demo:api)?"
+    },
+    "fields": [
+      {
+        "type": "heading",
+        "text": "Get in touch"
+      },
+      {
+        "type": "description",
+        "text": "Use this form for project enquiries — we reply within one working day."
+      },
+      {
+        "type": "text",
+        "id": "name",
+        "name": "name",
+        "label": "Name",
+        "required": true,
+        "size": 50
+      },
+      {
+        "type": "email",
+        "id": "email",
+        "name": "email",
+        "label": "Email address",
+        "required": true,
+        "size": 50
+      },
+      {
+        "type": "section",
+        "label": "Project details"
+      },
+      {
+        "type": "select",
+        "id": "service",
+        "name": "service",
+        "label": "Service",
+        "required": true,
+        "size": 100,
+        "options": [
+          "Website",
+          "Brand identity",
+          "Marketing",
+          "Other"
+        ],
+        "message": "Choose a service."
+      },
+      {
+        "type": "description",
+        "text": "Tell us the essentials — we'll ask for the rest on a call.",
+        "size": 50
+      },
+      {
+        "type": "textarea",
+        "id": "message",
+        "name": "message",
+        "label": "Project brief",
+        "required": true,
+        "size": 50
+      },
+      {
+        "type": "divider"
+      },
+      {
+        "type": "checkbox",
+        "id": "updates",
+        "name": "updates",
+        "label": "Send me occasional project updates",
+        "size": 100
+      },
+      {
+        "type": "heading",
+        "text": "Anything else?",
+        "line": false,
+        "align": "center"
+      },
+      {
+        "type": "divider",
+        "visible": false,
+        "min": "2rem"
       }
     ]
   }

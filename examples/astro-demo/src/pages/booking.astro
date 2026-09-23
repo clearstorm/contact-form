@@ -1,7 +1,6 @@
 ---
 import DemoLayout from "../layouts/DemoLayout.astro";
-import ContactForm from "@clearstorm/contact-form/astro/ContactForm.astro";
-import type { FormSpec } from "@clearstorm/contact-form/core";
+import FormDemo from "../components/FormDemo.astro";
 import spec from "../../../specs/booking.json";
 import { getForms } from "../lib/forms";
 
@@ -19,7 +18,7 @@ const [, form] = getForms(spec)[0];
   </p>
 
   <div class="demo-card">
-    <ContactForm form={form} prefill="datetime" />
+    <FormDemo form={form} prefill="datetime" />
   </div>
 
   <h2>What the spec controls</h2>

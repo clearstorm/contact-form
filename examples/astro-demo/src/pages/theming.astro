@@ -1,7 +1,6 @@
 ---
 import DemoLayout from "../layouts/DemoLayout.astro";
-import ContactForm from "@clearstorm/contact-form/astro/ContactForm.astro";
-import type { FormSpec } from "@clearstorm/contact-form/core";
+import FormDemo from "../components/FormDemo.astro";
 import themingSpec from "../../../specs/theming.json";
 import { getForm } from "../lib/forms";
 
@@ -20,12 +19,12 @@ const dark = getForm(themingSpec, "Dark — full override");
 
   <h2>Light — default theme + a brand accent</h2>
   <div class="demo-card theme-light">
-    <ContactForm form={light} />
+    <FormDemo form={light} />
   </div>
 
   <h2>Dark — full override block</h2>
   <div class="demo-card theme-dark">
-    <ContactForm form={dark} />
+    <FormDemo form={dark} />
   </div>
 
   <h2>The whole dark theme</h2>

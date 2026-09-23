@@ -235,3 +235,103 @@ h2 {
   background: #120e0c;
   border-color: #3a302b;
 }
+
+/* ---- Form | Spec tabs (FormDemo component) ---- */
+
+/* Tabs are CSS-only: a hidden radio pair drives which panel shows, via the
+   generic [id$="-tab-form"] / [id$="-tab-spec"] checks. Colours are tokens
+   so the theming page can re-scope them alongside the form theme. */
+.demo-tabs {
+  --tab-border: #e5e7eb;
+  --tab-text: #64748b;
+  --tab-active-text: #0f172a;
+  --tab-active-bg: #ffffff;
+}
+
+.demo-tabs-radio {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.demo-tabbar {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 0.9rem;
+  border-bottom: 1px solid var(--tab-border);
+}
+
+.demo-tab {
+  padding: 0.35rem 0.9rem;
+  margin-bottom: -1px;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  font-size: 0.85rem;
+  color: var(--tab-text);
+  cursor: pointer;
+  user-select: none;
+}
+
+.demo-tabs-radio[id$="-tab-form"]:checked ~ .demo-tabbar label[for$="-tab-form"],
+.demo-tabs-radio[id$="-tab-spec"]:checked ~ .demo-tabbar label[for$="-tab-spec"] {
+  color: var(--tab-active-text);
+  background: var(--tab-active-bg);
+  border-color: var(--tab-border);
+}
+
+.demo-tabpanel {
+  display: none;
+}
+
+.demo-tabs-radio[id$="-tab-form"]:checked ~ .demo-tabpanel--form,
+.demo-tabs-radio[id$="-tab-spec"]:checked ~ .demo-tabpanel--spec {
+  display: block;
+}
+
+.demo-spec-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.demo-spec-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.demo-copy {
+  font: inherit;
+  font-size: 0.75rem;
+  padding: 0.22rem 0.65rem;
+  border: 1px solid var(--tab-border);
+  border-radius: 6px;
+  background: var(--tab-active-bg, #ffffff);
+  color: #334155;
+  cursor: pointer;
+}
+
+.demo-copy:hover {
+  background: #f3f4f6;
+}
+
+/* The spec JSON — same dark code block as the site's other <pre>s, but
+   scrollable vertically for the longer specs (conditions, wizard.json). */
+.demo-spec {
+  margin: 0;
+  max-height: 20rem;
+  overflow: auto;
+}
+
+/* Theming page: keep the tab chrome readable on the dark card scope. */
+.theme-dark .demo-tabs {
+  --tab-border: #3a302b;
+  --tab-text: #b9ada2;
+  --tab-active-text: #faf5ee;
+  --tab-active-bg: #120e0c;
+}

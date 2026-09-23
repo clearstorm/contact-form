@@ -28,7 +28,9 @@ Zero runtime dependencies. No Tailwind required.
 > multi-form wizard) plus copy-paste-ready JSON form specs it renders directly.
 > Each spec file is a **map of named forms** — `{ "Name": FormSpec, … }` — so
 > one file can hold several examples and a single page can render them all
-> (the demo's `/wizard`, `/conditional` and `/theming` pages do exactly that).
+> (the demo's `/wizard`, `/conditional`, `/mailers` and `/theming` pages do
+> exactly that). Every form renders with Form | Spec tabs, so each example
+> shows and copies the exact JSON driving it.
 > See [`examples/README.md`](examples/README.md).
 
 ---

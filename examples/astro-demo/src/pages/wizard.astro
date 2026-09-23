@@ -1,6 +1,6 @@
 ---
 import DemoLayout from "../layouts/DemoLayout.astro";
-import ContactForm from "@clearstorm/contact-form/astro/ContactForm.astro";
+import FormDemo from "../components/FormDemo.astro";
 import type { FormSpec } from "@clearstorm/contact-form/core";
 import wizardSpec from "../../../specs/wizard.json";
 import { getForms } from "../lib/forms";
@@ -44,7 +44,7 @@ const markerRows: Array<[string, string, string]> = [
     <section class="demo-form">
       <h2>{name}</h2>
       <div class="demo-card">
-        <ContactForm form={form} />
+        <FormDemo form={form} />
       </div>
     </section>
   ))}

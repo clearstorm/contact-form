@@ -6,9 +6,8 @@ const pages = [
   { href: "/conditional", title: "Conditional fields", blurb: "Fields reveal from the visitor's own input — three named forms in one spec file: a realistic enquiry, all seven showWhen operators, and an AND reveal." },
   { href: "/wizard", title: "Multi-step wizard", blurb: "Three named forms from one spec file — a flagship wizard, every field type on an even-slice stepper, and the compact chrome options." },
   { href: "/structure", title: "Form structure", blurb: "Headings, descriptions, dividers and section breaks interleaved with real fields — structural elements never reach the payload." },
-  { href: "/contact", title: "CF7 mailer", blurb: "The default transport — posts to a WordPress Contact Form 7 endpoint, env-configurable via PUBLIC_API_URL / PUBLIC_CF7_FORM_ID." },
+  { href: "/mailers", title: "Mailers", blurb: "Both transports on one page — the default cf7 mailer (WordPress CF7 endpoint, env-configurable) and the json mailer posting the canonical payload to a local echo server." },
   { href: "/booking", title: "Booking (prefill)", blurb: "DateTime prefill, optional date/time, guests select — extra fields fold into the canonical payload." },
-  { href: "/json", title: "JSON mailer", blurb: "Generic endpoint transport — watch the exact payload the mailer sends on a local echo server." },
   { href: "/theming", title: "Theming", blurb: "Both themes — light and dark — as two named forms in one spec file, re-themed purely via CSS custom properties." },
 ];
 ---
@@ -35,8 +34,8 @@ const pages = [
     <h2>Quickstart</h2>
     <p class="lead" style="margin-block:0 1rem">
       The forms are live in this repo — no WordPress or backend required unless
-      you open the CF7 page. Forms using the <code>json</code> mailer post to a
-      local echo server.
+      you open the cf7 demo on the Mailers page. Forms using the
+      <code>json</code> mailer post to a local echo server.
     </p>
     <pre>{`# terminal 1 — payload inspector for the json-mailer forms
 cd examples/astro-demo

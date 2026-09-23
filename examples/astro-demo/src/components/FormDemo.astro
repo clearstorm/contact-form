@@ -1,0 +1,111 @@
+---
+/**
+ * Demo wrapper for a named form: renders the live `<ContactForm>` next to a
+ * **Spec** tab showing the exact JSON driving it. Every example page uses
+ * this, so each form on the site doubles as a copy-paste-ready reference.
+ *
+ * The tabs are CSS-only (a hidden radio pair keyed on the form's `name`
+ * slug, toggled by the generic `[id$="-tab-form"]:checked ~ …` rules in
+ * demo.css); the only JS is the shared Copy button script below (hoisted
+ * once per page, wired per `[data-copy-spec]`). `config` / `prefill` pass
+ * straight through to the form component.
+ */
+import ContactForm from "@clearstorm/contact-form/astro/ContactForm.astro";
+import type { FormSpec } from "@clearstorm/contact-form/core";
+
+interface Props {
+  form: FormSpec;
+  /** Explicit endpoint overrides — forwarded to ContactForm. */
+  config?: { endpoint?: string; apiUrl?: string; cf7FormId?: string };
+  /** Passed to ContactForm (booking demo). */
+  prefill?: "datetime";
+}
+
+const { form, config, prefill } = Astro.props;
+
+// The form's own name slug is unique per spec file (and per page), so the
+// tab radios never collide — even when a page renders several forms.
+const tabBase = form.name;
+const specJson = JSON.stringify(form, null, 2);
+---
+
+<div class="demo-tabs">
+  <input
+    class="demo-tabs-radio"
+    type="radio"
+    name={tabBase}
+    id={`${tabBase}-tab-form`}
+    checked
+  />
+  <input
+    class="demo-tabs-radio"
+    type="radio"
+    name={tabBase}
+    id={`${tabBase}-tab-spec`}
+  />
+
+  <div class="demo-tabbar" role="tablist" aria-label="View">
+    <label
+      class="demo-tab"
+      role="tab"
+      for={`${tabBase}-tab-form`}
+      aria-controls={`${tabBase}-panel-form`}
+    >
+      Form
+    </label>
+    <label
+      class="demo-tab"
+      role="tab"
+      for={`${tabBase}-tab-spec`}
+      aria-controls={`${tabBase}-panel-spec`}
+    >
+      Spec
+    </label>
+  </div>
+
+  <div
+    class="demo-tabpanel demo-tabpanel--form"
+    id={`${tabBase}-panel-form`}
+    role="tabpanel"
+    aria-labelledby={`${tabBase}-tab-form`}
+  >
+    <ContactForm form={form} config={config} prefill={prefill} />
+  </div>
+
+  <div
+    class="demo-tabpanel demo-tabpanel--spec"
+    id={`${tabBase}-panel-spec`}
+    role="tabpanel"
+    aria-labelledby={`${tabBase}-tab-spec`}
+  >
+    <div class="demo-spec-head">
+      <span class="demo-spec-title">Spec — {tabBase}.json</span>
+      <button class="demo-copy" type="button" data-copy-spec>Copy</button>
+    </div>
+    <pre class="demo-spec">{specJson}</pre>
+  </div>
+</div>
+
+<script>
+  // Shared, hoisted once per page: wire every Copy button. Reads the JSON
+  // from the sibling <pre> textContent, so nothing is duplicated in markup.
+  document
+    .querySelectorAll<HTMLButtonElement>("[data-copy-spec]")
+    .forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const pre = btn.closest(".demo-tabpanel")?.querySelector("pre");
+        const text = pre?.textContent ?? "";
+        let ok = false;
+        try {
+          if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(text);
+            ok = true;
+          }
+        } catch {
+          ok = false;
+        }
+        btn.textContent = ok ? "Copied ✓" : "Copy failed";
+        setTimeout(() => (btn.textContent = "Copy"), 1500);
+      });
+    });
+</script>

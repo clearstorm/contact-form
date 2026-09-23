@@ -1,7 +1,6 @@
 ---
 import DemoLayout from "../layouts/DemoLayout.astro";
-import ContactForm from "@clearstorm/contact-form/astro/ContactForm.astro";
-import type { FormSpec } from "@clearstorm/contact-form/core";
+import FormDemo from "../components/FormDemo.astro";
 import structure from "../../../specs/structure.json";
 import { getForms } from "../lib/forms";
 
@@ -26,7 +25,7 @@ const structureRows: Array<[string, string, string]> = [
   </p>
 
   <div class="demo-card">
-    <ContactForm form={structureForm} />
+    <FormDemo form={structureForm} />
   </div>
 
   <h2>The four elements</h2>

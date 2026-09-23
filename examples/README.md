@@ -26,7 +26,10 @@ demo.
 ### Pages
 
 Every page renders the named forms from **one spec file** — pages like
-`/wizard`, `/conditional` and `/theming` show several forms on a single page.
+`/wizard`, `/conditional`, `/mailers` and `/theming` show several forms on a
+single page. Every form renders with **Form | Spec tabs**: the Spec tab shows
+— and copies — the exact JSON driving it, so each example doubles as a
+copy-paste-ready reference.
 
 | Route | Demonstrates |
 | --- | --- |
@@ -35,9 +38,8 @@ Every page renders the named forms from **one spec file** — pages like
 | `/conditional` | **Conditional fields (`showWhen`)** — three named forms from one file: a realistic enquiry (`equals` service → other, `filled` rush → deadline), an operator-reference form exercising all seven operators (`equals`, `notEquals`, `in`, `notIn`, `includes`, `filled`, `empty`), and an AND form where a reveal needs two conditions to hold; hidden fields are out of scope and out of the payload |
 | `/wizard` | **Multi-step wizard (`step` markers)** — three named forms from one file: the flagship three-step wizard (centered rule-flanked stepper, pane-header defaults + per-marker overrides, step-scoped "Next" validation, a cross-step `showWhen` reveal, a hoisted hidden field), every field type on an `even`+`center` stepper with a `background` band, and the compact chrome options (`nav` without numbers / jump-backs, custom "Continue" + `ghost` "Back", a `full` pane-header rule, a bare `show: false` pane) |
 | `/structure` | **Form structure** — `heading`, `description` (sized helper text), `divider` (rule or invisible spacer) and `section` (labeled break) interleaved with real fields; structural elements never reach `data-rules` or the payload |
-| `/contact` | **`cf7` mailer** — endpoint via `config` prop read from `PUBLIC_API_URL` / `PUBLIC_CF7_FORM_ID`; shows the resolved CF7 endpoint (or a friendly config-error note) |
+| `/mailers` | **Both transports** — the `cf7` mailer (`config` prop read from `PUBLIC_API_URL` / `PUBLIC_CF7_FORM_ID`; resolved CF7 endpoint or a friendly config-error note) and the `json` mailer (canonical payload to the echo server — honeypot dropped, checkbox groups comma-joined, values trimmed), two named forms from one file |
 | `/booking` | **`prefill="datetime"`** — date/time pre-filled and still optional; required guests select; optional extras that fold into the payload |
-| `/json` | **`json` mailer** — posts the canonical payload to the echo server so you can inspect the exact wire format (honeypot dropped, checkbox groups comma-joined, values trimmed) |
 | `/theming` | **CSS-only re-theming** — two named forms from one file (`theme-light` / `theme-dark` slugs); the light side uses the shipped default theme + a brand accent, the dark side a full `--rf-*` override block |
 
 ### Wiring a real backend
@@ -72,6 +74,5 @@ form and the component scopes every field `id` as `{name}__{field}` (see
 | `theming.json` | **`Light — default + brand accent`** / **`Dark — full override`** — identical field shapes under distinct `name` slugs (each renders with its own form id); the theming page swaps the CSS scope, not the spec |
 | `all-fields.json` | **`All 19 field types`** — every core type; per-field `message` overrides; a form-level `copy` bag; a `hidden` field with a static value |
 | `structure.json` | **`Structure + decor`** — all four structural elements (`heading`, `description`, `divider`, `section`) interleaved with real fields; none of them reach `data-rules` or the payload |
-| `contact-cf7.json` | **`Contact — CF7 mailer`** — the classic CF7 shape (the reference site's general-enquiry form); `mailer` omitted, so it defaults to `cf7` |
+| `mailers.json` | **`Contact — CF7 mailer`** — the classic CF7 shape (the reference site's general-enquiry form); `mailer` omitted, so it defaults to `cf7` · **`JSON mailer echo`** — `mailer: "json"` with an `endpoint`; a checkbox group to show multi-value joining |
 | `booking.json` | **`Booking (prefill)`** — `prefill="datetime"` companion: optional date/time, required guests, optional message |
-| `json-endpoint.json` | **`JSON mailer echo`** — `mailer: "json"` with an `endpoint`; a checkbox group to show multi-value joining |

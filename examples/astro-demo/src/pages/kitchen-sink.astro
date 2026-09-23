@@ -1,7 +1,6 @@
 ---
 import DemoLayout from "../layouts/DemoLayout.astro";
-import ContactForm from "@clearstorm/contact-form/astro/ContactForm.astro";
-import type { FormSpec } from "@clearstorm/contact-form/core";
+import FormDemo from "../components/FormDemo.astro";
 import spec from "../../../specs/all-fields.json";
 import { getForms } from "../lib/forms";
 
@@ -29,7 +28,7 @@ const fieldTypes = [
 
   <h2>Try it</h2>
   <div class="demo-card">
-    <ContactForm form={form} />
+    <FormDemo form={form} />
   </div>
 
   <h2>What each type does</h2>

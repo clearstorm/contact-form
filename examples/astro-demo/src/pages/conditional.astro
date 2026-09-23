@@ -1,7 +1,6 @@
 ---
 import DemoLayout from "../layouts/DemoLayout.astro";
-import ContactForm from "@clearstorm/contact-form/astro/ContactForm.astro";
-import type { FormSpec } from "@clearstorm/contact-form/core";
+import FormDemo from "../components/FormDemo.astro";
 import conditionalSpec from "../../../specs/conditional.json";
 import { getForm } from "../lib/forms";
 
@@ -32,7 +31,7 @@ const operatorRows: Array<[string, string, string]> = [
 
   <h2>Realistic form</h2>
   <div class="demo-card">
-    <ContactForm form={enquiryForm} />
+    <FormDemo form={enquiryForm} />
   </div>
 
   <table class="demo-table">
@@ -62,7 +61,7 @@ const operatorRows: Array<[string, string, string]> = [
 
   <h2>All seven operators</h2>
   <div class="demo-card">
-    <ContactForm form={conditionsForm} />
+    <FormDemo form={conditionsForm} />
   </div>
 
   <table class="demo-table">
@@ -88,7 +87,7 @@ const operatorRows: Array<[string, string, string]> = [
     is ticked — either on its own keeps it hidden.
   </p>
   <div class="demo-card">
-    <ContactForm form={andForm} />
+    <FormDemo form={andForm} />
   </div>
 
   <p class="lead">

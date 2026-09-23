@@ -26,36 +26,11 @@ const structureRows: Array<[string, string, string]> = [
   <h1>General forms</h1>
   <p class="lead">
     The everyday forms that don't belong to a dedicated feature page — three
-    named forms in one spec file (<code>examples/specs/general.json</code>): a
-    booking form run with <code>prefill="datetime"</code>, the full 19-type
-    kitchen sink, and a form decorated with structural elements.
+    named forms in one spec file (<code>examples/specs/general.json</code>): the
+    full 19-type kitchen sink, a booking form run with
+    <code>prefill="datetime"</code>, and a form decorated with structural
+    elements.
   </p>
-
-  <h2>Booking + <code>prefill="datetime"</code></h2>
-  <p class="lead">
-    Rendered with <code>prefill="datetime"</code>: the date/time inputs start
-    at today / near-now (the script also raises the date picker's
-    <code>min</code> to today) while <em>both stay optional in the spec</em>.
-    Date, time and the required guests select are spec fields outside the CF7
-    core set — on submit they fold into the payload as labelled lines.
-  </p>
-
-  <div class="demo-card">
-    <FormDemo form={booking} prefill="datetime" />
-  </div>
-
-  <h3>What the spec controls</h3>
-  <table class="demo-table">
-    <thead>
-      <tr><th>Field</th><th>Spec</th><th>Result</th></tr>
-    </thead>
-    <tbody>
-      <tr><td><code>date</code></td><td><code>required: false</code>, size 33</td><td>pre-filled, optional</td></tr>
-      <tr><td><code>time</code></td><td><code>required: false</code>, size 33</td><td>pre-filled, optional</td></tr>
-      <tr><td><code>guests</code></td><td><code>required: true</code>, size 33</td><td>required select, 1–8</td></tr>
-      <tr><td><code>message</code></td><td><code>required: false</code></td><td>optional — folded into the payload only when filled</td></tr>
-    </tbody>
-  </table>
 
   <h2>All 19 field types</h2>
   <p class="lead">
@@ -94,6 +69,32 @@ const structureRows: Array<[string, string, string]> = [
       <tr><td><code>hidden</code></td><td>hidden input</td><td>never validated, forwarded as-is</td></tr>
       <tr><td><code>range</code></td><td>range input</td><td>within min 0 / max 100 (step 5)</td></tr>
       <tr><td><code>color</code></td><td>color input</td><td>optional here; hex <code>#rrggbb</code></td></tr>
+    </tbody>
+  </table>
+
+  <h2>Booking + <code>prefill="datetime"</code></h2>
+  <p class="lead">
+    Rendered with <code>prefill="datetime"</code>: the date/time inputs start
+    at today / near-now (the script also raises the date picker's
+    <code>min</code> to today) while <em>both stay optional in the spec</em>.
+    Date, time and the required guests select are spec fields outside the CF7
+    core set — on submit they fold into the payload as labelled lines.
+  </p>
+
+  <div class="demo-card">
+    <FormDemo form={booking} prefill="datetime" />
+  </div>
+
+  <h3>What the spec controls</h3>
+  <table class="demo-table">
+    <thead>
+      <tr><th>Field</th><th>Spec</th><th>Result</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>date</code></td><td><code>required: false</code>, size 33</td><td>pre-filled, optional</td></tr>
+      <tr><td><code>time</code></td><td><code>required: false</code>, size 33</td><td>pre-filled, optional</td></tr>
+      <tr><td><code>guests</code></td><td><code>required: true</code>, size 33</td><td>required select, 1–8</td></tr>
+      <tr><td><code>message</code></td><td><code>required: false</code></td><td>optional — folded into the payload only when filled</td></tr>
     </tbody>
   </table>
 

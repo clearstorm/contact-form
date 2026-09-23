@@ -48,6 +48,7 @@ const { form, config = {}, prefill } = Astro.props;
 const formName = form.name;
 const formId = `${form.name}-form`;
 const mailerName = form.mailer ?? "cf7";
+const statusMode = form.statusMode ?? "inline";
 
 // JSON is the source of truth for which fields are required and how extra
 // fields are folded into the message. The shared bundle rebuilds per-form
@@ -127,6 +128,7 @@ if (
   class="rf-form"
   data-mail-form={formName}
   data-mailer={mailerName}
+  data-status-mode={statusMode === "inline" ? undefined : statusMode}
   data-prefill={prefill}
   data-endpoint={formEndpoint}
   data-wp-url={wpUrl}
@@ -428,6 +430,17 @@ if (
   .rf-status--error {
     border-color: var(--rf-danger);
     color: var(--rf-danger);
+  }
+
+  /* Success-only view (`statusMode: "replace"`) — after a successful submit
+     the whole form collapses to the success box: every direct child except
+     .rf-status is hidden, and the form shell becomes a plain block. */
+  .rf-form--success {
+    display: block;
+  }
+
+  .rf-form--success > *:not(.rf-status) {
+    display: none;
   }
 
   /* Honeypot anti-spam field — off-screen, invisible to humans, present for bots. */
@@ -920,6 +933,7 @@ if (
     if (honeypot && honeypot.value.trim() !== "") {
       showSuccess(status, successMessage);
       form.reset();
+      if (form.dataset.statusMode === "replace") form.classList.add("rf-form--success");
       return;
     }
 
@@ -978,6 +992,10 @@ if (
         showSuccess(status, successMessage);
         form.reset();
         controls.forEach((control) => clearError(control));
+        // replace mode — the success box takes the form's place entirely.
+        if (form.dataset.statusMode === "replace") {
+          form.classList.add("rf-form--success");
+        }
       } else {
         showError(status, result.message || genericError);
       }

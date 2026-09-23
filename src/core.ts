@@ -365,6 +365,14 @@ export interface FormSpec {
   stepper?: StepperSpec;
   status: string;
   /**
+   * What happens after a successful submit:
+   * - `"inline"` (default) — the status box appears under the submit button
+   *   and the fields are cleared; the form stays visible.
+   * - `"replace"` — the whole form hides and only the success status box
+   *   remains (a "thanks, we've got it" pattern).
+   */
+  statusMode?: "inline" | "replace";
+  /**
    * Transport adapter used on submit (defaults to "cf7"). "json" posts the
    * canonical payload to `endpoint` — use it for Formspree-style endpoints,
    * your own API, or a serverless mail-delivery worker.

@@ -386,6 +386,29 @@ Behaviour:
 
 ---
 
+## Success state (`status` + `statusMode`)
+
+On success the form shows `form.status` in a box **under the submit button**
+and clears its fields — the form stays visible so the visitor can go again.
+That's `statusMode: "inline"`, the default.
+
+Pass `"statusMode": "replace"` to collapse the whole form instead, leaving
+only the success box — the classic "thanks, we've got it" pattern
+(no endpoint round-trip is required to see it on the demo's JSON mailer
+form, which uses it). `role="status"` keeps the message announced to screen
+readers in both modes.
+
+```jsonc
+{
+  "name": "enquiry",
+  "status": "Thanks — we'll reply shortly.",
+  "statusMode": "replace",   // "inline" (default) keeps the cleared form visible
+  "fields": []
+}
+```
+
+---
+
 ## Copy (text copy is consumer-driven)
 
 Every visitor-facing string resolves **`field.message` → `copy[key]` →

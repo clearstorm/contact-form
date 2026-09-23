@@ -49,6 +49,8 @@ const scopedId = (element: { id?: string; name: string }) => {
       step={element.step}
       maxlength={element.maxlength}
       pattern={element.pattern}
+      accept={element.accept}
+      multiple={element.multiple}
     />
   ) : (
     <Decor decor={element} />

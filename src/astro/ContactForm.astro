@@ -810,6 +810,8 @@ if (
       const values: string[] = [];
       for (const control of form.querySelectorAll<Control>("input, select, textarea")) {
         if (control.name !== name || isHiddenControl(control)) continue;
+        // File inputs can't sensibly drive conditions — skip them.
+        if (control instanceof HTMLInputElement && control.type === "file") continue;
         if (control instanceof HTMLInputElement && control.type === "checkbox") {
           if (control.checked && control.value.trim()) values.push(control.value.trim());
         } else {
@@ -872,7 +874,10 @@ if (
   ): boolean => {
     clearError(control);
     let value: string;
-    if (
+    if (control instanceof HTMLInputElement && control.type === "file") {
+      // A file field is "filled" when at least one file is attached.
+      value = control.files && control.files.length > 0 ? "1" : "";
+    } else if (
       control instanceof HTMLInputElement &&
       (control.type === "checkbox" || control.type === "radio")
     ) {

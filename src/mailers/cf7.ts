@@ -29,6 +29,16 @@ export const CORE_FIELDS = [
 export function cf7Payload(data: FormData, fields: FieldSpec[]): FormData {
   const payload = canonicalData(data, fields);
 
+  // File fields: canonicalData reduced them to filenames — swap those back
+  // for the real File objects so CF7's attachment handling sees the bytes.
+  for (const field of fields) {
+    if (field.type !== "file") continue;
+    const files = data.getAll(field.name).filter((value): value is File => value instanceof File);
+    if (files.length === 0) continue;
+    payload.delete(field.name);
+    for (const file of files) payload.append(field.name, file, file.name);
+  }
+
   const message = String(payload.get("message") ?? "").trim();
   const details = fields
     .map((field) => {

@@ -35,7 +35,8 @@ export type FieldType =
   | "radio"
   | "hidden"
   | "range"
-  | "color";
+  | "color"
+  | "file";
 
 /**
  * Field/description width as a percentage of the 12-column form row. Every
@@ -78,6 +79,8 @@ export interface FormCopy {
   textarea?: string;
   /** Checkbox/radio groups that must be selected. */
   checkbox?: string;
+  /** File fields that require an upload. */
+  file?: string;
   /** Submit button label while the request is in flight. */
   sending?: string;
   /**
@@ -165,6 +168,16 @@ export interface FormFieldSpec {
   step?: number | string;
   maxlength?: number;
   pattern?: string;
+  /**
+   * Accept hint for `file` inputs (e.g. `"image/*,.pdf"`). No validation
+   * implied — the picker hint only.
+   */
+  accept?: string;
+  /**
+   * Multiple values: `file` inputs accept several files; `select` renders a
+   * multi-select (`rows` controls its visible height).
+   */
+  multiple?: boolean;
 }
 
 /* ---- Structural elements (heading, description, divider, section) ---- */
@@ -685,6 +698,14 @@ export function buildRules(fields: FieldSpec[], copy: FormCopy = {}): Record<str
           message: messageFor(field, "color", "Enter a valid colour."),
         };
         break;
+      case "file":
+        // The component aggregates file-selection into "1" / "" for the rule.
+        rules[name] = {
+          required,
+          test: (value) => value === "1",
+          message: messageFor(field, "file", "Please attach a file."),
+        };
+        break;
       case "checkbox":
       case "radio":
         // The component aggregates selection state into "1" / "" for the rule.
@@ -764,6 +785,11 @@ export function canonicalData(data: FormData, fields: FieldSpec[]): FormData {
   for (const field of fields) {
     const values = data
       .getAll(field.name)
+      // File fields travel as the attached filename(s) in the canonical
+      // payload — a JSON endpoint gets names, not bytes ("a.txt, b.txt" for
+      // a multiple file input). The cf7 mailer re-attaches the real File
+      // objects from `data`, so the email path still gets the upload.
+      .map((value) => (value instanceof File ? value.name : value))
       .map((value) => String(value).trim())
       .filter(Boolean);
     payload.set(field.name, values.length > 1 ? values.join(", ") : (values[0] ?? ""));

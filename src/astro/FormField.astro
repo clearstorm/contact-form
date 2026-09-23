@@ -21,6 +21,10 @@ interface Props {
   step?: number | string;
   maxlength?: number;
   pattern?: string;
+  /** Accept hint for file inputs (picker filter only). */
+  accept?: string;
+  /** Multiple files / multi-select. */
+  multiple?: boolean;
 }
 
 const {
@@ -41,6 +45,8 @@ const {
   step,
   maxlength,
   pattern,
+  accept,
+  multiple,
 } = Astro.props;
 
 const isGroup = (type === "checkbox" || type === "radio") && (options?.length ?? 0) > 0;
@@ -98,8 +104,15 @@ const isSingleCheckbox = type === "checkbox" && !((options?.length ?? 0) > 0);
       maxlength={maxlength}
       class="rf-input rf-textarea"
     ></textarea>
-  ) : options?.length ? (
-    <select id={id} name={name} required={required} class="rf-input">
+  ) : type === "select" ? (
+    <select
+      id={id}
+      name={name}
+      required={required}
+      class="rf-input"
+      multiple={multiple}
+      size={multiple ? rows : undefined}
+    >
       {options.map((option) => <option>{option}</option>)}
     </select>
   ) : (
@@ -110,15 +123,23 @@ const isSingleCheckbox = type === "checkbox" && !((options?.length ?? 0) > 0);
       autocomplete={autocomplete}
       required={required}
       placeholder={placeholder}
-      value={value}
+      value={type === "file" ? undefined : value}
       min={min}
       max={max}
       step={step}
       maxlength={maxlength}
       pattern={pattern}
+      accept={accept}
+      multiple={multiple}
+      list={options?.length ? `${id}-list` : undefined}
       class="rf-input"
     />
   )}
+  {type !== "hidden" && type !== "select" && type !== "textarea" && !isGroup && !isSingleCheckbox && options?.length ? (
+    <datalist id={`${id}-list`}>
+      {options.map((option) => <option value={option} />)}
+    </datalist>
+  ) : null}
 </div>
 
 <style is:global>

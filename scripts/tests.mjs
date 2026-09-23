@@ -376,6 +376,47 @@ check(
   canonicalData(multi, demoFields.filter((f) => f.name === "site_id")).get("site_id") === "",
 );
 
+// --- 4b. field capabilities: file / multi-select ---
+const fileFieldsFromSpec = toFieldSpecs([
+  { type: "file", id: "cv", name: "cv", label: "CV", required: true },
+  { type: "file", id: "files", name: "files", label: "Files", required: false },
+]);
+const fileRules = buildRules(fileFieldsFromSpec);
+check("file required message default", validateValue(fileRules.cv, "") === "Please attach a file.");
+check("file required passes once selected", validateValue(fileRules.cv, "1") === null);
+check("file optional empty ok", validateValue(fileRules.files, "") === null);
+check(
+  "file copy override",
+  buildRules(toFieldSpecs([{ type: "file", name: "cv2", label: "CV", required: true }]), { file: "Attach your CV." }).cv2.message === "Attach your CV.",
+);
+check(
+  "serialized spec carries file type",
+  parseFieldSpec(serializeRules(fileFieldsFromSpec))[0].type === "file",
+);
+
+// canonicalData reduces File entries to filenames (comma-joined when multiple)
+const fileRaw = new FormData();
+fileRaw.set("cv", new File(["hello"], "resume.pdf"), "resume.pdf");
+fileRaw.set("files", new File(["a"], "a.png"), "a.png");
+fileRaw.append("files", new File(["b"], "b.png"), "b.png");
+check(
+  "canonical single file → filename",
+  canonicalData(fileRaw, fileFieldsFromSpec).get("cv") === "resume.pdf",
+  String(canonicalData(fileRaw, fileFieldsFromSpec).get("cv")),
+);
+check(
+  "canonical multiple files → comma-joined names",
+  canonicalData(fileRaw, fileFieldsFromSpec).get("files") === "a.png, b.png",
+  String(canonicalData(fileRaw, fileFieldsFromSpec).get("files")),
+);
+
+// cf7Payload swaps filenames back for the real File objects (attachment path)
+const cf7FileOut = cf7Payload(fileRaw, fileFieldsFromSpec);
+check(
+  "cf7 re-attaches real File objects",
+  cf7FileOut.get("cv") instanceof File && cf7FileOut.get("files") instanceof File,
+);
+
 // --- 5. jsonMailer against a real local server ---
 const server = createServer((req, res) => {
   if (req.url === "/ok") { res.writeHead(200); res.end("{}"); }

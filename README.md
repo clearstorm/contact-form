@@ -4,7 +4,7 @@ Reusable contact forms for [Astro](https://astro.build) sites (including static
 hosts), built from three decoupled pieces:
 
 - **Core** — a framework-agnostic engine (`src/core.ts`): the JSON form spec,
-  validation rules for **19 field types**, time normalisation and payload
+  validation rules for **20 field types**, time normalisation and payload
   normalisation. No framework or DOM dependencies, so the same code can run in
   a browser bundle or a Node worker.
 - **Mailers** — transport adapters (`src/mailers/`): `cf7` (Contact Form 7,
@@ -24,13 +24,13 @@ per-field `message` overrides, with built-in defaults.
 Zero runtime dependencies. No Tailwind required.
 
 > **Want to see it working?** `examples/` holds a runnable Astro demo site (all
-> 19 field types, both mailers, `prefill="datetime"`, CSS-only theming, a
+> 20 field types — including file uploads — both mailers, CSS-only theming, a
 > multi-form wizard) plus copy-paste-ready JSON form specs it renders directly.
 > Each spec file is a **map of named forms** — `{ "Name": FormSpec, … }` — so
 > one file can hold several examples and a single page can render them all
-> (the demo's `/wizard`, `/conditional`, `/mailers` and `/theming` pages do
-> exactly that). Every form renders with Form | Spec tabs, so each example
-> shows and copies the exact JSON driving it.
+> (the demo's `/field-types`, `/wizard`, `/conditional`, `/mailers` and
+> `/theming` pages do exactly that). Every form renders with Form | Spec tabs,
+> so each example shows and copies the exact JSON driving it.
 > See [`examples/README.md`](examples/README.md).
 
 ---
@@ -186,33 +186,46 @@ delivery adapter for this package is planned.
 | `month` | `<input type="month">` | required only |
 | `week` | `<input type="week">` | required only |
 | `textarea` | `<textarea>` | min length 10 |
-| `select` | `<select>` (from `options`) | required only |
+| `select` | `<select>` — single, or multi with `multiple: true` (`rows` = visible height) | required only; multi needs at least one option chosen |
 | `checkbox` | single, or group (with `options`) | must be selected when required |
 | `radio` | group (requires `options`) | must be selected when required |
 | `hidden` | `<input type="hidden">` | never validated |
 | `range` | `<input type="range">` | within 0–100 (override via `min`/`max`) |
 | `color` | `<input type="color">` | `#rrggbb` hex |
+| `file` | `<input type="file">` (single, or `multiple` with an `accept` hint) | must have a file selected when required |
 
 `select` needs `options: string[]`; checkbox/radio groups need `options` too
 (a checkbox without `options` is a single toggle next to its label). Input
 passthrough attributes — `placeholder`, `value`, `min`, `max`, `step`,
-`maxlength`, `pattern` — flow through to the rendered control.
+`maxlength`, `pattern`, and for file/select `accept` and `multiple` — flow
+through to the rendered control.
+
+**`options` on a non-picker input** (e.g. `text`, `email`, `search`, `number`,
+… — anything that isn't `select`, checkbox/radio, `textarea` or `hidden`)
+renders a `<datalist>` of suggestions on the input. They steer the visitor
+without restricting the value — free text stays valid.
+
+**`file` fields** are validated when required, and the canonical payload
+carries the attached **filename(s)** (`"a.txt, b.txt"` for a `multiple` file
+input) — a JSON endpoint receives names, not bytes. The cf7 mailer re-attaches
+the real uploads from the multipart body, so the email path gets the actual
+files.
 
 Every type can be required or optional. `required: false` (the default)
 never blocks submit; `optional: true` additionally renders a muted
 “(optional)” suffix on the label so visitors know they can skip it.
-`/general`'s “All 19 field types” form and the wizard's “Every field type” form pair required and
+`/field-types`'s “All 20 field types” form and the wizard's “Every field type” form pair required and
 `optional: true` instances of every optional-capable type side by side.
 
 ---
 
-## Form structure (headings, descriptions, dividers, sections)
+## Structural field types (headings, descriptions, dividers, sections)
 
-`fields` is the ordered layout of the form — and it may mix real fields with
-**structural elements** that shape the page without being fields. They render
-static markup only: they carry no `name`/`id`, are dropped from the client
-field spec during serialisation, and so never validate, never appear in the
-payload, and never reach the shared script.
+`fields` is the ordered layout of the form — it mixes data fields with the
+**structural field types** that shape the page without taking input. They
+render static markup only: they carry no `name`/`id`, are dropped from the
+client field spec during serialisation, and so never validate, never appear in
+the payload, and never reach the shared script.
 
 ```jsonc
 "fields": [
@@ -236,9 +249,9 @@ Styling follows the same theme system with dedicated tokens —
 `--rf-heading-*`, `--rf-description-*`, `--rf-divider-*`, `--rf-section-*`
 (see [Theming](#theming-rf-custom-properties)).
 
-> Live demo: `/general` renders the “Structure + decor” named form in
-> [`examples/specs/general.json`](examples/specs/general.json) — all four
-> elements in one form.
+> Live demo: `/field-types` renders the “Structural field types” named form in
+> [`examples/specs/field-types.json`](examples/specs/field-types.json) — all
+> four structural types in one form.
 
 ---
 
@@ -447,6 +460,7 @@ built-in default**. Put project-specific copy in the form spec:
 | `color` | colour format | `Enter a valid colour.` |
 | `textarea` | min length | `Message must be at least 10 characters.` |
 | `checkbox` | checkbox/radio required | `Please select this option.` |
+| `file` | file required | `Please attach a file.` |
 | `sending` | submit button while in flight | `Sending…` |
 | `back` *(deprecated)* | wizard Previous button — use `form.prev` | `Back` |
 | `next` *(deprecated)* | wizard Next button — use `form.next` | `Next` |

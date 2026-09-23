@@ -179,7 +179,7 @@
       },
       {
         "type": "description",
-        "text": "All 19 field types, spread across three panes — each optional-capable type ships a required twin here and an `optional: true` one. The stepper uses `variant: \"even\"` + `line: \"center\"` (equal full-width slices with rules between the chips) and a `background` band."
+        "text": "All 20 field types, spread across three panes — each optional-capable type ships a required twin here and an `optional: true` one. The stepper uses `variant: \"even\"` + `line: \"center\"` (equal full-width slices with rules between the chips) and a `background` band."
       },
       {
         "type": "step",
@@ -366,6 +366,16 @@
         "name": "rush",
         "label": "This is urgent",
         "size": 50
+      },
+      {
+        "type": "file",
+        "id": "portfolio",
+        "name": "portfolio",
+        "label": "Portfolio / samples",
+        "required": false,
+        "optional": true,
+        "size": 50,
+        "accept": ".pdf,image/*"
       },
       {
         "type": "step",

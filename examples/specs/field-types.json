@@ -1,5 +1,5 @@
 {
-  "All 19 field types": {
+  "All 20 field types": {
     "name": "all-fields",
     "submit": "Send",
     "status": "Thanks — the demo received your submission.",
@@ -212,6 +212,61 @@
         "message": "Your message must be at least 10 characters."
       },
       {
+        "type": "text",
+        "id": "city",
+        "name": "city",
+        "label": "Nearest city (datalist)",
+        "required": false,
+        "optional": true,
+        "size": 50,
+        "placeholder": "Type to see suggestions…",
+        "options": [
+          "Johannesburg",
+          "Cape Town",
+          "Durban",
+          "Pretoria",
+          "Gqeberha"
+        ]
+      },
+      {
+        "type": "select",
+        "id": "topics",
+        "name": "topics",
+        "label": "Topics of interest (multi-select)",
+        "required": true,
+        "size": 100,
+        "multiple": true,
+        "options": [
+          "Product updates",
+          "Events",
+          "Offers",
+          "Research",
+          "Careers"
+        ],
+        "message": "Pick at least one topic.",
+        "rows": 4
+      },
+      {
+        "type": "file",
+        "id": "cv",
+        "name": "cv",
+        "label": "CV / résumé",
+        "required": true,
+        "size": 50,
+        "accept": ".pdf,.doc,.docx"
+      },
+      {
+        "type": "file",
+        "id": "files",
+        "name": "files",
+        "label": "Supporting files",
+        "required": false,
+        "optional": true,
+        "size": 50,
+        "multiple": true,
+        "accept": "image/*,.pdf"
+      },
+      {
         "type": "hidden",
         "id": "hidden",
         "name": "hidden",
@@ -220,103 +275,7 @@
       }
     ]
   },
-  "Booking (prefill)": {
-    "name": "booking",
-    "submit": "Request table",
-    "status": "Thanks — we've noted your booking request.",
-    "mailer": "json",
-    "endpoint": "http://localhost:8787/submit",
-    "copy": {
-      "sending": "Booking…",
-      "invalidForm": "Some fields need your attention. Please check the form."
-    },
-    "fields": [
-      {
-        "type": "text",
-        "id": "first_name",
-        "name": "first_name",
-        "label": "First name",
-        "required": true,
-        "size": 50,
-        "autocomplete": "given-name"
-      },
-      {
-        "type": "text",
-        "id": "last_name",
-        "name": "last_name",
-        "label": "Last name",
-        "required": true,
-        "size": 50,
-        "autocomplete": "family-name"
-      },
-      {
-        "type": "email",
-        "id": "email",
-        "name": "email",
-        "label": "Email address",
-        "required": true,
-        "size": 50,
-        "autocomplete": "email"
-      },
-      {
-        "type": "tel",
-        "id": "contact",
-        "name": "contact",
-        "label": "Phone",
-        "required": true,
-        "size": 50,
-        "autocomplete": "tel"
-      },
-      {
-        "type": "date",
-        "id": "date",
-        "name": "date",
-        "label": "Preferred date",
-        "required": false,
-        "optional": true,
-        "size": 33
-      },
-      {
-        "type": "time",
-        "id": "time",
-        "name": "time",
-        "label": "Preferred time",
-        "required": false,
-        "optional": true,
-        "size": 33
-      },
-      {
-        "type": "select",
-        "id": "guests",
-        "name": "guests",
-        "label": "Number of guests",
-        "required": true,
-        "size": 33,
-        "options": [
-          "1",
-          "2",
-          "3",
-          "4",
-          "5",
-          "6",
-          "7",
-          "8"
-        ],
-        "message": "Choose the number of guests."
-      },
-      {
-        "type": "textarea",
-        "id": "message",
-        "name": "message",
-        "label": "Special requests",
-        "required": false,
-        "optional": true,
-        "size": 100,
-        "rows": 4
-      }
-    ]
-  },
-  "Structure + decor": {
+  "Structural field types": {
     "name": "structure",
     "submit": "Send",
     "status": "Thanks — the structured form worked end to end.",

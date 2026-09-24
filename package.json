@@ -1,7 +1,7 @@
 {
   "name": "@clearstorm/contact-form",
   "version": "0.3.0",
-  "description": "Reusable Astro contact forms: framework-agnostic validation core, CF7 + generic JSON transport adapters, consumer-driven copy (20 field types), self-contained --rf-* theming. Zero runtime dependencies.",
+  "description": "Framework-independent contact forms: shared core + astro/react/vanilla/TanStack Form bindings, CF7 + generic JSON transport adapters, consumer-driven copy (20 field types), self-contained --rf-* theming. Zero runtime dependencies.",
   "type": "module",
   "private": true,
   "license": "MIT",
@@ -18,20 +18,46 @@
     ".": "./src/core.ts",
     "./core": "./src/core.ts",
     "./mailers": "./src/mailers/index.ts",
+    "./runtime": "./src/runtime/index.ts",
+    "./vanilla": "./src/runtime/index.ts",
+    "./react": "./src/react/index.ts",
+    "./tanstack": "./src/tanstack/index.ts",
+    "./styles.css": "./src/runtime/styles.css",
     "./astro/ContactForm.astro": "./src/astro/ContactForm.astro",
-    "./astro/FormField.astro": "./src/astro/FormField.astro"
+    "./astro/FormField.astro": "./src/astro/FormField.astro",
+    "./astro/FormElements.astro": "./src/astro/FormElements.astro",
+    "./astro/Decor.astro": "./src/astro/Decor.astro"
   },
   "files": [
     "src"
   ],
   "scripts": {
-    "test": "node scripts/test.mjs"
+    "test": "node scripts/test.mjs",
+    "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
-    "astro": "^4.0.0 || ^5.0.0 || ^6.0.0 || ^7.0.0"
+    "astro": "^4.0.0 || ^5.0.0 || ^6.0.0 || ^7.0.0",
+    "react": "^18.0.0 || ^19.0.0",
+    "@tanstack/react-form": "^1.33.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "@tanstack/react-form": {
+      "optional": true
+    }
   },
   "devDependencies": {
-    "esbuild": "^0.25.0"
+    "@happy-dom/global-registrator": "^20.14.5",
+    "@tanstack/react-form": "^1.33.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "esbuild": "^0.25.0",
+    "happy-dom": "^20.14.5",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "typescript": "^5.9.3"
   },
   "allowScripts": {
     "esbuild@0.28.2": true,

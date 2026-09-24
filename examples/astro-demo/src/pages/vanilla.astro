@@ -1,0 +1,88 @@
+---
+import DemoLayout from "../layouts/DemoLayout.astro";
+import mailersSpec from "../../../specs/mailers.json";
+import { getForm } from "../lib/forms";
+
+// The exact same spec JSON these pages pass to the Astro component — here it
+// is mounted with plain JS instead. Nothing about the spec is Astro-specific.
+const form = getForm(mailersSpec, "JSON mailer echo");
+const specJson = JSON.stringify(form).replace(/</g, "\\u003c");
+---
+
+<DemoLayout title="Vanilla JS demo">
+  <p class="demo-kicker">@clearstorm/contact-form/vanilla</p>
+  <h1>Vanilla JS</h1>
+  <p class="lead">
+    The same form spec is just <em>data + one function call</em> — no framework
+    needed. <code>renderForm(container, spec)</code> mounts a fully working
+    form (validation, conditional fields, honeypot, mailer dispatch) into any
+    DOM node and returns <code>{'{ form, detach }'}</code>. The form below is
+    <code>"JSON mailer echo"</code> from
+    <code>examples/specs/mailers.json</code> — the identical spec the Mailers
+    page renders through the Astro component.
+  </p>
+
+  <div class="demo-card">
+    <h2>Usage</h2>
+    <pre>{`import { renderForm } from "@clearstorm/contact-form/vanilla";
+import "@clearstorm/contact-form/styles.css"; // once, anywhere
+
+const { form, detach } = renderForm(document.querySelector("#mount"), spec);
+
+// later — remove listeners and injected error DOM:
+detach();`}</pre>
+
+    <p class="lead" style="margin-block:0.4rem 0.2rem">
+      Styles are deliberately <em>not</em> auto-injected — import
+      <code>@clearstorm/contact-form/styles.css</code> once (or link it for
+      script-tag use). Try the lifecycle: <strong>Detach</strong> leaves the
+      markup in place but inert (submission and validation stop), then
+      <strong>Re-mount</strong> wires it up again.
+    </p>
+
+    <div id="vanilla-mount"></div>
+
+    <div class="demo-actions" style="display:flex; gap:0.5rem; margin-top:1rem">
+      <button class="demo-copy" type="button" id="vanilla-detach">Detach</button>
+      <button class="demo-copy" type="button" id="vanilla-remount">Re-mount</button>
+      <span id="vanilla-status" role="status" aria-live="polite" style="align-self:center"></span>
+    </div>
+  </div>
+
+  <p class="lead" style="margin-block:0.6rem 0.2rem">
+    The form reads the spec from an inline JSON blob and mounts client-side, so
+    this page can live on any static host. The component's own script
+    (<code>initForms</code>) uses the exact same engine under the hood.
+  </p>
+</DemoLayout>
+
+<script type="application/json" id="vanilla-spec" is:inline set:html={specJson} />
+
+<script>
+  import { renderForm } from "@clearstorm/contact-form/vanilla";
+  import "@clearstorm/contact-form/styles.css";
+
+  const root = document.getElementById("vanilla-mount");
+  const status = document.getElementById("vanilla-status");
+  const detachBtn = document.getElementById("vanilla-detach");
+  const remountBtn = document.getElementById("vanilla-remount");
+
+  const spec = JSON.parse(document.getElementById("vanilla-spec")?.textContent ?? "{}");
+
+  let detach: (() => void) | null = null;
+  const mount = (): void => {
+    root.innerHTML = "";
+    const mounted = renderForm(root, spec);
+    detach = mounted.detach;
+    status.textContent = "mounted";
+  };
+
+  detachBtn.addEventListener("click", () => {
+    detach?.();
+    detach = null;
+    status.textContent = "detached — markup left in place, engine unwired";
+  });
+  remountBtn.addEventListener("click", mount);
+
+  mount();
+</script>

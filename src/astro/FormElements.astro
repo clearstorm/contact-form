@@ -1,14 +1,12 @@
 ---
 /**
- * Render an ordered list of form elements — fields render as `FormField`,
- * structural elements as `Decor`. Used by ContactForm for the single-page
- * layout, the wizard's shared prefix, and each step pane. The caller must not
- * pass `step` markers here (they are consumed by `toSteps`); every element is
- * either a field or a visual decor.
+ * Render an ordered list of form elements — thin shell over the shared
+ * `renderElements` builder (src/runtime/markup.ts). Fields render as FormField
+ * markup, structural elements as Decor markup. The caller must not pass `step`
+ * markers here (consumed by `toSteps`); every element is a field or a decor.
  */
-import FormField from "./FormField.astro";
-import Decor from "./Decor.astro";
-import { isFieldSpec, gridSpan, type FormElement } from "../core";
+import { renderElements } from "../runtime/markup";
+import type { FormElement } from "../core";
 
 interface Props {
   elements: FormElement[];
@@ -22,37 +20,6 @@ interface Props {
 }
 
 const { elements, idPrefix = "" } = Astro.props;
-
-/** Element `id` → attribute value, scoped under `idPrefix` when set. */
-const scopedId = (element: { id?: string; name: string }) => {
-  const raw = element.id ?? element.name;
-  return idPrefix ? `${idPrefix}__${raw}` : raw;
-};
 ---
-{elements.map((element) =>
-  isFieldSpec(element) ? (
-    <FormField
-      label={element.label}
-      id={scopedId(element)}
-      name={element.name}
-      type={element.type}
-      autocomplete={element.autocomplete}
-      required={element.required}
-      optional={element.optional}
-      rows={element.rows}
-      options={element.options}
-      span={gridSpan(element.size)}
-      placeholder={element.placeholder}
-      value={element.value}
-      min={element.min}
-      max={element.max}
-      step={element.step}
-      maxlength={element.maxlength}
-      pattern={element.pattern}
-      accept={element.accept}
-      multiple={element.multiple}
-    />
-  ) : (
-    <Decor decor={element} />
-  ),
-)}
+
+<Fragment set:html={renderElements(elements, idPrefix)} />

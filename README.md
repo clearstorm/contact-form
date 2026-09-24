@@ -1,17 +1,20 @@
 # @clearstorm/contact-form
 
-Reusable contact forms for [Astro](https://astro.build) sites (including static
-hosts), built from three decoupled pieces:
+Reusable, framework-independent contact forms — a **fat engine, thin bindings**
+package: the same JSON form spec drives an Astro component, a React component,
+a single-call vanilla JS helper, or an opt-in TanStack Form bridge. Built from
+three decoupled pieces:
 
 - **Core** — a framework-agnostic engine (`src/core.ts`): the JSON form spec,
-  validation rules for **20 field types**, time normalisation and payload
-  normalisation. No framework or DOM dependencies, so the same code can run in
-  a browser bundle or a Node worker.
+  validation rules for **20 field types**, conditional visibility, time
+  normalisation and payload normalisation. No framework or DOM dependencies,
+  so the same code can run in a browser bundle or a Node worker.
 - **Mailers** — transport adapters (`src/mailers/`): `cf7` (Contact Form 7,
   the default) and `json` (generic POST to any endpoint you control).
   A Nodemailer-based delivery adapter is planned as a follow-up release.
-- **Components** — self-contained `ContactForm.astro` / `FormField.astro`:
-  namespaced `rf-*` markup, styled entirely with `--rf-*` CSS custom
+- **Runtime** — the shared client engine and markup builders for every
+  binding (`src/runtime/`): namespaced `rf-*` markup and the DOM-driven client
+  (`attachForm` / `initForms`), styled entirely with `--rf-*` CSS custom
   properties. The shipped theme is a **generic, compact light scheme** —
   override the variables on your own scope and it re-themes without touching
   the markup.
@@ -23,14 +26,14 @@ per-field `message` overrides, with built-in defaults.
 
 Zero runtime dependencies. No Tailwind required.
 
-> **Want to see it working?** `examples/` holds a runnable Astro demo site (all
+> **Want to see it working?** `examples/` holds a runnable **Astro site** (all
 > 20 field types — including file uploads — both mailers, CSS-only theming, a
-> multi-form wizard) plus copy-paste-ready JSON form specs it renders directly.
+> multi-form wizard, plus a vanilla-JS page mounting the same specs with
+> `renderForm`), a **Vite + React app** (the uncontrolled React adapter and the
+> TanStack Form bridge side by side), and the copy-paste-ready JSON form specs
+> both demos render directly.
 > Each spec file is a **map of named forms** — `{ "Name": FormSpec, … }` — so
-> one file can hold several examples and a single page can render them all
-> (the demo's `/field-types`, `/wizard`, `/conditional`, `/mailers` and
-> `/theming` pages do exactly that). Every form renders with Form | Spec tabs,
-> so each example shows and copies the exact JSON driving it.
+> one file can hold several examples and a single page can render them all.
 > See [`examples/README.md`](examples/README.md).
 
 ---
@@ -107,6 +110,105 @@ const { PUBLIC_API_URL, PUBLIC_CF7_FORM_ID } = import.meta.env; // your conventi
 `endpoint` for `json`) → a build-time console warning that the form is missing
 its endpoint config. How the values reach the component — your env files, CI
 secrets, hard-coding, content JSON — is entirely the consumer's business.
+
+---
+
+## Bindings (Astro · React · vanilla JS · TanStack Form)
+
+One package, multiple bindings — all driven by the same `FormSpec`, sharing
+the same engine and markup builders via subpath exports:
+
+| Subpath | What you get |
+| --- | --- |
+| `@clearstorm/contact-form/core` | spec types + framework-less logic (rules, `toSteps`, `canonicalData`, …) |
+| `@clearstorm/contact-form/mailers` | `cf7` / `json` transport adapters |
+| `@clearstorm/contact-form/runtime` (alias `./vanilla`) | `renderForm`, `attachForm`/`initForms`, markup builders |
+| `@clearstorm/contact-form/react` | `ContactForm` + `Field` React components (peer: `react`) |
+| `@clearstorm/contact-form/tanstack` | `useContactForm` bridge + `ContactFormField` (peers: `react`, `@tanstack/react-form`) |
+| `@clearstorm/contact-form/styles.css` | the shared stylesheet (single source; never auto-injected) |
+| `@clearstorm/contact-form/astro/…` | the original `.astro` components, unchanged |
+
+**Styles are imported once**, never auto-injected — every binding shares
+`@clearstorm/contact-form/styles.css`. The `rf-*` markup, `data-*`
+serialisation and `--rf-*` theming are one source of truth across all of them.
+
+### Astro (unchanged surface)
+
+```astro
+---
+import ContactForm from "@clearstorm/contact-form/astro/ContactForm.astro";
+---
+<ContactForm form={form} config={{ apiUrl, cf7FormId }} />
+```
+
+### React (uncontrolled — the engine owns the form)
+
+Works in any React framework (Next.js App + Pages Router, TanStack Start,
+Vite). Renders the shared shell and hands the mounted DOM to the engine:
+**validation, conditional visibility and submission never touch React**
+reconciliation, and the engine is detached on unmount (StrictMode-safe).
+
+```tsx
+import { ContactForm } from "@clearstorm/contact-form/react";
+import "@clearstorm/contact-form/styles.css";
+
+<ContactForm form={spec} config={{ endpoint }} />
+```
+
+### Vanilla JS (`renderForm`)
+
+Mount a complete, working form into any DOM node — no framework needed:
+
+```js
+import { renderForm } from "@clearstorm/contact-form/vanilla";
+import "@clearstorm/contact-form/styles.css";
+
+const { form, detach } = renderForm("#root", spec, { config: { endpoint } });
+// later — remove all listeners + injected error DOM:
+detach();
+```
+
+`attachForm(formEl, options)` is the lower-level entry (attach the engine to
+existing `rf-*` markup, returns the same `detach`); `initForms(root?)` scans
+the DOM once for the Astro script. Conditional fields, wizard state, the
+honeypot and both mailers behave identically in every binding.
+
+### TanStack Form (opt-in bridge)
+
+Own the inputs with TanStack Form while the package keeps providing the
+validation rules and transport:
+
+```tsx
+import { useForm } from "@tanstack/react-form";
+import { useContactForm, ContactFormField } from "@clearstorm/contact-form/tanstack";
+
+const bridge = useContactForm(spec, { config: { endpoint } });
+const form = useForm({
+  defaultValues: bridge.initialValues,
+  onSubmit: async ({ value }) => {
+    const result = await bridge.submit(value);   // → { ok, message }
+    // result.ok ? show success : show result.message
+  },
+});
+
+<form className="rf-form" onSubmit={(e) => { e.preventDefault(); form.handleSubmit(); }}>
+  {spec.fields.map((field) =>
+    bridge.isVisible(field.name, values) &&
+      <ContactFormField key={field.id} form={form} spec={field} bridge={bridge} />
+  )}
+  <button type="submit">{spec.submit}</button>
+</form>
+```
+
+- `validators` — per-field TanStack validators mirroring the core rules
+  (attach as `validators={{ onChange: bridge.validators[name], onBlur: …,
+  onSubmit: … }}`).
+- `submit(values)` — builds the canonical payload (only *visible* fields) and
+  runs the spec's mailer, exactly like the engine-driven bindings.
+- `isVisible(name, values)` / `visibleFieldNames(values)` — conditional
+  visibility read off TanStack state instead of the DOM.
+- `<ContactFormField />` renders the shared `rf-*` field markup with values
+  and errors owned by TanStack (see `examples/react-demo`).
 
 ---
 
@@ -601,16 +703,36 @@ src/
 │   ├── index.ts               # Mailer types + getMailer registry
 │   ├── cf7.ts                 # CF7 REST transport + payload policy
 │   └── json.ts                # generic POST transport
+├── runtime/                   # framework-agnostic layer all bindings share
+│   ├── markup.ts              # rf-* markup builders (single source of truth)
+│   ├── engine.ts              # attachForm / initForms — DOM-driven client engine
+│   ├── render.ts              # renderForm — vanilla JS entry point
+│   └── styles.css             # the one stylesheet (import once, never auto-injected)
+├── react/
+│   ├── ContactForm.tsx        # uncontrolled React adapter (SSR-friendly)
+│   └── index.ts
+├── tanstack/
+│   ├── useContactForm.ts      # opt-in TanStack Form bridge (validators, submit, visibility)
+│   ├── Field.tsx              # ContactFormField — controlled rf-* field renderer
+│   └── index.ts
 └── astro/
-    ├── ContactForm.astro      # form shell, data-* serialisation, submit wiring
-    └── FormField.astro        # labelled field with rf-* styles
+    ├── ContactForm.astro      # thin shell → renderFormShell + initForms
+    ├── FormField.astro        # thin shell → renderField
+    ├── FormElements.astro     # thin shell → renderElements
+    └── Decor.astro            # thin shell → renderDecor
 ```
 
-Run the test suite (core + both mailers):
+Run the test suite (core + mailers + markup snapshots + client engine under
+happy-dom):
 
 ```bash
 npm install && npm test
+npm run typecheck             # strict tsc over src/
 ```
+
+The markup snapshot suite (`scripts/markup-tests.ts`) pins every binding's
+output to `scripts/fixtures/*.html` — after an intentional markup change,
+regenerate with `RECORD=1 npm test` and review the diff.
 
 ## License
 

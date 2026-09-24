@@ -1,6 +1,10 @@
 ---
 import "../styles/demo.css";
 
+// The package styles are imported once here (not auto-injected) — every
+// ContactForm on the site shares this single stylesheet.
+import "@clearstorm/contact-form/styles.css";
+
 interface Props {
   title: string;
 }
@@ -14,6 +18,7 @@ const links = [
   { href: "/wizard", label: "Wizard" },
   { href: "/theming", label: "Theming" },
   { href: "/mailers", label: "Mailers" },
+  { href: "/vanilla", label: "Vanilla JS" },
 ];
 ---
 <!doctype html>

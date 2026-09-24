@@ -4,8 +4,9 @@ Everything you need to see `@clearstorm/contact-form` working end to end.
 
 | Path | What it is |
 | --- | --- |
-| `astro-demo/` | A minimal standalone **Astro site** consuming the package (linked live via a `file:` dependency) — try every feature in a browser |
-| `specs/` | Copy-paste-ready **JSON form specs** the demo actually renders (single source of truth) |
+| `astro-demo/` | A minimal standalone **Astro site** consuming the package (linked live via a `file:` dependency) — every classic feature in a browser, plus a **vanilla JS** page (`/vanilla`) mounting the same specs with `renderForm` |
+| `react-demo/` | A **Vite + React app** (Vite 6 + React 19) with two pages in one: the uncontrolled `<ContactForm />` adapter and the **TanStack Form** bridge (`useContactForm` + `<ContactFormField />`) |
+| `specs/` | Copy-paste-ready **JSON form specs** the demos actually render (single source of truth) |
 
 ---
 
@@ -39,6 +40,7 @@ doubles as a copy-paste-ready reference.
 | `/wizard` | **Multi-step wizard (`step` markers)** — three named forms from one file: the flagship three-step wizard (centered rule-flanked stepper, pane-header defaults + per-marker overrides, step-scoped "Next" validation, a cross-step `showWhen` reveal, a hoisted hidden field), every field type on an `even`+`center` stepper with a `background` band, and the compact chrome options (`nav` without numbers / jump-backs, custom "Continue" + `ghost` "Back", a `full` pane-header rule, a bare `show: false` pane) |
 | `/mailers` | **Both transports** — the `cf7` mailer (`config` prop read from `PUBLIC_API_URL` / `PUBLIC_CF7_FORM_ID`; resolved CF7 endpoint or a friendly config-error note) and the `json` mailer (canonical payload to the echo server — honeypot dropped, checkbox groups comma-joined, values trimmed), two named forms from one file |
 | `/theming` | **CSS-only re-theming** — two named forms from one file (`theme-light` / `theme-dark` slugs); the light side uses the shipped default theme + a brand accent, the dark side a full `--rf-*` override block |
+| `/vanilla` | **Vanilla JS binding** — the "JSON mailer echo" spec mounted with a single `renderForm("#mount", spec)` call (no framework), plus the `detach()` lifecycle: Detach leaves the markup but unwires the engine, Re-mount wires it again |
 
 ### Wiring a real backend
 
@@ -50,6 +52,33 @@ doubles as a copy-paste-ready reference.
 - **JSON**: any endpoint that accepts a `multipart/form-data` POST and answers
   with JSON. `scripts/echo-server.mjs` is the no-dependency stand-in; a
   serverless mail-delivery worker is the real-world target.
+
+---
+
+## `react-demo/` — run it
+
+Vite 6 + React 19 app consuming the same `file:../..` package link. Shows
+both React paths on one screen:
+
+- **Uncontrolled** — `<ContactForm form={spec} />` renders the shared shell
+  and hands the DOM to the engine; React never re-renders the form internals
+  and the engine is detached on unmount (StrictMode-safe).
+- **TanStack Form (opt-in bridge)** — `useContactForm(spec)` maps the core
+  rules to per-field validators and the mailer to `onSubmit`;
+  `<ContactFormField />` renders the shared `rf-*` field markup with values /
+  errors owned by TanStack. Conditional fields hide via
+  `bridge.isVisible(name, values)`, and submitting sends only the *visible*
+  fields through the spec's `json` mailer.
+
+```bash
+npm install
+npm run demo:api    # terminal 1 — the astro-demo echo server (localhost:8787)
+npm run dev         # terminal 2 — http://localhost:5173
+```
+
+`npm run build` emits a static bundle in `react-demo/dist/`. The `json`
+mailer forms expect the echo server; everything else (validation, conditional
+visibility) works without it.
 
 ---
 

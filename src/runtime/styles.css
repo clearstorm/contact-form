@@ -1,0 +1,703 @@
+/**
+ * Contact form styles — the single theming source for every framework
+ * binding (Astro shells, React, vanilla JS). Namespaced to rf-* and driven
+ * entirely by the --rf-* custom-property tokens declared on :where(.rf-form).
+ * Import this once in your bundle (or link it directly for plain-HTML use).
+ */
+/* ---- Contact form fields (namespaced; themeable via --rf-* custom props) ---- */
+
+  .rf-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--rf-field-gap, 0.375rem);
+    min-width: 0;
+  }
+
+  .rf-field--hidden {
+    display: none;
+  }
+
+  .rf-label {
+    font-size: var(--rf-label-size, 0.82rem);
+    font-weight: var(--rf-label-weight, 600);
+    letter-spacing: 0.06em;
+    color: var(--rf-label-color, inherit);
+  }
+
+  .rf-label .rf-optional {
+    font-weight: 400;
+    color: var(--rf-muted, #6b7280);
+  }
+
+  .rf-field input:not(input[type="checkbox"]):not(input[type="radio"]),
+  .rf-field select,
+  .rf-field textarea {
+    width: 100%;
+    min-height: var(--rf-field-min-height, 2.75rem);
+    border: 1px solid var(--rf-field-border, #d1d5db);
+    border-radius: 2px;
+    background: var(--rf-field-bg, #ffffff);
+    color: var(--rf-field-text, #111827);
+    padding: var(--rf-field-padding-y, 0.5rem) var(--rf-field-padding-x, 0.75rem);
+    color-scheme: var(--rf-color-scheme, light);
+    font: inherit;
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+  }
+
+  .rf-field input:not(input[type="checkbox"]):not(input[type="radio"]):focus-visible,
+  .rf-field select:focus-visible,
+  .rf-field textarea:focus-visible {
+    outline-color: var(--rf-focus, #2563eb);
+  }
+
+  .rf-field input[type="range"] {
+    min-height: 2rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  .rf-field input[type="color"] {
+    padding: 0.125rem;
+  }
+
+  .rf-field textarea {
+    min-height: var(--rf-textarea-min-height, 7rem);
+    resize: vertical;
+  }
+
+  /* Checkbox / radio groups and single options — natural sizing, no full-width styling. */
+  .rf-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem var(--rf-gap-x, 0.75rem);
+    padding-top: 0.25rem;
+  }
+
+  .rf-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    color: var(--rf-label-color, inherit);
+    cursor: pointer;
+  }
+
+  .rf-option input {
+    width: auto;
+    min-height: auto;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    accent-color: var(--rf-focus, #2563eb);
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+  }
+
+  .rf-option input:focus-visible {
+    outline-color: var(--rf-focus, #2563eb);
+  }
+
+  .rf-option--single .rf-label {
+    font-size: 0.9rem;
+    font-weight: 400;
+  }
+
+  /* Field error state (added by the form's script at runtime). */
+  .rf-input-invalid {
+    border-color: var(--rf-danger, #dc2626) !important;
+    outline-color: var(--rf-danger, #dc2626) !important;
+  }
+
+  .rf-field-error {
+    margin: -0.15rem 0 0;
+    color: var(--rf-danger, #dc2626);
+    font-size: 0.75rem;
+    line-height: 1.4;
+  }
+
+  /* 12-column row spans on desktop — the wrapper carries `rf-span-{1..12}`
+     (the span comes from `gridSpan` in the renderer). Below 48rem the grid is
+     a single column and every element stacks full-width. */
+  @media (min-width: 48rem) {
+    .rf-span-1 { grid-column: span 1; }
+    .rf-span-2 { grid-column: span 2; }
+    .rf-span-3 { grid-column: span 3; }
+    .rf-span-4 { grid-column: span 4; }
+    .rf-span-5 { grid-column: span 5; }
+    .rf-span-6 { grid-column: span 6; }
+    .rf-span-7 { grid-column: span 7; }
+    .rf-span-8 { grid-column: span 8; }
+    .rf-span-9 { grid-column: span 9; }
+    .rf-span-10 { grid-column: span 10; }
+    .rf-span-11 { grid-column: span 11; }
+    .rf-span-12 { grid-column: span 12; }
+  }
+
+.rf-heading {
+    grid-column: span 12;
+    margin: var(--rf-heading-margin, 0.25rem 0 0);
+    font-size: var(--rf-heading-size, 1rem);
+    font-weight: var(--rf-heading-weight, 700);
+    letter-spacing: 0.04em;
+    line-height: 1.3;
+    color: var(--rf-heading-color, inherit);
+  }
+
+  .rf-heading--center {
+    text-align: center;
+  }
+
+  /* Heading rule (default on; `line: false` hides it) — a flex row whose
+     pseudo-elements draw rules on the left and/or right of the text:
+     left → rule on the right · right → rule on the left · center → both. */
+  .rf-heading--rule {
+    display: flex;
+    align-items: center;
+    gap: var(--rf-heading-line-gap, 0.75rem);
+  }
+
+  .rf-heading--rule::before,
+  .rf-heading--rule::after {
+    content: "";
+    flex: 1;
+    border-top: var(--rf-heading-line-thickness, 1px) solid
+      var(--rf-heading-line-color, var(--rf-field-border, #d1d5db));
+  }
+
+  .rf-heading--left.rf-heading--rule::before {
+    display: none;
+  }
+
+  .rf-heading--right.rf-heading--rule::after {
+    display: none;
+  }
+
+  /* "full" — the title sits on its own line with a full-width rule beneath it
+     (instead of flanking rules), still driven by the --rf-heading-line-* tokens. */
+  .rf-heading--full.rf-heading--rule {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .rf-heading--full.rf-heading--rule::before {
+    display: none;
+  }
+
+  .rf-heading--full.rf-heading--rule::after {
+    width: 100%;
+  }
+
+  /* Description spans the row via the shared `.rf-span-{1..12}` classes from
+     FormField.astro (span from `gridSpan`, default 100 → 12 columns on
+     desktop, full-width below 48rem). */
+  .rf-description {
+    margin: var(--rf-description-margin, 0.125rem 0 0);
+    font-size: var(--rf-description-size, 0.82rem);
+    line-height: 1.5;
+    color: var(--rf-description-color, var(--rf-muted, #6b7280));
+  }
+
+  .rf-divider {
+    grid-column: span 12;
+    margin: var(--rf-divider-margin, 0.5rem 0);
+    border: 0;
+    border-top: var(--rf-divider-thickness, 1px) solid
+      var(--rf-divider-color, var(--rf-field-border, #d1d5db));
+  }
+
+  .rf-divider--spacer {
+    min-height: var(--rf-divider-spacer-min, 1rem);
+  }
+
+  .rf-section {
+    grid-column: span 12;
+    margin: var(--rf-section-margin, 0.75rem 0);
+    border-top: var(--rf-section-thickness, 1px) solid
+      var(--rf-section-color, var(--rf-field-border, #d1d5db));
+  }
+
+  .rf-section--labeled {
+    display: flex;
+    align-items: center;
+    gap: var(--rf-section-gap, 0.75rem);
+    border-top: 0;
+  }
+
+  .rf-section--labeled::before,
+  .rf-section--labeled::after {
+    content: "";
+    flex: 1;
+    border-top: var(--rf-section-thickness, 1px) solid
+      var(--rf-section-color, var(--rf-field-border, #d1d5db));
+  }
+
+  .rf-section-label {
+    font-size: var(--rf-section-label-size, 0.78rem);
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--rf-section-label-color, var(--rf-muted, #6b7280));
+  }
+
+/* ---- Contact form shell (namespaced; themeable via --rf-* custom props) ---- */
+
+  /* Default theme — generic, compact, light. Hosts override any --rf-*
+     variable (colours, native-control scheme, spacing) by declaring it on
+     their own scope (e.g. :root, a wrapper, or .rf-form itself). */
+  :where(.rf-form) {
+    /* colour */
+    --rf-field-bg: #ffffff;
+    --rf-field-border: #d1d5db;
+    --rf-field-text: #111827;
+    --rf-focus: #2563eb;
+    --rf-muted: #6b7280;
+    /* field labels — colour, size and weight are all themeable */
+    --rf-label-color: inherit;
+    --rf-label-size: 0.82rem;
+    --rf-label-weight: 600;
+    --rf-submit-bg: #111827;
+    --rf-submit-text: #ffffff;
+    --rf-success: #16a34a;
+    --rf-success-text: #14532d;
+    --rf-danger: #dc2626;
+    /* native controls (date pickers etc.) */
+    --rf-color-scheme: light;
+    /* spacing — compact minimum rhythm */
+    --rf-gap-x: 0.75rem;
+    --rf-gap-y: 1rem;
+    --rf-field-gap: 0.375rem;
+    --rf-field-padding-y: 0.5rem;
+    --rf-field-padding-x: 0.75rem;
+    --rf-field-min-height: 2.75rem;
+    --rf-textarea-min-height: 7rem;
+    --rf-submit-min-height: 2.75rem;
+    --rf-submit-padding-x: 1.1rem;
+    --rf-submit-gap: 0.5rem;
+    --rf-submit-margin-top: 0.25rem;
+    /* buttons — secondary (outline) and ghost (text-only) variants */
+    --rf-button-secondary-color: var(--rf-submit-bg);
+    --rf-button-secondary-border: var(--rf-submit-bg);
+    --rf-button-secondary-hover-bg: var(--rf-submit-bg);
+    --rf-button-secondary-hover-color: var(--rf-submit-text);
+    --rf-button-ghost-color: var(--rf-submit-bg);
+    --rf-button-ghost-hover-bg: color-mix(in srgb, var(--rf-submit-bg) 10%, transparent);
+    --rf-status-padding: 0.75rem;
+    /* wizard (multi-step) — stepper, panes and nav footer */
+    --rf-step-color: #9ca3af;
+    --rf-step-active-color: var(--rf-submit-bg);
+    --rf-step-done-color: var(--rf-success);
+    --rf-step-bg: transparent;
+    --rf-step-active-bg: var(--rf-step-bg);
+    --rf-step-done-bg: var(--rf-step-bg);
+    --rf-step-size: 1.5rem;
+    --rf-step-label-size: 0.78rem;
+    --rf-steps-gap: 0.5rem 1rem;
+    --rf-steps-margin: 0 0 0.5rem;
+    --rf-steps-bg: transparent;
+    --rf-steps-padding: 0.25rem 0.5rem;
+    --rf-steps-line-color: var(--rf-field-border, #d1d5db);
+    --rf-steps-line-thickness: 1px;
+    --rf-steps-line-gap: 0.75rem;
+    --rf-step-footer-gap: 0.5rem;
+    --rf-step-header-gap: 0.5rem;
+    --rf-step-header-num-size: 1.6rem;
+    --rf-step-header-num-color: var(--rf-step-active-color);
+    /* structural elements (headings, descriptions, dividers, sections) */
+    --rf-heading-size: 1rem;
+    --rf-heading-weight: 700;
+    --rf-heading-color: inherit;
+    --rf-heading-margin: 0.25rem 0 0;
+    --rf-description-size: 0.82rem;
+    --rf-description-color: #6b7280;
+    --rf-description-margin: 0.125rem 0 0;
+    --rf-divider-color: #d1d5db;
+    --rf-divider-thickness: 1px;
+    --rf-divider-margin: 0.5rem 0;
+    --rf-divider-spacer-min: 1rem;
+    --rf-section-color: #d1d5db;
+    --rf-section-thickness: 1px;
+    --rf-section-margin: 0.75rem 0;
+    --rf-section-gap: 0.75rem;
+    --rf-section-label-size: 0.78rem;
+    --rf-section-label-color: #6b7280;
+  }
+
+  .rf-form {
+    display: grid;
+    grid-template-columns: 1fr;
+    column-gap: var(--rf-gap-x);
+    row-gap: var(--rf-gap-y);
+    width: 100%;
+  }
+
+  .rf-submit-row {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--rf-gap-y);
+    margin-top: var(--rf-submit-margin-top);
+    grid-column: span 1;
+  }
+
+  .rf-submit {
+    display: inline-flex;
+    min-height: var(--rf-submit-min-height);
+    align-items: center;
+    justify-content: center;
+    gap: var(--rf-submit-gap);
+    border: 1px solid var(--rf-submit-bg);
+    border-radius: 2px;
+    background: var(--rf-submit-bg);
+    color: var(--rf-submit-text);
+    padding: 0 var(--rf-submit-padding-x);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    line-height: 1;
+    text-transform: uppercase;
+    transition: background-color 150ms, color 150ms, border-color 150ms;
+    cursor: pointer;
+  }
+
+  .rf-submit:hover {
+    background: transparent;
+    color: var(--rf-submit-bg);
+  }
+
+  .rf-submit:disabled {
+    cursor: default;
+  }
+
+  /* Variants (default = "primary", above). Specificity equal to
+     `.rf-submit:hover`, so declared after it to win on hover. */
+  .rf-submit--secondary {
+    background: transparent;
+    border-color: var(--rf-button-secondary-border);
+    color: var(--rf-button-secondary-color);
+  }
+
+  .rf-submit--secondary:hover {
+    background: var(--rf-button-secondary-hover-bg);
+    border-color: var(--rf-button-secondary-hover-bg);
+    color: var(--rf-button-secondary-hover-color);
+  }
+
+  .rf-submit--ghost {
+    background: transparent;
+    border-color: transparent;
+    color: var(--rf-button-ghost-color);
+  }
+
+  .rf-submit--ghost:hover {
+    background: var(--rf-button-ghost-hover-bg);
+    border-color: transparent;
+    color: var(--rf-button-ghost-color);
+  }
+
+  /* Status box — success colours by default; .rf-status--error switches them. */
+  .rf-status {
+    grid-column: span 1;
+    padding: var(--rf-status-padding);
+    border: 1px solid var(--rf-success);
+    color: var(--rf-success-text);
+  }
+
+  .rf-status--error {
+    border-color: var(--rf-danger);
+    color: var(--rf-danger);
+  }
+
+  /* Success-only view (`statusMode: "replace"`) — after a successful submit
+     the whole form collapses to the success box: every direct child except
+     .rf-status is hidden, and the form shell becomes a plain block. */
+  .rf-form--success {
+    display: block;
+  }
+
+  .rf-form--success > *:not(.rf-status) {
+    display: none;
+  }
+
+  /* Honeypot anti-spam field — off-screen, invisible to humans, present for bots. */
+  .rf-honeypot {
+    position: absolute;
+    left: -9999px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* ---- Wizard (multi-step) layout ----
+     The shared prefix and each step pane are their own 12-column grid inside
+     the form grid, so fields keep their `rf-span-{n}` widths; panes stay in
+     the DOM (hidden + inert) so cross-step showWhen conditions keep reading
+     earlier steps' values. */
+
+  .rf-shared,
+  .rf-steps,
+  .rf-pane,
+  .rf-step-footer {
+    grid-column: span 1;
+  }
+
+  .rf-shared,
+  .rf-pane {
+    display: grid;
+    grid-template-columns: 1fr;
+    column-gap: var(--rf-gap-x);
+    row-gap: var(--rf-gap-y);
+    min-width: 0;
+  }
+
+  .rf-shared[hidden],
+  .rf-pane[hidden],
+  [data-step-back][hidden] {
+    display: none;
+  }
+
+  .rf-steps {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--rf-steps-gap, 0.5rem 1rem);
+    margin: var(--rf-steps-margin, 0 0 0.5rem);
+    padding: 0;
+    list-style: none;
+    background: var(--rf-steps-bg, transparent);
+  }
+
+  /* Strip band — applied when `nav.background` fills the whole strip. */
+  .rf-steps--band {
+    padding: var(--rf-steps-padding, 0.25rem 0.5rem);
+    border-radius: 999px;
+  }
+
+  /* Alignment — opt-in via `StepperSpec.nav.variant` (default left),
+     `even` = space-evenly. */
+  .rf-steps--center {
+    justify-content: center;
+  }
+
+  .rf-steps--right {
+    justify-content: flex-end;
+  }
+
+  .rf-steps--even {
+    justify-content: space-evenly;
+  }
+
+  /* Lines — opt-in via `StepperSpec.nav.line`. top/bottom draw a full-width
+     rule above/below the strip; center flanks the chips like a pane header,
+     weighted by the variant (left → rule right of the row, right → rule on
+     the left, center → both sides). With variant "even" a flank can't flex,
+     so the rules run vertically BETWEEN the chips instead. */
+  .rf-steps--line-top {
+    border-top: var(--rf-steps-line-thickness, 1px) solid
+      var(--rf-steps-line-color, #d1d5db);
+    padding-top: var(--rf-steps-line-gap, 0.75rem);
+  }
+
+  .rf-steps--line-bottom {
+    border-bottom: var(--rf-steps-line-thickness, 1px) solid
+      var(--rf-steps-line-color, #d1d5db);
+    padding-bottom: var(--rf-steps-line-gap, 0.75rem);
+  }
+
+  .rf-steps--line-center {
+    gap: var(--rf-steps-line-gap, 0.75rem);
+  }
+
+  .rf-steps--line-center::before,
+  .rf-steps--line-center::after {
+    content: "";
+    flex: 1;
+    border-top: var(--rf-steps-line-thickness, 1px) solid
+      var(--rf-steps-line-color, #d1d5db);
+  }
+
+  .rf-steps--left.rf-steps--line-center::before {
+    display: none;
+  }
+
+  .rf-steps--right.rf-steps--line-center::after {
+    display: none;
+  }
+
+  .rf-steps--even.rf-steps--line-center {
+    column-gap: 0; /* separators own the rhythm; space-evenly still lays the strip out */
+  }
+
+  .rf-steps--even.rf-steps--line-center::before,
+  .rf-steps--even.rf-steps--line-center::after {
+    display: none;
+  }
+
+  /* Every step owns an equal slice of the strip's full width; the chip sits
+     centred inside it, and the rule at each slice boundary lands exactly
+     halfway between neighbouring chips. */
+  .rf-steps--even.rf-steps--line-center .rf-step {
+    flex: 1 1 0;
+    min-width: 0;
+    justify-content: center;
+    padding-inline: calc(var(--rf-steps-line-gap, 0.75rem) / 2);
+  }
+
+  .rf-steps--even.rf-steps--line-center .rf-step + .rf-step {
+    border-left: var(--rf-steps-line-thickness, 1px) solid
+      var(--rf-steps-line-color, #d1d5db);
+  }
+
+  .rf-step {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+  }
+
+  /* The stepper content is a button so completed steps are clickable;
+     disabled until the visit passes that step (no forward jumps). The chip
+     is a pill: transparent by default (current look) — background tokens
+     colour it via `--rf-step-bg` / `-active-bg` / `-done-bg`. */
+  .rf-step-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.15rem 0.5rem;
+    border: 0;
+    border-radius: 999px;
+    background: var(--rf-step-bg, transparent);
+    font: inherit;
+    color: inherit;
+    cursor: default;
+  }
+
+  .rf-step-btn:disabled {
+    color: inherit; /* the step tokens decide the look — don't let the UA grey it */
+    opacity: 1;
+  }
+
+  .rf-step-btn:focus-visible {
+    outline: 2px solid var(--rf-focus);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  .rf-step-index {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--rf-step-size, 1.5rem);
+    height: var(--rf-step-size, 1.5rem);
+    border: 1px solid var(--rf-step-color, #9ca3af);
+    border-radius: 50%;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--rf-step-color, #9ca3af);
+  }
+
+  .rf-step-label {
+    font-size: var(--rf-step-label-size, 0.78rem);
+    color: var(--rf-step-color, #9ca3af);
+  }
+
+  .rf-step[aria-current="step"] .rf-step-index {
+    border-color: var(--rf-step-active-color, var(--rf-submit-bg));
+    background: var(--rf-step-active-color, var(--rf-submit-bg));
+    color: var(--rf-submit-text);
+  }
+
+  .rf-step[aria-current="step"] .rf-step-label {
+    color: inherit;
+    font-weight: 600;
+  }
+
+  .rf-step[aria-current="step"] .rf-step-btn {
+    background: var(--rf-step-active-bg, transparent);
+  }
+
+  .rf-step--done .rf-step-index {
+    border-color: var(--rf-step-done-color, var(--rf-success));
+    color: var(--rf-step-done-color, var(--rf-success));
+  }
+
+  .rf-step--done .rf-step-btn {
+    cursor: pointer;
+    background: var(--rf-step-done-bg, transparent);
+  }
+
+  .rf-step--done .rf-step-btn:hover .rf-step-index {
+    background: var(--rf-step-done-color, var(--rf-success));
+    color: var(--rf-submit-text);
+  }
+
+  /* Step pane header — number chip + heading, reuse the heading rule tokens. */
+  .rf-step-header {
+    grid-column: span 12;
+    display: flex;
+    align-items: center;
+    gap: var(--rf-step-header-gap, 0.5rem);
+    margin: var(--rf-heading-margin, 0.25rem 0 0);
+  }
+
+  .rf-step-header-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: var(--rf-step-header-num-size, 1.6rem);
+    height: var(--rf-step-header-num-size, 1.6rem);
+    border: 1px solid var(--rf-step-header-num-color, var(--rf-step-active-color));
+    border-radius: 50%;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--rf-step-header-num-color, var(--rf-step-active-color));
+  }
+
+  .rf-step-header .rf-heading {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+  }
+
+  .rf-step-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--rf-step-footer-gap, 0.5rem);
+    margin-top: var(--rf-submit-margin-top);
+  }
+
+  @media (min-width: 48rem) {
+    .rf-form {
+      grid-template-columns: repeat(12, 1fr);
+    }
+
+    .rf-submit-row {
+      grid-column: span 12;
+      flex-direction: row;
+      align-items: center;
+    }
+
+    .rf-status {
+      grid-column: span 12;
+    }
+
+    .rf-shared,
+    .rf-steps,
+    .rf-pane,
+    .rf-step-footer {
+      grid-column: span 12;
+    }
+
+    .rf-shared,
+    .rf-pane {
+      grid-template-columns: repeat(12, 1fr);
+    }
+  }

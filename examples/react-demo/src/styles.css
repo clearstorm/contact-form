@@ -1,0 +1,105 @@
+/* Demo page chrome — deliberately plain, must NOT style the form itself so the
+   package's default theme shows through. The form styles come from importing
+   `@clearstorm/contact-form/styles.css` once (see App.tsx). */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  line-height: 1.55;
+  color: #1f2937;
+  background: #f6f7f9;
+}
+
+.demo-shell {
+  width: min(52rem, 100% - 2.5rem);
+  margin-inline: auto;
+}
+
+.demo-header {
+  background: #111827;
+  color: #f9fafb;
+  padding-block: 1rem;
+}
+
+.demo-header__inner {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.demo-brand {
+  font-weight: 700;
+}
+
+.demo-main {
+  padding-block: 2rem 4rem;
+}
+
+.demo-footer {
+  color: #6b7280;
+  font-size: 0.9rem;
+  padding-block: 1.5rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.demo-kicker {
+  font-size: 0.8rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #6b7280;
+  margin-block: 1.5rem 0.25rem;
+}
+
+h1 {
+  margin-block: 0 0.5rem;
+  font-size: 2rem;
+}
+
+h2 {
+  margin-block: 2.5rem 0.5rem;
+  font-size: 1.35rem;
+}
+
+.lead {
+  color: #4b5563;
+  max-width: 46rem;
+}
+
+.demo-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 1.5rem;
+  margin-block: 1rem 1.5rem;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
+}
+
+pre {
+  background: #111827;
+  color: #e5e7eb;
+  padding: 1rem;
+  border-radius: 6px;
+  overflow-x: auto;
+  font-size: 0.85rem;
+}
+
+code {
+  background: #f3f4f6;
+  padding: 0.1rem 0.3rem;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.demo-status {
+  margin-top: 1rem;
+}

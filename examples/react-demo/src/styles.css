@@ -1,6 +1,9 @@
-/* Demo page chrome — deliberately plain, must NOT style the form itself so the
-   package's default theme shows through. The form styles come from importing
-   `@clearstorm/contact-form/styles.css` once (see App.tsx). */
+/* Demo page chrome — deliberately plain. It must NOT style the form itself:
+   the whole point is that the package's default light theme shows through.
+   The only form styling here is the theming page's `.theme-*` override scopes
+   (see the Theming section below), which demonstrate consumer-side re-theming.
+   The form styles come from importing `@clearstorm/contact-form/styles.css`
+   once (see App.tsx). */
 
 * {
   box-sizing: border-box;
@@ -19,80 +22,79 @@ body {
   margin-inline: auto;
 }
 
+/* ---- header / footer ---- */
+
 .demo-header {
   background: #111827;
   color: #f9fafb;
-  padding-block: 1rem;
 }
 
 .demo-header__inner {
   display: flex;
-  align-items: baseline;
-  gap: 1rem;
   flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+  padding-block: 0.9rem;
 }
 
 .demo-brand {
+  font-size: 0.85rem;
   font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.demo-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+}
+
+.demo-nav a {
+  color: #d1d5db;
+  font-size: 0.85rem;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+
+.demo-nav a:hover,
+.demo-nav a[aria-current="page"] {
+  color: #ffffff;
+  border-bottom-color: currentColor;
 }
 
 .demo-main {
-  padding-block: 2rem 4rem;
+  padding-block: 2.5rem 3.5rem;
 }
 
 .demo-footer {
-  color: #6b7280;
-  font-size: 0.9rem;
-  padding-block: 1.5rem;
   border-top: 1px solid #e5e7eb;
-}
-
-.demo-kicker {
-  font-size: 0.8rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  background: #ffffff;
   color: #6b7280;
-  margin-block: 1.5rem 0.25rem;
+  font-size: 0.82rem;
+  padding-block: 1rem;
 }
 
-h1 {
-  margin-block: 0 0.5rem;
-  font-size: 2rem;
+code,
+pre {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
-h2 {
-  margin-block: 2.5rem 0.5rem;
-  font-size: 1.35rem;
-}
-
-.lead {
-  color: #4b5563;
-  max-width: 46rem;
-}
-
-.demo-card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  padding: 1.5rem;
-  margin-block: 1rem 1.5rem;
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
+code {
+  background: #eef0f3;
+  border-radius: 3px;
+  padding: 0.1em 0.35em;
+  font-size: 0.9em;
 }
 
 pre {
   background: #111827;
   color: #e5e7eb;
-  padding: 1rem;
   border-radius: 6px;
+  padding: 1rem 1.1rem;
   overflow-x: auto;
-  font-size: 0.85rem;
-}
-
-code {
-  background: #f3f4f6;
-  padding: 0.1rem 0.3rem;
-  border-radius: 4px;
-  font-size: 0.9em;
+  font-size: 0.8rem;
+  line-height: 1.5;
 }
 
 pre code {
@@ -100,6 +102,256 @@ pre code {
   padding: 0;
 }
 
-.demo-status {
+/* ---- page bits ---- */
+
+.demo-kicker {
+  margin: 0 0 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: #b45309;
+}
+
+h1 {
+  margin: 0 0 0.6rem;
+  font-size: 1.7rem;
+  line-height: 1.2;
+}
+
+h2 {
+  margin: 2.2rem 0 0.6rem;
+  font-size: 1.15rem;
+}
+
+.lead {
+  margin: 0 0 1.5rem;
+  max-width: 46rem;
+  color: #4b5563;
+}
+
+.demo-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1.5rem 1.6rem 1.8rem;
+  margin-block: 1.4rem;
+}
+
+.demo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 1rem;
+  margin-block: 1.4rem;
+}
+
+.demo-tile {
+  display: block;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1.1rem 1.2rem;
+  text-decoration: none;
+  color: inherit;
+}
+
+.demo-tile:hover {
+  border-color: #b45309;
+}
+
+.demo-tile h3 {
+  margin: 0 0 0.3rem;
+  font-size: 0.95rem;
+}
+
+.demo-tile p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+.demo-note {
+  border-left: 3px solid #b45309;
+  background: #fdf3e7;
+  border-radius: 0 6px 6px 0;
+  padding: 0.8rem 1rem;
+  font-size: 0.9rem;
+  margin-block: 1rem;
+}
+
+.demo-note p {
+  margin: 0.3rem 0;
+}
+
+.demo-note p:first-child {
+  margin-top: 0;
+}
+
+.demo-note p:last-child {
+  margin-bottom: 0;
+}
+
+.demo-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.88rem;
+  margin-block: 1rem;
+}
+
+.demo-table th,
+.demo-table td {
+  border: 1px solid #e5e7eb;
+  padding: 0.45rem 0.7rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.demo-table th {
+  background: #f3f4f6;
+  font-weight: 600;
+}
+
+.demo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
   margin-top: 1rem;
+}
+
+.demo-actions .demo-status {
+  align-self: center;
+}
+
+/* ---- Theming demo: two CSS-only themes for the SAME markup ---- */
+
+/* Light: the shipped default theme, with a single brand accent override
+   (--rf-focus) to show that even the "light" side is consumer-tuned. */
+.theme-light .rf-form {
+  --rf-focus: #b45309;
+}
+
+/* Dark: a full override block. No markup changes — just --rf-* variables. */
+.theme-dark .rf-form {
+  --rf-field-bg: #1b1512;
+  --rf-field-border: #3a302b;
+  --rf-field-text: #faf5ee;
+  --rf-focus: #f0bd79;
+  --rf-muted: #b9ada2;
+  --rf-label-color: #faf5ee;
+  --rf-submit-bg: #c46f48;
+  --rf-submit-text: #120e0c;
+  --rf-success: #16a34a;
+  --rf-success-text: #bbf7d0;
+  --rf-danger: #e56b65;
+  --rf-color-scheme: dark;
+  --rf-field-gap: 0.5rem;
+  --rf-field-padding-y: 0.65rem;
+  --rf-field-padding-x: 0.85rem;
+  --rf-field-min-height: 3rem;
+  --rf-submit-min-height: 3rem;
+}
+
+.theme-dark {
+  background: #120e0c;
+  border-color: #3a302b;
+}
+
+/* ---- Form | Spec tabs (FormDemonstration component) ---- */
+
+/* Tabs are CSS-only: a hidden radio pair drives which panel shows, via the
+   generic [id$="-tab-form"] / [id$="-tab-spec"] checks. Colours are tokens
+   so the theming page can re-scope them alongside the form theme. */
+.demo-tabs {
+  --tab-border: #e5e7eb;
+  --tab-text: #64748b;
+  --tab-active-text: #0f172a;
+  --tab-active-bg: #ffffff;
+}
+
+.demo-tabs-radio {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.demo-tabbar {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 0.9rem;
+  border-bottom: 1px solid var(--tab-border);
+}
+
+.demo-tab {
+  padding: 0.35rem 0.9rem;
+  margin-bottom: -1px;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  font-size: 0.85rem;
+  color: var(--tab-text);
+  cursor: pointer;
+  user-select: none;
+}
+
+.demo-tabs-radio[id$="-tab-form"]:checked ~ .demo-tabbar label[for$="-tab-form"],
+.demo-tabs-radio[id$="-tab-spec"]:checked ~ .demo-tabbar label[for$="-tab-spec"] {
+  color: var(--tab-active-text);
+  background: var(--tab-active-bg);
+  border-color: var(--tab-border);
+}
+
+.demo-tabpanel {
+  display: none;
+}
+
+.demo-tabs-radio[id$="-tab-form"]:checked ~ .demo-tabpanel--form,
+.demo-tabs-radio[id$="-tab-spec"]:checked ~ .demo-tabpanel--spec {
+  display: block;
+}
+
+.demo-spec-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.demo-spec-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.demo-copy {
+  font: inherit;
+  font-size: 0.75rem;
+  padding: 0.22rem 0.65rem;
+  border: 1px solid var(--tab-border);
+  border-radius: 6px;
+  background: var(--tab-active-bg, #ffffff);
+  color: #334155;
+  cursor: pointer;
+}
+
+.demo-copy:hover {
+  background: #f3f4f6;
+}
+
+/* The spec JSON — same dark code block as the site's other <pre>s, but
+   scrollable vertically for the longer specs (conditions, wizard.json). */
+.demo-spec {
+  margin: 0;
+  max-height: 20rem;
+  overflow: auto;
+}
+
+/* Theming page: keep the tab chrome readable on the dark card scope. */
+.theme-dark .demo-tabs {
+  --tab-border: #3a302b;
+  --tab-text: #b9ada2;
+  --tab-active-text: #faf5ee;
+  --tab-active-bg: #120e0c;
 }

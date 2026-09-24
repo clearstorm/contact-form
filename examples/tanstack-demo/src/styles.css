@@ -1,0 +1,212 @@
+/* Demo page chrome — deliberately plain. It must NOT style the form itself:
+   the whole point is that the package's default light theme shows through.
+   The form styles come from importing `@clearstorm/contact-form/styles.css`
+   once (see App.tsx). Same chrome as the react-demo, plus the header nav
+   buttons for this app's demo switcher. */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  line-height: 1.55;
+  color: #1f2937;
+  background: #f6f7f9;
+}
+
+.demo-shell {
+  width: min(52rem, 100% - 2.5rem);
+  margin-inline: auto;
+}
+
+.demo-header {
+  background: #111827;
+  color: #f9fafb;
+}
+
+.demo-header__inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+  padding-block: 0.9rem;
+}
+
+.demo-brand {
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.demo-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.6rem;
+}
+
+/* The demo switcher — plain buttons styled as nav links. */
+.demo-nav .demo-copy {
+  background: transparent;
+  border: 1px solid #374151;
+  color: #d1d5db;
+  font: inherit;
+  font-size: 0.8rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.demo-nav .demo-copy:hover {
+  background: #1f2937;
+  color: #ffffff;
+}
+
+.demo-nav .demo-copy--active {
+  border-color: #b45309;
+  color: #ffffff;
+}
+
+.demo-main {
+  padding-block: 2.5rem 3.5rem;
+}
+
+.demo-footer {
+  border-top: 1px solid #e5e7eb;
+  background: #ffffff;
+  color: #6b7280;
+  font-size: 0.82rem;
+  padding-block: 1rem;
+}
+
+code,
+pre {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+code {
+  background: #eef0f3;
+  border-radius: 3px;
+  padding: 0.1em 0.35em;
+  font-size: 0.9em;
+}
+
+pre {
+  background: #111827;
+  color: #e5e7eb;
+  border-radius: 6px;
+  padding: 1rem 1.1rem;
+  overflow-x: auto;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+pre code {
+  background: transparent;
+  padding: 0;
+}
+
+/* ---- page bits ---- */
+
+.demo-kicker {
+  margin: 0 0 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: #b45309;
+}
+
+h1 {
+  margin: 0 0 0.6rem;
+  font-size: 1.7rem;
+  line-height: 1.2;
+}
+
+h2 {
+  margin: 2.2rem 0 0.6rem;
+  font-size: 1.15rem;
+}
+
+.lead {
+  margin: 0 0 1.5rem;
+  max-width: 46rem;
+  color: #4b5563;
+}
+
+.demo-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1.5rem 1.6rem 1.8rem;
+  margin-block: 1.4rem;
+}
+
+.demo-note {
+  border-left: 3px solid #b45309;
+  background: #fdf3e7;
+  border-radius: 0 6px 6px 0;
+  padding: 0.8rem 1rem;
+  font-size: 0.9rem;
+  margin-block: 1rem;
+}
+
+.demo-note p {
+  margin: 0.3rem 0;
+}
+
+.demo-note p:first-child {
+  margin-top: 0;
+}
+
+.demo-note p:last-child {
+  margin-bottom: 0;
+}
+
+.demo-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.88rem;
+  margin-block: 1rem;
+}
+
+.demo-table th,
+.demo-table td {
+  border: 1px solid #e5e7eb;
+  padding: 0.45rem 0.7rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.demo-table th {
+  background: #f3f4f6;
+  font-weight: 600;
+}
+
+/* ---- provider toggle (ZodValidation demo) ---- */
+
+.demo-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-block: 1rem;
+}
+
+.demo-toggle .demo-copy {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  color: #334155;
+  font: inherit;
+  font-size: 0.8rem;
+  padding: 0.3rem 0.8rem;
+  cursor: pointer;
+}
+
+.demo-toggle .demo-copy--active {
+  border-color: #b45309;
+  color: #0f172a;
+  font-weight: 600;
+}

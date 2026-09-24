@@ -29,9 +29,12 @@ Zero runtime dependencies. No Tailwind required.
 > **Want to see it working?** `examples/` holds a runnable **Astro site** (all
 > 20 field types — including file uploads — both mailers, CSS-only theming, a
 > multi-form wizard, plus a vanilla-JS page mounting the same specs with
-> `renderForm`), a **Vite + React app** (the uncontrolled React adapter and the
-> TanStack Form bridge side by side), and the copy-paste-ready JSON form specs
-> both demos render directly.
+> `renderForm`), a **Vite + React app** with the same seven routes as the Astro
+> demo (each rendering the uncontrolled `<ContactForm />`; `/vanilla` mounts
+> `renderForm()` *inside* React), a **TanStack Form bridge app** —
+> `useContactForm` + `<ContactFormField />` and a **vanilla | Zod validation
+> toggle** for the pluggable validation seam — and the copy-paste-ready JSON
+> form specs all three demos render directly.
 > Each spec file is a **map of named forms** — `{ "Name": FormSpec, … }` — so
 > one file can hold several examples and a single page can render them all.
 > See [`examples/README.md`](examples/README.md).
@@ -208,7 +211,7 @@ const form = useForm({
 - `isVisible(name, values)` / `visibleFieldNames(values)` — conditional
   visibility read off TanStack state instead of the DOM.
 - `<ContactFormField />` renders the shared `rf-*` field markup with values
-  and errors owned by TanStack (see `examples/react-demo`).
+  and errors owned by TanStack (see `examples/tanstack-demo`).
 
 ---
 

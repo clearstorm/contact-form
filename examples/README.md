@@ -5,7 +5,8 @@ Everything you need to see `@clearstorm/contact-form` working end to end.
 | Path | What it is |
 | --- | --- |
 | `astro-demo/` | A minimal standalone **Astro site** consuming the package (linked live via a `file:` dependency) — every classic feature in a browser, plus a **vanilla JS** page (`/vanilla`) mounting the same specs with `renderForm` |
-| `react-demo/` | A **Vite + React app** (Vite 6 + React 19) with two pages in one: the uncontrolled `<ContactForm />` adapter and the **TanStack Form** bridge (`useContactForm` + `<ContactFormField />`) |
+| `react-demo/` | A **Vite + React app** (Vite 6 + React 19) with **route parity with the Astro demo** — the same seven paths (`/`, `/field-types`, `/conditional`, `/wizard`, `/mailers`, `/theming`, `/vanilla`), each rendering the named forms from the same `examples/specs/*.json` via the uncontrolled `<ContactForm />` |
+| `tanstack-demo/` | A **Vite + React app** for the opt-in **TanStack Form** bridge (`useContactForm` + `<ContactFormField />`) and the pluggable-validation seam — a vanilla | Zod provider toggle proving only *which rules run* changes |
 | `specs/` | Copy-paste-ready **JSON form specs** the demos actually render (single source of truth) |
 
 ---
@@ -57,28 +58,66 @@ doubles as a copy-paste-ready reference.
 
 ## `react-demo/` — run it
 
-Vite 6 + React 19 app consuming the same `file:../..` package link. Shows
-both React paths on one screen:
+Vite 6 + React 19 app consuming the same `file:../..` package link. It mirrors
+the Astro demo **route for route** — the same seven paths, each rendering the
+named forms from the same spec JSON with the uncontrolled `<ContactForm />`:
 
-- **Uncontrolled** — `<ContactForm form={spec} />` renders the shared shell
-  and hands the DOM to the engine; React never re-renders the form internals
-  and the engine is detached on unmount (StrictMode-safe).
-- **TanStack Form (opt-in bridge)** — `useContactForm(spec)` maps the core
-  rules to per-field validators and the mailer to `onSubmit`;
-  `<ContactFormField />` renders the shared `rf-*` field markup with values /
-  errors owned by TanStack. Conditional fields hide via
-  `bridge.isVisible(name, values)`, and submitting sends only the *visible*
-  fields through the spec's `json` mailer.
+| Route | Demonstrates |
+| --- | --- |
+| `/` | Index + quickstart |
+| `/field-types` | The all-20 field types kitchen sink + the structural field types |
+| `/conditional` | Realistic enquiry, all seven `showWhen` operators, and an AND reveal |
+| `/wizard` | The three wizard forms from one spec file (step markers + stepper) |
+| `/mailers` | Both transports — `cf7` (env-configurable endpoint) and `json` (echo server) |
+| `/theming` | Light/dark scope re-theming with `--rf-*` variables |
+| `/vanilla` | `renderForm()` mounted *inside* a React component, with the `detach()` lifecycle |
+
+Every form renders with **Form | Spec tabs** (the Spec tab shows — and copies —
+the exact JSON driving it), just like the Astro demo. React never re-renders the
+form internals: the engine owns validation, conditional visibility, wizard state
+and submission, and is detached on unmount (StrictMode-safe).
 
 ```bash
 npm install
-npm run demo:api    # terminal 1 — the astro-demo echo server (localhost:8787)
+npm run demo:api    # terminal 1 — echo server (localhost:8787) — lives in this repo
 npm run dev         # terminal 2 — http://localhost:5173
 ```
 
-`npm run build` emits a static bundle in `react-demo/dist/`. The `json`
-mailer forms expect the echo server; everything else (validation, conditional
-visibility) works without it.
+`npm run build` emits a static bundle in `react-demo/dist/` (Vite serves the
+`index.html` fallback for every route). The `json` mailer forms expect the echo
+server; everything else (validation, conditional visibility) works without it.
+
+The `cf7` form on `/mailers` reads `VITE_API_URL` / `VITE_CF7_FORM_ID`.
+Point them at a real WordPress install (see the Wiring section above) to watch a
+real CF7 submission: `VITE_API_URL=https://cms.example.com VITE_CF7_FORM_ID=5 npm run dev`.
+
+---
+
+## `tanstack-demo/` — run it
+
+A focused app for the opt-in **TanStack Form** bridge and the pluggable
+validation seam (Vite 6 + React 19 + TanStack Form + Zod):
+
+- **TanStack bridge** — `useContactForm(spec)` maps the core rules to per-field
+  validators and the mailer to `onSubmit`; `<ContactFormField />` renders the
+  shared `rf-*` markup with values / errors owned by TanStack Form. Conditional
+  fields hide via `bridge.isVisible(name, values)`.
+- **Vanilla | Zod validation** — the same "Realistic enquiry" form, rendered by
+  the exact same component, with only the validation provider swapped:
+  `validation: vanillaValidation` vs `validation: zodValidation(schema)` from
+  `@clearstorm/contact-form/validation`. Copy, required-ness and format come
+  from the consumer's Zod schema; the DOM, payload and mailer stay identical.
+
+```bash
+npm install
+npm run demo:api    # terminal 1 — echo server (localhost:8787)
+npm run dev         # terminal 2 — http://localhost:5174
+```
+
+`zod` is an optional peer of the package — in the demo it's a real dependency
+because the demo builds schemas. Toggle providers, type `a@b` as the email, and
+submit to feel the difference. The schema is consumed structurally
+(`.shape` + `.safeParse`), so the package module itself never imports zod.
 
 ---
 

@@ -16,7 +16,7 @@
  */
 import { attachForm } from "./engine";
 import { renderFormShell, type ShellOptions } from "./markup";
-import type { FormSpec } from "../core";
+import type { FormSpec, ValidationProvider } from "../core";
 
 export interface RenderOptions extends Omit<ShellOptions, "form"> {
   /**
@@ -25,6 +25,12 @@ export interface RenderOptions extends Omit<ShellOptions, "form"> {
    * this option exists for script-tag / no-bundler consumers.
    */
   styles?: string;
+  /**
+   * Validation provider — swaps which rules run. Defaults to the package's
+   * vanilla rules; pass e.g. a Zod-derived provider (see
+   * `@clearstorm/contact-form/validation`) to validate differently.
+   */
+  validation?: ValidationProvider;
 }
 
 export interface RenderedForm {
@@ -66,6 +72,6 @@ export function renderForm(
   }
 
   root.appendChild(formEl);
-  const detach = attachForm(formEl, { spec: form });
+  const detach = attachForm(formEl, { spec: form, validation: options.validation });
   return { form: formEl, detach };
 }

@@ -18,7 +18,6 @@
  * optional `spec`/`config` override for forms rendered outside the shell.
  */
 import {
-  buildRules,
   buttonLabel,
   buttonVariant,
   evaluateVisibility,
@@ -26,12 +25,14 @@ import {
   toFieldSpecs,
   toSteps,
   validateValue,
+  vanillaValidation,
   visibleNames,
   type ButtonVariant,
   type FieldSpec,
   type FormCopy,
   type FormSpec,
   type Rule,
+  type ValidationProvider,
   type VisibilityCondition,
 } from "../core";
 import { getMailer, type MailerConfig } from "../mailers";
@@ -216,6 +217,7 @@ const hideStatus = (status: Status): void => {
 async function handleSubmit(
   event: Event,
   fields: FieldSpec[],
+  rules: Record<string, Rule>,
   mailerName: string,
   successMessage: string,
   copy: FormCopy,
@@ -226,7 +228,6 @@ async function handleSubmit(
   if (!(form instanceof HTMLFormElement)) return;
   event.preventDefault();
 
-  const rules = buildRules(fields, copy);
   const genericError = copy.error ?? "Something went wrong. Please try again in a moment.";
 
   const status = form.querySelector<HTMLElement>(".rf-status");
@@ -325,6 +326,12 @@ export interface AttachOptions {
   spec?: FormSpec;
   /** Explicit config overrides — win over the form's data-* attributes. */
   config?: Partial<MailerConfig>;
+  /**
+   * Validation provider — swaps which rules run. Defaults to the package's
+   * vanilla rules (`vanillaValidation`); pass e.g. a Zod-derived provider
+   * (see `@clearstorm/contact-form/validation`) to validate differently.
+   */
+  validation?: ValidationProvider;
 }
 
 interface StepsMeta {
@@ -401,7 +408,7 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): () 
       /* malformed copy — keep defaults */
     }
   }
-  const rules = buildRules(fields, copy);
+  const rules = (opts.validation ?? vanillaValidation).buildRules(fields, copy);
   const mailerName = spec?.mailer ?? form.dataset.mailer ?? "cf7";
   const status = form.querySelector<HTMLElement>(".rf-status");
   const successMessage = spec?.status ?? status?.textContent ?? "";
@@ -482,7 +489,7 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): () 
 
   on(form, "submit", (event) => {
     if (!isWizard) {
-      void handleSubmit(event, fields, mailerName, successMessage, copy, visibility);
+      void handleSubmit(event, fields, rules, mailerName, successMessage, copy, visibility);
       return;
     }
     // Wizard: the submit button advances the current step; the last step
@@ -501,7 +508,7 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): () 
       goTo(currentStep + 1);
       return;
     }
-    void handleSubmit(event, fields, mailerName, successMessage, copy, visibility, stepControls);
+    void handleSubmit(event, fields, rules, mailerName, successMessage, copy, visibility, stepControls);
   });
 
   // Stepper: completed steps are clickable and jump back without validation

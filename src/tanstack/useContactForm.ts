@@ -32,16 +32,17 @@
 
 import { useMemo } from "react";
 import {
-  buildRules,
   evaluateVisibility,
   isFieldSpec,
   toFieldSpecs,
   validateValue,
+  vanillaValidation,
   visibleNames,
   type FieldSpec,
   type FormFieldSpec,
   type FormSpec,
   type Rule,
+  type ValidationProvider,
 } from "../core";
 import { getMailer, type MailerConfig, type MailerResult } from "../mailers";
 
@@ -67,6 +68,17 @@ export interface TanStackBridgeOptions {
     apiUrl?: string;
     cf7FormId?: string;
   };
+  /**
+   * Validation provider — swaps which rules the per-field validators run.
+   * Defaults to the package's vanilla rules; pass e.g. a Zod-derived provider
+   * (see `@clearstorm/contact-form/validation`) to validate differently.
+   */
+  validation?: ValidationProvider;
+  /**
+   * Fully replace the derived validators, keyed by field name. When present,
+   * `validation` is ignored — these win for every field they name.
+   */
+  validators?: Record<string, FieldValidator>;
 }
 
 /* ---- pure helpers (exported for non-hook use) ---- */
@@ -102,9 +114,18 @@ export function validateFieldValue(rule: Rule | undefined, field: FieldSpec, val
   return validateValue(rule, normalizeValue(field, value)) ?? undefined;
 }
 
-/** Derive per-field TanStack validators from a field spec (+ copy overrides). */
-export function buildValidators(fields: FieldSpec[], copy: FormSpec["copy"] = {}): Record<string, FieldValidator> {
-  const rules = buildRules(fields, copy);
+/**
+ * Derive per-field TanStack validators from a field spec (+ copy overrides).
+ * Pass a custom `ValidationProvider` to drive the rules from your own source
+ * (e.g. a Zod schema via the adapter in `@clearstorm/contact-form/validation`);
+ * defaults to the package's vanilla rules.
+ */
+export function buildValidators(
+  fields: FieldSpec[],
+  copy: FormSpec["copy"] = {},
+  provider: ValidationProvider = vanillaValidation,
+): Record<string, FieldValidator> {
+  const rules = provider.buildRules(fields, copy);
   const validators: Record<string, FieldValidator> = {};
   for (const field of fields) {
     const rule = rules[field.name];
@@ -222,7 +243,10 @@ export function useContactForm(form: FormSpec, options: TanStackBridgeOptions = 
   const fieldSpecs = useMemo(() => form.fields.filter(isFieldSpec), [form]);
   const fields = useMemo(() => toFieldSpecs(form.fields), [form]);
   const copy = form.copy ?? {};
-  const validators = useMemo(() => buildValidators(fields, copy), [fields, copy]);
+  const validators = useMemo(
+    () => options.validators ?? buildValidators(fields, copy, options.validation),
+    [fields, copy, options.validators, options.validation],
+  );
   const initialValues = useMemo(() => buildInitialValues(fieldSpecs), [fieldSpecs]);
   const mailerConfig: MailerConfig = useMemo(
     () => ({

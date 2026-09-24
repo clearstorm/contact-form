@@ -24,6 +24,7 @@ import {
   type ShellOptions,
 } from "./markup";
 import { RenderedForm, renderForm, type RenderOptions } from "./render";
+import { vanillaValidation, type ValidationProvider } from "../core";
 
 import "../mailers"; // transport adapters used by the engine
 
@@ -45,6 +46,9 @@ export {
   renderForm,
   type RenderedForm,
   type RenderOptions,
+  // validation seam
+  vanillaValidation,
+  type ValidationProvider,
 };
 
 export type { FormSpec, FormFieldSpec } from "../core";

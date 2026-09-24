@@ -610,7 +610,12 @@ export function visibleNames(
 export interface Rule {
   required?: boolean;
   test: (value: string) => boolean;
-  message: string;
+  /**
+   * The message to show on failure. A static string works everywhere; the
+   * function form is for adapters (e.g. the optional Zod bridge) that want to
+   * surface the exact error for the current value.
+   */
+  message: string | ((value: string) => string);
 }
 
 const NAME_RE = /^[\p{L}\s''-]{2,}$/u;
@@ -741,10 +746,35 @@ export function buildRules(fields: FieldSpec[], copy: FormCopy = {}): Record<str
  */
 export function validateValue(rule: Rule | undefined, value: string): string | null {
   if (!rule) return null;
-  if (rule.required && !value) return rule.message;
-  if (value && !rule.test(value)) return rule.message;
+  const message = typeof rule.message === "function" ? rule.message(value) : rule.message;
+  if (rule.required && !value) return message;
+  if (value && !rule.test(value)) return message;
   return null;
 }
+
+/* ---- Validation seam ---- */
+
+/**
+ * Pluggable rule builder. The default (`vanillaValidation`) derives per-field
+ * rules from the spec's type/required/min/max/message — everything downstream
+ * (the DOM engine, React adapter, TanStack bridge) validates through opaque
+ * `Rule` objects, so swapping the provider changes *which* rules run, never
+ * *how* they run.
+ *
+ * ```ts
+ * const provider: ValidationProvider = {
+ *   buildRules(fields, copy) { …your rules, e.g. derived from a Zod schema… },
+ * };
+ * renderForm("#root", spec, { validation: provider });
+ * ```
+ */
+export interface ValidationProvider {
+  /** Build the per-field rules a form's client field specs validate against. */
+  buildRules(fields: FieldSpec[], copy?: FormCopy): Record<string, Rule>;
+}
+
+/** The built-in provider — the regex rules `buildRules` ships with. */
+export const vanillaValidation: ValidationProvider = { buildRules };
 
 /* ---- Time normalisation ---- */
 

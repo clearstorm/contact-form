@@ -22,6 +22,7 @@
     "./vanilla": "./src/runtime/index.ts",
     "./react": "./src/react/index.ts",
     "./tanstack": "./src/tanstack/index.ts",
+    "./validation": "./src/validation/index.ts",
     "./styles.css": "./src/runtime/styles.css",
     "./astro/ContactForm.astro": "./src/astro/ContactForm.astro",
     "./astro/FormField.astro": "./src/astro/FormField.astro",
@@ -38,13 +39,17 @@
   "peerDependencies": {
     "astro": "^4.0.0 || ^5.0.0 || ^6.0.0 || ^7.0.0",
     "react": "^18.0.0 || ^19.0.0",
-    "@tanstack/react-form": "^1.33.0"
+    "@tanstack/react-form": "^1.33.0",
+    "zod": "^3.22.0 || ^4.0.0"
   },
   "peerDependenciesMeta": {
     "react": {
       "optional": true
     },
     "@tanstack/react-form": {
+      "optional": true
+    },
+    "zod": {
       "optional": true
     }
   },
@@ -57,7 +62,8 @@
     "happy-dom": "^20.14.5",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "zod": "^4.6.5"
   },
   "allowScripts": {
     "esbuild@0.28.2": true,

@@ -692,6 +692,39 @@ bounds, `color`, `textarea` min length 10, names ≥ 2 letters, checkbox/radio
 selection). Errors render inline and clear on input; the honeypot field
 absorbs bots (pretend-success, nothing sent).
 
+### Validation is pluggable
+
+Core exposes a seam: a `ValidationProvider` is just `{ buildRules(fields, copy) }`
+returning per-field `Rule` objects. Every binding validates through that
+seam, so swapping the provider changes *which* rules run — never *how* they
+run. The default is `vanillaValidation` (the regex rules above); pass your
+own provider through any binding:
+
+```ts
+import { renderForm } from "@clearstorm/contact-form/vanilla";
+import { zodValidation } from "@clearstorm/contact-form/validation";
+import { z } from "zod";
+
+renderForm("#root", spec, {
+  validation: zodValidation(z.object({
+    email: z.string().email("Enter a valid email address."),
+    age: z.coerce.number().min(18, "Must be 18 or older."),
+  })),
+});
+```
+
+- **React:** `<ContactForm form={spec} validation={provider} />`
+- **TanStack:** `useContactForm(spec, { validation: provider })` (or hand it raw
+  `validators` per field to bypass the seam entirely)
+- **Engine:** `attachForm(formEl, { validation: provider })`
+
+`zod` is an **optional peer dependency** — it's only loaded when you import the
+adapter, and the adapter consumes the schema structurally (`.shape` +
+`safeParse`), so zod v3 and v4 both work. Fields present in the schema
+validate against it (required-ness, format and messages all come from the
+schema — including per-value issue text); fields absent from the schema keep
+the vanilla rule, so the two compose instead of replacing each other.
+
 ---
 
 ## Project layout
@@ -714,6 +747,9 @@ src/
 ├── tanstack/
 │   ├── useContactForm.ts      # opt-in TanStack Form bridge (validators, submit, visibility)
 │   ├── Field.tsx              # ContactFormField — controlled rf-* field renderer
+│   └── index.ts
+├── validation/
+│   ├── zod.ts                 # zodValidation — optional Zod adapter (structural)
 │   └── index.ts
 └── astro/
     ├── ContactForm.astro      # thin shell → renderFormShell + initForms

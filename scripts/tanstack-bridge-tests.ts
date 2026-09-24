@@ -13,7 +13,7 @@ import {
   valuesToFormData,
   visibleFieldNames,
 } from "../src/tanstack/useContactForm";
-import { canonicalData, toFieldSpecs, type FormSpec } from "../src/core";
+import { canonicalData, toFieldSpecs, vanillaValidation, type FormSpec } from "../src/core";
 
 let failures = 0;
 const check = (label: string, cond: boolean, extra = "") => {
@@ -121,6 +121,30 @@ check(
 check(
   "validator: optional single checkbox doesn't force a choice",
   validators.rush({ value: false }) === undefined,
+);
+
+/* ---- buildValidators with a custom validation provider ---- */
+
+const strictProvider = {
+  ...vanillaValidation,
+  buildRules(flds: Parameters<typeof vanillaValidation.buildRules>[0], cpy: Parameters<typeof vanillaValidation.buildRules>[1]) {
+    const built = vanillaValidation.buildRules(flds, cpy);
+    // Mimics a Zod-backed adapter: email bypassed, name's per-value message.
+    if (built.email) built.email.test = () => true;
+    if (built.first_name) built.first_name.message = (value: string) => `Name must shout (had "${value}")`;
+    return built;
+  },
+};
+const providerValidators = buildValidators(fields, spec.copy, strictProvider);
+check(
+  "buildValidators: custom provider routes into per-field validators",
+  providerValidators.email({ value: "any-old-thing" }) === undefined &&
+    providerValidators.first_name({ value: "" }) === 'Name must shout (had "")',
+  `got=${providerValidators.first_name({ value: "" })}`,
+);
+check(
+  "buildValidators: raw validators still derive when provider omitted",
+  typeof buildValidators(fields, spec.copy).first_name === "function",
 );
 
 /* ---- normalizeValue ---- */

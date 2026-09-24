@@ -5,6 +5,7 @@
  * - scripts/tests.mjs               — core + mailers (no DOM)
  * - scripts/markup-tests.ts         — markup snapshot fixtures (no DOM)
  * - scripts/tanstack-bridge-tests.ts — TanStack bridge pure helpers (no DOM)
+ * - scripts/zod-validation-tests.ts — zod adapter provider (no DOM)
  * - scripts/engine-tests.ts         — client engine under happy-dom (DOM)
  */
 import { buildSync } from "esbuild";
@@ -50,12 +51,22 @@ buildSync({
   logLevel: "warning",
 });
 
+buildSync({
+  entryPoints: ["scripts/zod-validation-tests.ts"],
+  bundle: true,
+  platform: "node",
+  format: "esm",
+  outfile: "/tmp/contact-form-zod-tests.mjs",
+  logLevel: "warning",
+});
+
 execSync("node /tmp/contact-form-tests.mjs", { stdio: "inherit" });
 execSync("node /tmp/contact-form-markup-tests.mjs", {
   stdio: "inherit",
   env: { ...process.env, FIXTURES_DIR: new URL("./fixtures/", import.meta.url).pathname },
 });
 execSync("node /tmp/contact-form-tanstack-tests.mjs", { stdio: "inherit" });
+execSync("node /tmp/contact-form-zod-tests.mjs", { stdio: "inherit" });
 
 // happy-dom occasionally hangs at module import in a fresh Node process (ESM
 // loader flake, ~1 in 4 processes). Retry only on the hang (SIGTERM from the

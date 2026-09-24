@@ -370,5 +370,88 @@ check(
   `url=${calls[calls.length - 1]?.url}`,
 );
 
+/* ---- 9. pluggable validation: custom provider swaps rules + messages ---- */
+
+const { vanillaValidation } = await import("../src/core");
+
+const providerSpec = jsonSpec([
+  { type: "text", id: "a", name: "a", label: "A", required: true },
+  { type: "email", id: "b", name: "b", label: "B", required: true },
+]);
+
+/** Provider that overrides messages and formats through the seam. */
+const customProvider = {
+  ...vanillaValidation,
+  buildRules(fields: Parameters<typeof vanillaValidation.buildRules>[0], copy?: Parameters<typeof vanillaValidation.buildRules>[1]) {
+    const rules = vanillaValidation.buildRules(fields, copy);
+    // Static message override.
+    if (rules.a) rules.a.message = "CUSTOM REQUIRED MSG";
+    // Per-value message + a max-length test instead of email format.
+    if (rules.b) {
+      rules.b.test = (value) => value.length <= 5;
+      rules.b.message = (value: string) => `B too long (${value.length})`;
+    }
+    return rules;
+  },
+};
+
+/** Error text scoped to one field's wrapper (DOM order is not indexed). */
+const fieldError = (form: HTMLFormElement, name: string): string =>
+  form.querySelector<HTMLElement>(`[name="${name}"]`)?.closest(".rf-field")?.querySelector(".rf-field-error")?.textContent ?? "";
+
+// (a) attachForm({ validation }) — provider messages reach the DOM.
+document.body.innerHTML = '<div id="root"></div>';
+const pform = mount(renderFormShell({ form: providerSpec }));
+attachForm(pform, { validation: customProvider });
+submit(pform);
+await until(() => errorCount(pform) === 2);
+check(
+  "attachForm validation: custom static message shown for empty field",
+  fieldError(pform, "a") === "CUSTOM REQUIRED MSG",
+  `got=${fieldError(pform, "a")}`,
+);
+
+// (b) per-value message resolves against the current value.
+input(pform, "a").value = "Sam";
+input(pform, "b").value = "123456";
+submit(pform);
+await until(() => fieldError(pform, "b") === "B too long (6)");
+check(
+  "attachForm validation: function message evaluated per value",
+  fieldError(pform, "b") === "B too long (6)",
+  `got=${fieldError(pform, "b")}`,
+);
+check(
+  "attachForm validation: filled valid field clears",
+  fieldError(pform, "a") === "",
+  `got=${fieldError(pform, "a")}`,
+);
+
+// (c) renderForm({ validation }) forwards the provider to the engine.
+const m4 = renderForm(root()!, providerSpec, { validation: customProvider });
+input(m4.form, "a").value = "Sam";
+input(m4.form, "b").value = "123456";
+submit(m4.form);
+check(
+  "renderForm validation: provider rules apply to rendered form",
+  (await until(() => fieldError(m4.form, "b") === "B too long (6)")) &&
+    errorCount(m4.form) === 1 &&
+    fieldError(m4.form, "a") === "",
+  `b=${fieldError(m4.form, "b")} a=${fieldError(m4.form, "a")} count=${errorCount(m4.form)}`,
+);
+m4.detach();
+
+// (d) no provider → still the vanilla defaults (no regression).
+document.body.innerHTML = '<div id="root"></div>';
+const vform = mount(renderFormShell({ form: providerSpec }));
+attachForm(vform);
+submit(vform);
+await until(() => errorCount(vform) === 2);
+check(
+  "default validation unchanged without a provider",
+  fieldError(vform, "a") !== "CUSTOM REQUIRED MSG" && fieldError(vform, "b") !== "B too long (0)",
+  `a=${fieldError(vform, "a")}`,
+);
+
 console.log(failures === 0 ? "\nENGINE ALL PASS" : `\nENGINE ${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);

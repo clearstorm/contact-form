@@ -14,7 +14,7 @@
 import { useEffect, useRef, type ReactElement } from "react";
 import { fieldRenderProps, renderField, renderFormShell } from "../runtime/markup";
 import { attachForm } from "../runtime/engine";
-import type { FormFieldSpec, FormSpec } from "../core";
+import type { FormFieldSpec, FormSpec, ValidationProvider } from "../core";
 
 export interface ContactFormProps {
   form: FormSpec;
@@ -22,10 +22,16 @@ export interface ContactFormProps {
   config?: { endpoint?: string; apiUrl?: string; cf7FormId?: string };
   /** "datetime" pre-fills date/time inputs with the current local date/time. */
   prefill?: "datetime";
+  /**
+   * Validation provider — swaps which rules run. Defaults to the package's
+   * vanilla rules; pass e.g. a Zod-derived provider (see
+   * `@clearstorm/contact-form/validation`) to validate differently.
+   */
+  validation?: ValidationProvider;
 }
 
 /** Server-rendered, engine-wired contact form for any React-based framework. */
-export function ContactForm({ form, config, prefill }: ContactFormProps): ReactElement {
+export function ContactForm({ form, config, prefill, validation }: ContactFormProps): ReactElement {
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -34,8 +40,8 @@ export function ContactForm({ form, config, prefill }: ContactFormProps): ReactE
     if (!root || !formEl) return;
     // `spec` is passed explicitly so the engine never depends on the shell's
     // data-rules serialisation being present on a custom mount point.
-    return attachForm(formEl, { spec: form });
-  }, [form]);
+    return attachForm(formEl, { spec: form, validation });
+  }, [form, validation]);
 
   return (
     <div

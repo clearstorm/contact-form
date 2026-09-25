@@ -155,8 +155,11 @@ reconciliation, and the engine is detached on unmount (StrictMode-safe).
 import { ContactForm } from "@clearstorm/contact-form/react";
 import "@clearstorm/contact-form/styles.css";
 
-<ContactForm form={spec} config={{ endpoint }} />
+<ContactForm form={spec} config={{ endpoint }} hooks={{ beforeSubmit }} />
 ```
+
+`hooks` is optional and accepts the engine's lifecycle hooks (plus a named
+registry for spec hook-refs); `Field` renders a single field from the spec.
 
 ### Vanilla JS (`renderForm`)
 
@@ -166,14 +169,19 @@ Mount a complete, working form into any DOM node — no framework needed:
 import { renderForm } from "@clearstorm/contact-form/vanilla";
 import "@clearstorm/contact-form/styles.css";
 
-const { form, detach } = renderForm("#root", spec, { config: { endpoint } });
+const { form, detach, on } = renderForm("#root", spec, { config: { endpoint } });
+on("rf:submit-success", (e) => trackSubmit(e.detail)); // the rf:* event bus
 // later — remove all listeners + injected error DOM:
 detach();
 ```
 
-`attachForm(formEl, options)` is the lower-level entry (attach the engine to
-existing `rf-*` markup, returns the same `detach`); `initForms(root?)` scans
-the DOM once for the Astro script. Conditional fields, wizard state, the
+`attachForm(formEl, options)` is the lower-level entry — attach the engine to
+existing `rf-*` markup, or pass `options.spec` for the exact rendered form. It
+returns `{ on(event, handler), detach() }`: `on` subscribes to the `rf:*`
+event bus through the engine's detach-safe registry (`detach()` removes
+subscriptions with every other listener; native `addEventListener` on the form
+sees the same events). `initForms(root?)` scans the DOM once for the Astro
+script and returns a combined detach. Conditional fields, wizard state, the
 honeypot and both mailers behave identically in every binding.
 
 ### TanStack Form (opt-in bridge)
@@ -208,10 +216,55 @@ const form = useForm({
   onSubmit: … }}`).
 - `submit(values)` — builds the canonical payload (only *visible* fields) and
   runs the spec's mailer, exactly like the engine-driven bindings.
+- `on(event, handler)` — subscribe to `rf:submit-start` / `rf:submit-success`
+  / `rf:submit-error` around `submit()`.
+- `beforeSubmit` / `afterSubmit` options — mirror the engine's lifecycle
+  hooks: returning `false` from `beforeSubmit` cancels `submit()` (it resolves
+  `{ ok: false, message: "" }` with no mailer call, no `rf:submit-start`).
 - `isVisible(name, values)` / `visibleFieldNames(values)` — conditional
   visibility read off TanStack state instead of the DOM.
 - `<ContactFormField />` renders the shared `rf-*` field markup with values
   and errors owned by TanStack (see `examples/tanstack-demo`).
+
+### Events & lifecycle hooks (the `rf:*` bus)
+
+Every engine-driven form announces its lifecycle on a namespaced **`rf:*`
+event bus**. `attachForm` and `renderForm` return an `on(event, handler)` that
+subscribes through the engine's detach-safe registry; because the events are
+plain `CustomEvent`s dispatched on the `<form>`, native `addEventListener`
+receives them too. `detach()` removes subscriptions with every other listener.
+
+| Event | Fires | `detail` |
+| --- | --- | --- |
+| `rf:fields-change` | a control's `input` / `change` | `{ name, value }` |
+| `rf:row-add` / `rf:row-remove` | a repeater row added / removed | `{ name, count }` |
+| `rf:step-change` | wizard step transition (Next, Back, stepper jump) | `{ from, to, total }` |
+| `rf:submit-start` | after validation passes, before the mailer | `{ name, id, form }` |
+| `rf:submit-success` | the mailer accepted the submission | `{ name, id }` |
+| `rf:submit-error` | the mailer failed | `{ name, id, message }` |
+
+Lifecycle **hooks** let a consumer veto or observe those same moments
+declaratively by passing them in the attach options:
+
+```js
+renderForm("#root", spec, {
+  config: { endpoint },
+  hooks: {
+    beforeValidateStep: () => guard() !== false, // false cancels the "Next" advance
+    afterStepChange: ({ from, to }) => setStep(from, to),
+    beforeSubmit: () => maybeCancel() === false, // false cancels submission
+    afterSubmit: ({ ok, message }) => notify(ok, message),
+  },
+});
+```
+
+A spec can instead carry hook *names* — `hooks: { beforeSubmit: "trackLead" }`
+— resolved against the named functions registered in the attach options
+(`hooks: { trackLead: fn }`). Specs stay JSON-serialisable, and an
+unregistered name is a no-op while the matching event still fires. The React
+binding exposes the same seam through its optional `hooks` prop; the TanStack
+bridge mirrors the submit hooks (`beforeSubmit` / `afterSubmit` options) and
+the `rf:submit-*` events (`bridge.on(...)`).
 
 ---
 

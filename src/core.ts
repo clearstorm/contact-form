@@ -521,6 +521,16 @@ export function stepperModifiers(stepper: StepperSpec | undefined): string {
   return parts.join(" ");
 }
 
+/**
+ * The lifecycle hook names the wizard / submit seam supports. A hook is a
+ * consumer-supplied *function*; a `FormSpec` may reference it by name (the
+ * spec JSON stays serialisable — never a function in a spec). The engine
+ * resolves a spec's hook name against the named functions registered in the
+ * attach options, so declarative specs can wire analytics callbacks without
+ * shipping code in the JSON.
+ */
+export type HookName = "beforeValidateStep" | "afterStepChange" | "beforeSubmit" | "afterSubmit";
+
 export interface FormSpec {
   /** Baked form identity (e.g. "enquiry" | "booking") — keys data-mail-form, the form id and the JS hooks. */
   name: string;
@@ -557,6 +567,15 @@ export interface FormSpec {
   cf7?: { apiUrl?: string; formId?: string };
   /** Visitor-facing copy overrides for this form. */
   copy?: FormCopy;
+  /**
+   * Lifecycle hooks, referenced by *name*: `{ beforeSubmit: "trackLead" }`.
+   * The engine resolves each name against the functions registered in the
+   * attach options (`attachForm(opts.hooks)`, `renderForm(options.hooks)`) —
+   * inline hook functions there win over the spec's names. A name that isn't
+   * registered is a no-op, but the matching `rf:*` event still fires, so
+   * analytics never loses visibility (see FEATURES `event-bus`).
+   */
+  hooks?: Partial<Record<HookName, string>>;
   /**
    * The ordered layout of the form: real fields plus (optionally) structural
    * elements — `heading`, `description`, `divider`, `section` — and wizard

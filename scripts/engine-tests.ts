@@ -504,9 +504,9 @@ check(
 /* ---- 5. detach (StrictMode safety): idempotent, no double wiring ---- */
 
 form = mount(renderFormShell({ form: errSpec }));
-const detach = attachForm(form);
-detach();
-detach(); // idempotent
+const attachedA = attachForm(form);
+attachedA.detach();
+attachedA.detach(); // idempotent
 const before = calls.length;
 submit(form);
 await tick();
@@ -705,7 +705,7 @@ const repeaterSpec = jsonSpec([
 ]);
 
 const repform = mount(renderFormShell({ form: repeaterSpec }));
-const detachR = attachForm(repform);
+const repeaterAttached = attachForm(repform);
 const rows = () => Array.from(repform.querySelectorAll<HTMLElement>("[data-repeater-row]"));
 const addBtn = () => repform.querySelector<HTMLButtonElement>("[data-add-row]");
 const removeBtns = () => Array.from(repform.querySelectorAll<HTMLButtonElement>("[data-remove-row]"));
@@ -783,7 +783,7 @@ check(
   find(repform, ".rf-repeater-error")?.textContent?.trim() === "Need at least one member.",
   `got=${find(repform, ".rf-repeater-error")?.textContent}`,
 );
-detachR();
+repeaterAttached.detach();
 
 /* ---- 9b. Conditional repeaters (showWhen row groups) ---- */
 
@@ -820,6 +820,245 @@ check(
     !find(cform2, ".rf-repeater-error") &&
     !find(cform2, ".rf-field-error"),
   JSON.stringify(hiddenPayload),
+);
+
+/* ---- 10. M5: the `rf:*` event bus + lifecycle hooks ---- */
+
+// A collector that records a CustomEvent as a compact string.
+const recordInto = (bucket: string[]) => (elem: CustomEvent) =>
+  bucket.push(`${elem.type}:${JSON.stringify(elem.detail)}`);
+
+/* 10a. rf:submit-* on a successful submit, then detach kills the bus. */
+const busSubmit = mount(
+  renderFormShell({ form: jsonSpec([{ type: "text", id: "a", name: "a", label: "A" }], { name: "engine-bus-submit" }) }),
+);
+const attachedSubmit = attachForm(busSubmit);
+const submitEvents: string[] = [];
+attachedSubmit.on("rf:submit-start", recordInto(submitEvents));
+attachedSubmit.on("rf:submit-success", recordInto(submitEvents));
+attachedSubmit.on("rf:submit-error", recordInto(submitEvents));
+const callsBeforeSubmit = calls.length;
+submit(busSubmit);
+check("valid submit reaches the mailer", await until(() => calls.length === callsBeforeSubmit + 1));
+const typeOf = (e: string) => /^rf:[a-z-]+/.exec(e)?.[0] ?? "";
+const submitLifecycle = () => submitEvents.map(typeOf);
+check(
+  "rf:submit-start then rf:submit-success, in order, with the form identity",
+  (await until(() => submitLifecycle().join(",") === "rf:submit-start,rf:submit-success")) &&
+    submitEvents[0].includes('"name":"engine-bus-submit"'),
+  submitEvents.join(" | "),
+);
+attachedSubmit.detach();
+submitEvents.length = 0;
+submit(busSubmit);
+await tick();
+check("detach removes bus subscriptions (no more events)", submitEvents.length === 0, submitEvents.join(" | "));
+
+/* 10b. rf:submit-error on a failed mailer. */
+const busFail = mount(
+  renderFormShell({ form: jsonSpec([{ type: "text", id: "a", name: "a", label: "A" }], { name: "engine-bus-fail", endpoint: "https://example.test/fail" }) }),
+);
+const attachedFail = attachForm(busFail);
+const failEvents: string[] = [];
+attachedFail.on("rf:submit-start", recordInto(failEvents));
+attachedFail.on("rf:submit-error", recordInto(failEvents));
+attachedFail.on("rf:submit-success", () => failEvents.push("rf:submit-success"));
+const failLifecycle = () => failEvents.map(typeOf);
+submit(busFail);
+check(
+  "failed submit fires rf:submit-start then rf:submit-error (never success)",
+  await until(() => failLifecycle().join(",") === "rf:submit-start,rf:submit-error"),
+  failEvents.join(","),
+);
+
+/* 10c. native addEventListener sees the same events (bus parity). */
+const busNative = mount(
+  renderFormShell({ form: jsonSpec([{ type: "text", id: "a", name: "a", label: "A" }], { name: "engine-bus-native" }) }),
+);
+attachForm(busNative);
+const nativeEvents: string[] = [];
+busNative.addEventListener("rf:submit-start", () => nativeEvents.push("native-start"));
+const callsBeforeNative = calls.length;
+submit(busNative);
+check(
+  "native addEventListener receives rf: events",
+  await until(() => calls.length === callsBeforeNative + 1) && nativeEvents.length === 1,
+  nativeEvents.join(","),
+);
+
+/* 10d. rf:fields-change on control interaction. */
+const busFields = mount(
+  renderFormShell({ form: jsonSpec([{ type: "text", id: "a", name: "a", label: "A" }], { name: "engine-bus-fields" }) }),
+);
+const attachedFields = attachForm(busFields);
+const fieldEvents: Array<{ name: string; value: string }> = [];
+attachedFields.on("rf:fields-change", (e) => fieldEvents.push(e.detail as { name: string; value: string }));
+input(busFields, "a").value = "hello";
+fire(input(busFields, "a"), "input");
+check(
+  "rf:fields-change carries the control's name + value",
+  fieldEvents.length >= 1 && fieldEvents.at(-1)?.name === "a" && fieldEvents.at(-1)?.value === "hello",
+  JSON.stringify(fieldEvents),
+);
+
+/* 10e. rf:row-add / rf:row-remove with live counts. */
+const busRows = mount(
+  renderFormShell({
+    form: jsonSpec(
+      [
+        {
+          type: "repeater",
+          id: "links",
+          name: "links",
+          fields: [{ type: "url", id: "url", name: "url", label: "Link" }],
+        },
+      ],
+      { name: "engine-bus-rows" },
+    ),
+  }),
+);
+const attachedRows = attachForm(busRows);
+const rowEvents: Array<{ type: string; count: number }> = [];
+attachedRows.on("rf:row-add", (e) => rowEvents.push({ type: e.type, count: (e.detail as { count: number }).count }));
+attachedRows.on("rf:row-remove", (e) => rowEvents.push({ type: e.type, count: (e.detail as { count: number }).count }));
+find<HTMLButtonElement>(busRows, "[data-add-row]")!.click();
+await tick();
+find<HTMLButtonElement>(busRows, "[data-remove-row]")!.click();
+await tick();
+check(
+  "row add/remove emit rf:row-add and rf:row-remove with live counts",
+  rowEvents.map((r) => `${r.type}:${r.count}`).join(",") === "rf:row-add:2,rf:row-remove:1",
+  JSON.stringify(rowEvents),
+);
+
+/* 10f. wizard: rf:step-change + beforeValidateStep veto + afterStepChange. */
+const busWiz = jsonSpec(
+  [
+    { type: "step", label: "Step 1" },
+    { type: "text", id: "bus_name", name: "bus_name", label: "Name", required: true },
+    { type: "step", label: "Step 2" },
+    { type: "email", id: "bus_email", name: "bus_email", label: "Email" },
+  ],
+  { name: "engine-bus-wizard" },
+);
+const busWizForm = mount(renderFormShell({ form: busWiz }));
+const stepCalls: number[] = [];
+let stepVeto = false;
+const wizEvents: string[] = [];
+const attachedWiz = attachForm(busWizForm, {
+  hooks: {
+    beforeValidateStep: (ctx) => {
+      stepCalls.push(ctx.from);
+      return stepVeto ? false : true;
+    },
+    afterStepChange: (ctx) => wizEvents.push(`after:${ctx.from}->${ctx.to}`),
+  },
+});
+attachedWiz.on("rf:step-change", (e) => {
+  const { from, to } = e.detail as { from: number; to: number };
+  wizEvents.push(`event:${from}->${to}`);
+});
+const wizPane = (i: number) => busWizForm.querySelector<HTMLElement>(`[data-pane="${i}"]`) as HTMLElement;
+check("wizard starts on pane 0", !wizPane(0).hidden && wizPane(1).hidden);
+input(busWizForm, "bus_name").value = "Jane";
+stepVeto = true;
+submit(busWizForm);
+await tick();
+check("beforeValidateStep veto cancels the advance", wizPane(1).hidden && wizEvents.length === 0, wizEvents.join(","));
+stepVeto = false;
+submit(busWizForm);
+await until(() => !wizPane(1).hidden);
+check(
+  "rf:step-change then afterStepChange fire once, from->to = 0->1",
+  wizEvents.join(",") === "event:0->1,after:0->1",
+  wizEvents.join(","),
+);
+check("beforeValidateStep ran on each Next path", stepCalls.join(",") === "0,0", stepCalls.join(","));
+
+/* 10g. beforeSubmit veto cancels the submission (no mailer, no rf:submit-start). */
+let submitVeto = false;
+const afterResults: Array<{ ok: boolean; message: string }> = [];
+const busVeto = mount(
+  renderFormShell({ form: jsonSpec([{ type: "text", id: "a", name: "a", label: "A" }], { name: "engine-bus-veto" }) }),
+);
+const attachedVeto = attachForm(busVeto, {
+  hooks: {
+    beforeSubmit: () => (submitVeto ? false : undefined),
+    afterSubmit: (ctx) => afterResults.push({ ok: ctx.ok, message: ctx.message }),
+  },
+});
+const vetoEvents: string[] = [];
+attachedVeto.on("rf:submit-start", () => vetoEvents.push("rf:submit-start"));
+attachedVeto.on("rf:submit-success", () => vetoEvents.push("rf:submit-success"));
+const callsBeforeVeto = calls.length;
+submitVeto = true;
+submit(busVeto);
+await tick();
+check(
+  "beforeSubmit veto cancels submission (no start event, mailer untouched)",
+  vetoEvents.length === 0 && calls.length === callsBeforeVeto,
+  `${vetoEvents.join(",")} calls=${calls.length - callsBeforeVeto}`,
+);
+submitVeto = false;
+submit(busVeto);
+check(
+  "non-vetoed submit fires rf:submit-start then rf:submit-success",
+  await until(() => vetoEvents.join(",") === "rf:submit-start,rf:submit-success"),
+  vetoEvents.join(","),
+);
+check(
+  "afterSubmit ran with ok=true and the success message",
+  afterResults.length === 1 && afterResults[0].ok === true && afterResults[0].message === "Thanks!",
+  JSON.stringify(afterResults),
+);
+
+/* 10h. spec hook-ref names resolve via the options registry; inline wins. */
+const namedSpec = {
+  ...jsonSpec([{ type: "text", id: "a", name: "a", label: "A" }], { name: "engine-bus-named" }),
+  hooks: { beforeSubmit: "trackLead" },
+};
+const namedCalls: string[] = [];
+const busNamed = mount(renderFormShell({ form: namedSpec }));
+const attachedNamed = attachForm(busNamed, {
+  spec: namedSpec,
+  hooks: { trackLead: () => { namedCalls.push("named"); return true; } },
+});
+submit(busNamed);
+check(
+  "a spec-named hook fires through the options registry",
+  await until(() => namedCalls.length === 1),
+  namedCalls.join(","),
+);
+const inlineCalls: string[] = [];
+const busInline = mount(renderFormShell({ form: namedSpec }));
+attachForm(busInline, {
+  spec: namedSpec,
+  hooks: {
+    trackLead: () => { inlineCalls.push("named"); return true; },
+    beforeSubmit: () => { inlineCalls.push("inline"); return true; },
+  },
+});
+submit(busInline);
+check(
+  "inline hook beats the spec's named reference",
+  await until(() => inlineCalls.join(",") === "inline"),
+  inlineCalls.join(","),
+);
+
+/* 10i. hooks never fire without being supplied (no-op, but events still fire). */
+const noHookCalls: string[] = [];
+const busNoHooks = mount(
+  renderFormShell({ form: jsonSpec([{ type: "text", id: "a", name: "a", label: "A" }], { name: "engine-bus-nohooks" }) }),
+);
+const attachedNoHooks = attachForm(busNoHooks);
+attachedNoHooks.on("rf:submit-start", () => noHookCalls.push("start"));
+const callsBeforeNoHooks = calls.length;
+submit(busNoHooks);
+check(
+  "absent hooks never throw and the bus still fires",
+  await until(() => callsBeforeNoHooks === calls.length || calls.length === callsBeforeNoHooks + 1) &&
+    noHookCalls.length === 1,
+  `${noHookCalls.join(",")}`,
 );
 
 console.log(failures === 0 ? "\nENGINE ALL PASS" : `\nENGINE ${failures} FAILURES`);

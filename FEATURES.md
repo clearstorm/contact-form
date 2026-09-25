@@ -33,6 +33,13 @@ Status vocabulary: `implemented` · `partial` · `planned` · `deprecated`.
 | `grid-sizing` | 12-column field sizing | `size` percentage → nearest column span via `gridSpan` (`rf-span-1..12`); fields collapse below `48rem` | implemented |
 | `repeaters` | Repeaters (row groups) | `type: "repeater"` containers holding any field types; dynamic add/remove rows with `minRows`/`maxRows` bounds, per-row validate-by-row, and a structured JSON-array canonical payload per group | implemented |
 
+## Events & hooks — `src/runtime/engine.ts`
+
+| ID | Feature | Scope | Status |
+| --- | --- | --- | --- |
+| `event-bus` | `rf:*` event bus | Namespaced `rf:*` `CustomEvent`s on the form — `rf:fields-change`, `rf:row-add` / `rf:row-remove`, `rf:step-change`, `rf:submit-start` / `rf:submit-success` / `rf:submit-error`. `attachForm` / `renderForm` return `on(event, handler)` riding the detach-safe listener registry (native `addEventListener` parity); `initForms` collects everything | implemented |
+| `wizard-hooks` | Lifecycle hooks | `beforeValidateStep` / `afterStepChange` / `beforeSubmit` / `afterSubmit` in `attachForm` / `renderForm` options and the `react` `hooks` prop (step/submit hooks veto by returning `false`); `FormSpec.hooks` hook-ref *names* resolve against the options' named registry (specs stay serialisable); the TanStack bridge mirrors the submit hooks + `rf:submit-*` events | implemented |
+
 ## Bindings
 
 | ID | Feature | Scope | Status |

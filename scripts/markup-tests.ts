@@ -367,6 +367,15 @@ if (RECORD) {
   check("shell carries endpoint + mailer", shell.includes("data-mailer=\"json\"") && shell.includes("data-endpoint=\"https://example.test/send\""));
   check("single-page shell has no data-steps", !shell.includes("data-steps="));
 
+  /* ---- lifecycle hooks never serialise into the shell ---- */
+  check(
+    "spec hooks stay out of the shell (byte-identical to the plain spec)",
+    renderFormShell({
+      form: { ...singleSpec, hooks: { beforeValidateStep: "onStep", beforeSubmit: "trackLead" } },
+    }) === shell,
+  );
+  check("no data-hooks attribute leaks into markup", !shell.includes("data-hooks"));
+
   /* ---- repeater invariants ---- */
   const repeaterShell = snapshots.find((s) => s.name === "shell-repeater")!.html;
   const repeaterRulesAttr = /data-rules="([^"]*)"/.exec(repeaterShell)?.[1] ?? "";

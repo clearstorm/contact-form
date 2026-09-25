@@ -13,7 +13,7 @@
 
 import { useEffect, useRef, type ReactElement } from "react";
 import { fieldRenderProps, renderField, renderFormShell } from "../runtime/markup";
-import { attachForm } from "../runtime/engine";
+import { attachForm, type HookRegistry } from "../runtime/engine";
 import type { FormFieldSpec, FormSpec, ValidationProvider } from "../core";
 
 export interface ContactFormProps {
@@ -28,10 +28,16 @@ export interface ContactFormProps {
    * `@clearstorm/contact-form/validation`) to validate differently.
    */
   validation?: ValidationProvider;
+  /**
+   * Lifecycle hooks (`beforeValidateStep` / `afterStepChange` /
+   * `beforeSubmit` / `afterSubmit` — veto-capable) plus a named registry for
+   * the spec's hook-ref *names* (see `attachForm` options).
+   */
+  hooks?: HookRegistry;
 }
 
 /** Server-rendered, engine-wired contact form for any React-based framework. */
-export function ContactForm({ form, config, prefill, validation }: ContactFormProps): ReactElement {
+export function ContactForm({ form, config, prefill, validation, hooks }: ContactFormProps): ReactElement {
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -40,8 +46,9 @@ export function ContactForm({ form, config, prefill, validation }: ContactFormPr
     if (!root || !formEl) return;
     // `spec` is passed explicitly so the engine never depends on the shell's
     // data-rules serialisation being present on a custom mount point.
-    return attachForm(formEl, { spec: form, validation });
-  }, [form, validation]);
+    const attached = attachForm(formEl, { spec: form, validation, hooks });
+    return () => attached.detach();
+  }, [form, validation, hooks]);
 
   return (
     <div

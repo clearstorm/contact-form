@@ -8,8 +8,10 @@
  * the `rf-*` markup (see `markup.ts`) and hand it over with `attachForm`.
  *
  * Two entry points:
- * - `attachForm(form, opts?)` — wire one rendered form; returns a detach
- *   function (safe for React StrictMode / hot reload).
+ * - `attachForm(form, opts?)` — wire one rendered form; returns
+ *   `{ on(event, handler), detach() }` — a detached-safe `rf:*` event bus plus
+ *   a detach that removes every listener (safe for React StrictMode / hot
+ *   reload).
  * - `initForms(root?)` — wire every `form[data-mail-form]` under a root
  *   (used by the Astro shell's script tag).
  *
@@ -32,6 +34,7 @@ import {
   type FieldSpec,
   type FormCopy,
   type FormSpec,
+  type HookName,
   type Rule,
   type RuleContext,
   type ValidationProvider,
@@ -42,6 +45,81 @@ import { getMailer, type MailerConfig } from "../mailers";
 type Control = HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
 type Status = HTMLElement | null;
 type Handler = (event: Event) => void;
+
+/* ---- Events (the `rf:*` bus) + lifecycle hooks ---- */
+
+/** Context shared by the step lifecycle hooks. */
+export interface StepHookContext {
+  /** Step being left (or the current step for `beforeValidateStep`). */
+  from: number;
+  /** Step being entered (or `from + 1` for a "Next" advance). */
+  to: number;
+  /** The form being driven. */
+  form: HTMLFormElement;
+}
+
+/** Context for `beforeSubmit` (and the `rf:submit-start` event detail). */
+export interface BeforeSubmitContext {
+  form: HTMLFormElement;
+  /** The form's identity (`data-mail-form` name) — a stable analytics id. */
+  name: string;
+  /** The form element's DOM id (may be empty). */
+  id: string;
+}
+
+/** Context for `afterSubmit`. */
+export interface AfterSubmitContext extends BeforeSubmitContext {
+  /** `true` when the mailer accepted the submission. */
+  ok: boolean;
+  /** The success or error message shown to the visitor. */
+  message: string;
+}
+
+export type StepHook = (ctx: StepHookContext) => boolean | void;
+export type SubmitHook = (ctx: BeforeSubmitContext) => boolean | void;
+export type AfterSubmitHook = (ctx: AfterSubmitContext) => void;
+
+/**
+ * Lifecycle hooks available on the attach options. Every hook is optional and
+ * the step/submit hooks are **veto-capable**: returning `false` cancels the
+ * operation (the step doesn't advance / the form doesn't submit).
+ */
+export interface WizardHooks {
+  /** Runs before "Next" validates the current step; `false` cancels the advance. */
+  beforeValidateStep?: StepHook;
+  /** Runs after a step change completes (stepper jump, Next, Back). */
+  afterStepChange?: StepHook;
+  /** Runs after validation passes, before the mailer; `false` cancels submission. */
+  beforeSubmit?: SubmitHook;
+  /** Runs after the mailer resolves (success or error; never on a veto). */
+  afterSubmit?: AfterSubmitHook;
+}
+
+/**
+ * The `hooks` field on attach options: the four lifecycle hooks plus a named
+ * registry the spec's hook-ref *names* resolve against — `{ "trackLead": fn }`
+ * lets a spec's `hooks: { beforeSubmit: "trackLead" }` wire a declarative
+ * callback (specs stay JSON-serialisable: names, never functions).
+ */
+export type HookRegistry = WizardHooks & Record<string, StepHook | SubmitHook | AfterSubmitHook>;
+
+/** Event names the attach result's `on()` accepts — the namespaced `rf:*` bus. */
+export type FormEventName =
+  | "rf:fields-change"
+  | "rf:row-add"
+  | "rf:row-remove"
+  | "rf:step-change"
+  | "rf:submit-start"
+  | "rf:submit-success"
+  | "rf:submit-error";
+
+/** The result of `attachForm`: a detach-safe event subscription + cleanup. */
+export interface AttachedForm {
+  /** Subscribe to a `rf:*` event on the form. Removed by `detach()` like every listener. */
+  on(event: FormEventName, handler: (event: CustomEvent) => void): void;
+  /** Remove every listener (incl. `on` subscriptions) and injected error DOM. */
+  detach(): void;
+}
 
 /* ---- Field error state ---- */
 
@@ -364,6 +442,8 @@ async function handleSubmit(
   scopedControls?: Control[],
   /** Row-aware per-control validation (supplied by `attachForm`). */
   validateControl?: (control: Control) => boolean,
+  /** Resolved submit lifecycle hooks (see `attachForm`). */
+  hooks?: { beforeSubmit?: SubmitHook; afterSubmit?: AfterSubmitHook },
 ): Promise<void> {
   const form = event.currentTarget;
   if (!(form instanceof HTMLFormElement)) return;
@@ -448,6 +528,20 @@ async function handleSubmit(
     button.textContent = sending ? sendingLabel : originalLabel;
   };
 
+  // The `rf:*` submit bus: dispatch named custom events on the form so attach
+  // subscribers (and native `addEventListener`) observe the submit lifecycle.
+  const formName = form.dataset.mailForm ?? "";
+  const formId = form.id;
+  const emit = (name: string, detail?: unknown): void => {
+    form.dispatchEvent(new CustomEvent(name, { detail }));
+  };
+  const submitContext: BeforeSubmitContext = { form, name: formName, id: formId };
+
+  // Lifecycle hook — vetoing cancels the submission outright (no mailer call,
+  // no `rf:submit-start`).
+  if (hooks?.beforeSubmit?.(submitContext) === false) return;
+  emit("rf:submit-start", submitContext);
+
   const config: MailerConfig = {
     endpoint: form.dataset.endpoint,
     apiUrl: form.dataset.wpUrl,
@@ -456,6 +550,8 @@ async function handleSubmit(
   };
 
   setSending(true);
+  let ok = false;
+  let message = successMessage;
   try {
     const result = await getMailer(mailerName).submit({
       data: new FormData(form),
@@ -465,6 +561,7 @@ async function handleSubmit(
       config,
     });
     if (result.ok) {
+      ok = true;
       showSuccess(status, successMessage);
       form.reset();
       controls.forEach((control) => clearError(control));
@@ -473,17 +570,20 @@ async function handleSubmit(
       if (form.dataset.statusMode === "replace") {
         form.classList.add("rf-form--success");
       }
+      emit("rf:submit-success", { name: formName, id: formId });
     } else {
-      showError(status, result.message || genericError);
+      message = result.message || genericError;
+      showError(status, message);
+      emit("rf:submit-error", { name: formName, id: formId, message });
     }
   } catch (error) {
-    showError(
-      status,
-      error instanceof Error && error.message ? error.message : genericError,
-    );
+    message = error instanceof Error && error.message ? error.message : genericError;
+    showError(status, message);
+    emit("rf:submit-error", { name: formName, id: formId, message });
   } finally {
     setSending(false);
   }
+  hooks?.afterSubmit?.({ ok, message, form, name: formName, id: formId });
 }
 
 /* ---- Attach / detach ---- */
@@ -503,6 +603,14 @@ export interface AttachOptions {
    * (see `@clearstorm/contact-form/validation`) to validate differently.
    */
   validation?: ValidationProvider;
+  /**
+   * Lifecycle hooks (`beforeValidateStep` / `afterStepChange` /
+   * `beforeSubmit` / `afterSubmit` — the step/submit hooks veto by returning
+   * `false`). Named entries here are also the registry the spec's hook-ref
+   * *names* resolve against: with `hooks: { "trackLead": fn }`, a spec's
+   * `hooks: { beforeSubmit: "trackLead" }` wires `fn`. Inline hooks win.
+   */
+  hooks?: HookRegistry;
 }
 
 interface StepsMeta {
@@ -545,10 +653,13 @@ const applyPrefill = (form: HTMLFormElement): void => {
  * Wire a rendered contact form: build rules, visibility engine and wizard
  * state, then attach every listener (submit, controller input/change,
  * per-control re-validation, stepper jumps, footer Back/Next, prefill).
- * Returns a detach function that removes every listener and cleans injected
- * error DOM — call it on unmount (React StrictMode / hot reload safe).
+ * Returns `{ on(event, handler), detach() }` — `on` subscribes to the `rf:*`
+ * event bus through the same detach-safe registry (native `addEventListener`
+ * on the form sees the same events), and `detach` removes every listener and
+ * cleans injected error DOM; call it on unmount (React StrictMode / hot
+ * reload safe).
  */
-export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): () => void {
+export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): AttachedForm {
   /* Listener registry — every listener added here can be removed on detach. */
   const listeners = new Map<EventTarget, Map<string, Set<Handler>>>();
   const on = (target: EventTarget, type: string, handler: Handler): void => {
@@ -586,6 +697,26 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): () 
 
   const visibility = createVisibilityEngine(form, fields);
   const getValues = (): Record<string, string[]> => visibility.allValues();
+
+  /* ---- The `rf:*` event bus + lifecycle hooks ---- */
+
+  const emit = (name: string, detail?: unknown): void => {
+    form.dispatchEvent(new CustomEvent(name, { detail }));
+  };
+
+  // Resolve a lifecycle hook: the inline canonical key wins; else the spec's
+  // hook-ref *name*, looked up in the options' named registry.
+  const hookFor = (name: HookName): StepHook | SubmitHook | AfterSubmitHook | undefined => {
+    const direct = opts.hooks?.[name];
+    if (direct) return direct;
+    const ref = spec?.hooks?.[name];
+    return ref ? opts.hooks?.[ref] : undefined;
+  };
+
+  const submitHooks = {
+    beforeSubmit: hookFor("beforeSubmit") as SubmitHook | undefined,
+    afterSubmit: hookFor("afterSubmit") as AfterSubmitHook | undefined,
+  };
 
   const isControl = (el: Element): el is Control =>
     el instanceof HTMLInputElement ||
@@ -662,6 +793,7 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): () 
       });
 
   const goTo = (step: number, options?: { focus?: boolean }): void => {
+    const from = currentStep;
     currentStep = step;
     form.querySelectorAll<HTMLElement>("[data-pane]").forEach((pane, i) => {
       const active = i === step;
@@ -699,11 +831,17 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): () 
     if (options?.focus) {
       form.querySelector<HTMLElement>(`[data-pane="${step}"] .rf-step-header`)?.focus();
     }
+    // Announce the transition on the bus (the initial `goTo(0)` at attach is
+    // from === to, so it never emits) and run the `afterStepChange` hook.
+    if (from !== step) {
+      emit("rf:step-change", { from, to: step, total: stepCount });
+      (hookFor("afterStepChange") as StepHook | undefined)?.({ from, to: step, form });
+    }
   };
 
   on(form, "submit", (event) => {
     if (!isWizard) {
-      void handleSubmit(event, fields, rules, mailerName, successMessage, copy, visibility, undefined, validateControl);
+      void handleSubmit(event, fields, rules, mailerName, successMessage, copy, visibility, undefined, validateControl, submitHooks);
       return;
     }
     // Wizard: the submit button advances the current step; the last step
@@ -714,15 +852,18 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): () 
     );
     if (currentStep < stepCount - 1) {
       event.preventDefault();
+      const nextStep = currentStep + 1;
+      // Lifecycle hook — vetoing cancels the step advance before validation.
+      if ((hookFor("beforeValidateStep") as StepHook | undefined)?.({ from: currentStep, to: nextStep, form }) === false) return;
       const invalid = stepControls.filter((control) => !validateControl(control));
       if (invalid.length > 0) {
         invalid[0].focus();
         return;
       }
-      goTo(currentStep + 1);
+      goTo(nextStep);
       return;
     }
-    void handleSubmit(event, fields, rules, mailerName, successMessage, copy, visibility, stepControls, validateControl);
+    void handleSubmit(event, fields, rules, mailerName, successMessage, copy, visibility, stepControls, validateControl, submitHooks);
   });
 
   // Stepper: completed steps are clickable and jump back without validation
@@ -751,6 +892,17 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): () 
   };
   on(form, "input", onControllerInput);
   on(form, "change", onControllerInput);
+
+  // The `rf:fields-change` bus: announce every control interaction. Both
+  // `input` and `change` fire — they carry distinct moments a consumer may
+  // care about (analytics adapters typically throttle these).
+  const onBusFieldChange = (event: Event): void => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement)) return;
+    emit("rf:fields-change", { name: target.name, value: target.value });
+  };
+  on(form, "input", onBusFieldChange);
+  on(form, "change", onBusFieldChange);
 
   // Initial visibility — the server renders every field visible; the script
   // hides the ones whose conditions don't hold yet.
@@ -863,6 +1015,7 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): () 
       rowsRoot.appendChild(clone);
       for (const control of Array.from(clone.querySelectorAll<Control>("input, select, textarea"))) wireControl(control);
       sync();
+      emit("rf:row-add", { name, count: rowCount() });
     };
 
     if (addBtn) on(addBtn, "click", addRow);
@@ -878,6 +1031,7 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): () 
       if (!row || rowCount() <= minRows) return;
       row.remove();
       sync();
+      emit("rf:row-remove", { name, count: rowCount() });
     });
 
     sync();
@@ -889,19 +1043,26 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): () 
   // footer labels ("Next" until the final step) and any conditional fields.
   if (isWizard) goTo(0);
 
-  return () => {
-    for (const [target, byType] of listeners) {
-      for (const [type, handlers] of byType) {
-        for (const handler of handlers) target.removeEventListener(type, handler as EventListener);
+  return {
+    on(event, handler) {
+      // The bus rides the same registry as every internal listener, so
+      // `detach()` removes subscriptions with everything else.
+      on(form, event, handler as Handler);
+    },
+    detach() {
+      for (const [target, byType] of listeners) {
+        for (const [type, handlers] of byType) {
+          for (const handler of handlers) target.removeEventListener(type, handler as EventListener);
+        }
       }
-    }
-    listeners.clear();
-    // Remove injected error state so the form returns to its pristine DOM.
-    form.querySelectorAll<Control>("input, select, textarea").forEach((control) => {
-      control.removeAttribute("aria-invalid");
-      control.classList.remove("rf-input-invalid");
-    });
-    form.querySelectorAll(".rf-field-error").forEach((el) => el.remove());
+      listeners.clear();
+      // Remove injected error state so the form returns to its pristine DOM.
+      form.querySelectorAll<Control>("input, select, textarea").forEach((control) => {
+        control.removeAttribute("aria-invalid");
+        control.classList.remove("rf-input-invalid");
+      });
+      form.querySelectorAll(".rf-field-error").forEach((el) => el.remove());
+    },
   };
 }
 
@@ -913,7 +1074,8 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): () 
 export function initForms(root: ParentNode = document): () => void {
   const detachers: Array<() => void> = [];
   root.querySelectorAll<HTMLFormElement>("form[data-mail-form]").forEach((form) => {
-    detachers.push(attachForm(form));
+    const attached = attachForm(form);
+    detachers.push(() => attached.detach());
   });
   return () => detachers.forEach((detach) => detach());
 }

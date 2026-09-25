@@ -30,7 +30,7 @@
  */
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import {
   evaluateVisibility,
   isFieldSpec,
@@ -90,6 +90,19 @@ export interface TanStackBridgeOptions {
    * `validation` is ignored — these win for every field they name.
    */
   validators?: Record<string, FieldValidator>;
+  /**
+   * Runs inside `submit()` before the mailer. Returning `false` cancels the
+   * submission: `submit` resolves `{ ok: false, message: "" }` without a
+   * mailer call and without `rf:submit-start`. (Mirror of the engine's
+   * `attachForm` `beforeSubmit` hook.)
+   */
+  beforeSubmit?: (ctx: { values: FormValues }) => boolean | void;
+  /**
+   * Runs after the mailer resolves — `ok` true on success, false on failure.
+   * Never runs on a `beforeSubmit` veto. (Mirror of the engine's
+   * `attachForm` `afterSubmit` hook.)
+   */
+  afterSubmit?: (ctx: { ok: boolean; message: string; values: FormValues }) => void;
 }
 
 /* ---- pure helpers (exported for non-hook use) ---- */
@@ -278,6 +291,11 @@ export interface ContactFormBridge {
   toFormData: (values: FormValues) => FormData;
   /** Run the spec's mailer against the current values — TanStack `onSubmit`. */
   submit: (values: FormValues) => Promise<MailerResult>;
+  /** Subscribe to a `rf:submit-*` event emitted around `submit()`. */
+  on: (
+    event: "rf:submit-start" | "rf:submit-success" | "rf:submit-error",
+    handler: (event: CustomEvent) => void,
+  ) => void;
   /** Resolved transport config (spec + explicit overrides). */
   mailerConfig: MailerConfig;
 }
@@ -324,17 +342,53 @@ export function useContactForm(form: FormSpec, options: TanStackBridgeOptions = 
     [fields],
   );
 
+  const submitBus = useRef(new Map<string, Set<(event: CustomEvent) => void>>()).current;
+  const on: ContactFormBridge["on"] = (event, handler) => {
+    let set = submitBus.get(event);
+    if (!set) {
+      set = new Set();
+      submitBus.set(event, set);
+    }
+    set.add(handler);
+  };
+  const emit = (name: string, detail?: unknown): void => {
+    const set = submitBus.get(name);
+    if (!set || set.size === 0) return;
+    const ev = new CustomEvent(name, { detail });
+    for (const handler of set) handler(ev);
+  };
+
   const submit = useMemo(
     () => async (values: FormValues): Promise<MailerResult> => {
+      // Lifecycle hook — vetoing cancels the submission outright (no mailer
+      // call, no `rf:submit-start`; the caller gets a non-ok empty result).
+      if (options.beforeSubmit?.({ values }) === false) return { ok: false, message: "" };
+      const name = form.name;
+      const id = "";
+      emit("rf:submit-start", { name, id });
       // Only what the visitor currently sees is validated and sent — hidden
       // conditional fields stay out of the payload (same contract as the
       // engine's DOM-driven path).
       const visible = visibleFieldNames(fields, values);
       const mailerFields = scalarFields.filter((field) => visible.has(field.name));
       const data = valuesToFormData(values, scalarFields);
-      return getMailer(form.mailer).submit({ data, fields: mailerFields, config: mailerConfig });
+      let result: MailerResult;
+      try {
+        result = await getMailer(form.mailer).submit({ data, fields: mailerFields, config: mailerConfig });
+      } catch (error) {
+        // Keep the bridge's throwing contract (callers may still catch), but
+        // announce the failure on the bus and run `afterSubmit` regardless.
+        const message = error instanceof Error && error.message ? error.message : "Something went wrong. Please try again.";
+        emit("rf:submit-error", { name, id, message });
+        options.afterSubmit?.({ ok: false, message, values });
+        throw error;
+      }
+      if (result.ok) emit("rf:submit-success", { name, id });
+      else emit("rf:submit-error", { name, id, message: result.message });
+      options.afterSubmit?.({ ok: result.ok, message: result.message, values });
+      return result;
     },
-    [scalarFields, form.mailer, mailerConfig],
+    [scalarFields, form.mailer, mailerConfig, options.beforeSubmit, options.afterSubmit, fields, form.name],
   );
 
   return {
@@ -345,6 +399,7 @@ export function useContactForm(form: FormSpec, options: TanStackBridgeOptions = 
     visibleFieldNames: (values) => visibleFieldNames(fields, values),
     toFormData: (values) => valuesToFormData(values, scalarFields),
     submit,
+    on,
     mailerConfig,
   };
 }

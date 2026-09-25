@@ -14,7 +14,7 @@
  * Styles are intentionally NOT auto-injected (import styles.css once, or link
  * it directly for script-tag / plain-HTML use).
  */
-import { attachForm } from "./engine";
+import { attachForm, type FormEventName, type HookRegistry } from "./engine";
 import { renderFormShell, type ShellOptions } from "./markup";
 import type { FormSpec, ValidationProvider } from "../core";
 
@@ -31,12 +31,20 @@ export interface RenderOptions extends Omit<ShellOptions, "form"> {
    * `@clearstorm/contact-form/validation`) to validate differently.
    */
   validation?: ValidationProvider;
+  /**
+   * Lifecycle hooks (`beforeValidateStep` / `afterStepChange` /
+   * `beforeSubmit` / `afterSubmit` — veto-capable) plus a named registry for
+   * the spec's hook-ref *names* (see `attachForm` options).
+   */
+  hooks?: HookRegistry;
 }
 
 export interface RenderedForm {
   /** The mounted `<form>` element. */
   form: HTMLFormElement;
-  /** Remove all listeners and injected error DOM. */
+  /** Subscribe to a `rf:*` event on the form — removed by `detach()`. */
+  on: (event: FormEventName, handler: (event: CustomEvent) => void) => void;
+  /** Remove all listeners (incl. `on` subscriptions) and injected error DOM. */
   detach: () => void;
 }
 
@@ -72,6 +80,10 @@ export function renderForm(
   }
 
   root.appendChild(formEl);
-  const detach = attachForm(formEl, { spec: form, validation: options.validation });
-  return { form: formEl, detach };
+  const attached = attachForm(formEl, { spec: form, validation: options.validation, hooks: options.hooks });
+  return {
+    form: formEl,
+    on: (event, handler) => attached.on(event, handler),
+    detach: () => attached.detach(),
+  };
 }

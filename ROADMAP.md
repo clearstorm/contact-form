@@ -25,6 +25,14 @@ in [FEATURES.md](FEATURES.md) as implemented:
   field types, visitor add/remove rows with `minRows` / `maxRows` bounds,
   row-scoped validation, and one structured JSON-array canonical payload
   entry per row group.
+- **M5 — wizard hooks + event bus.** Lifecycle hooks (`beforeValidateStep` /
+  `afterStepChange` / `beforeSubmit` / `afterSubmit` — the step/submit hooks
+  veto by returning `false`) across `attachForm` / `renderForm` and the
+  TanStack bridge, plus the namespaced `rf:*` event bus (`rf:fields-change`,
+  `rf:row-add` / `rf:row-remove`, `rf:step-change`, `rf:submit-start` /
+  `submit-success` / `submit-error`). `FormSpec.hooks` hook-ref *names*
+  resolve against the attach options' named registry, so specs stay
+  serialisable.
 
 ---
 
@@ -43,11 +51,16 @@ Ship a versioned build to the npm registry (drop `private`, publish with the
 existing `files: ["src"]` layout) so consumers can install `@clearstorm/
 contact-form` by version. Flip `release-npm-publish` when done.
 
-## Deprecation cleanup
+## M6 — Analytics + deprecation cleanup
 
-- Remove the legacy `copy.back` / `copy.next` label fallbacks (superseded by
-  `FormSpec.prev` / `FormSpec.next`).
-- Remove the `66` size alias once no spec or demo depends on it (keep `67`).
+- **Analytics seam.** `createAnalytics({ adapter })` — a zero-dependency
+  helper that subscribes a consumer-supplied adapter to the M5 `rf:*` bus
+  (step progress, row interaction, submit outcomes), flip `analytics-seam`
+  to `implemented` when it lands.
+- **Deprecation cleanup.**
+  - Remove the legacy `copy.back` / `copy.next` label fallbacks (superseded by
+    `FormSpec.prev` / `FormSpec.next`).
+  - Remove the `66` size alias once no spec or demo depends on it (keep `67`).
 
 ## v1.0 stabilization
 

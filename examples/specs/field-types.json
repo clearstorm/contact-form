@@ -89,7 +89,7 @@
         "name": "range",
         "label": "Range (0–100)",
         "required": true,
-        "size": 66,
+        "size": 67,
         "min": 0,
         "max": 100,
         "step": 5,

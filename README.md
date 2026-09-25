@@ -125,7 +125,7 @@ the same engine and markup builders via subpath exports:
 | --- | --- |
 | `@clearstorm/contact-form/core` | spec types + framework-less logic (rules, `toSteps`, `canonicalData`, …) |
 | `@clearstorm/contact-form/mailers` | `cf7` / `json` transport adapters |
-| `@clearstorm/contact-form/runtime` (alias `./vanilla`) | `renderForm`, `attachForm`/`initForms`, markup builders |
+| `@clearstorm/contact-form/runtime` (alias `./vanilla`) | `renderForm`, `attachForm`/`initForms`, `createAnalytics`, markup builders |
 | `@clearstorm/contact-form/react` | `ContactForm` + `Field` React components (peer: `react`) |
 | `@clearstorm/contact-form/tanstack` | `useContactForm` bridge + `ContactFormField` (peers: `react`, `@tanstack/react-form`) |
 | `@clearstorm/contact-form/styles.css` | the shared stylesheet (single source; never auto-injected) |
@@ -265,6 +265,23 @@ unregistered name is a no-op while the matching event still fires. The React
 binding exposes the same seam through its optional `hooks` prop; the TanStack
 bridge mirrors the submit hooks (`beforeSubmit` / `afterSubmit` options) and
 the `rf:submit-*` events (`bridge.on(...)`).
+
+**Analytics** — `createAnalytics({ adapter })` is the zero-dependency analytics
+seam over the same bus. Give it a tracker (`track(event, detail)`) and subscribe
+each form once; the whole `rf:*` bus is forwarded with its details (form
+identity, step transitions, row counts, submit outcomes):
+
+```js
+import { renderForm, createAnalytics } from "@clearstorm/contact-form/vanilla";
+
+const analytics = createAnalytics({ adapter: { track: (e, d) => telemetry(e, d) } });
+const { form, detach } = renderForm("#root", spec, { config: { endpoint } });
+const stop = analytics.attach(form); // on unmount
+```
+
+It only consumes events the engine already emits — no fabricated events, no
+`data-*` hooks — and its `attach` uses native `addEventListener`, so it works
+even on forms the engine didn't wire. FEATURES tracks it as `analytics-seam`.
 
 ---
 
@@ -459,7 +476,7 @@ the payload, and never reach the shared script.
 | Type | Keys | Renders |
 | --- | --- | --- |
 | `heading` | `text`, optional `align` (`left` \| `center`), optional `line` (default `true`) | full-width section title (`<h3 class="rf-heading">`); the rule follows the alignment — `left` keeps the line on the right of the text, `right` on the left, `center` on both sides — and `line: false` renders text only |
-| `description` | `text`, optional `size` (100 \| 90 \| 80 \| 75 \| 70 \| 67 \| 66 \| 60 \| 50 \| 40 \| 33 \| 30 \| 25 \| 20 \| 10, default 100) | muted helper text sharing the field grid spans |
+| `description` | `text`, optional `size` (100 \| 90 \| 80 \| 75 \| 70 \| 67 \| 60 \| 50 \| 40 \| 33 \| 30 \| 25 \| 20 \| 10, default 100) | muted helper text sharing the field grid spans |
 | `divider` | optional `visible` (default `true`), optional `min` (CSS length) | thin rule, or with `visible: false` an invisible spacer |
 | `section` | optional `label` | section break; the label sits centered on the rule |
 
@@ -538,9 +555,9 @@ Behaviour:
   strip into the plain informational stepper.
 - Buttons are the form spec's `submit` / `next` / `prev`, each a plain label
   or `{ "label", "variant" }` with `primary` | `secondary` | `ghost`
-  (defaults: `submit`/`next` → primary, `prev` → secondary). Legacy
-  `copy.back` / `copy.next` labels are still honoured as fallbacks. The
-  stepper theme ships with `--rf-step-*` / `--rf-steps-*` tokens (see
+  (defaults: `submit`/`next` → primary, `prev` → secondary) — the wizard
+  button labels come from those specs alone. The stepper theme ships with
+  `--rf-step-*` / `--rf-steps-*` tokens (see
   [Theming](#theming-rf-custom-properties)).
 
 > Live demo: `/wizard` renders all three named forms in
@@ -712,8 +729,6 @@ built-in default**. Put project-specific copy in the form spec:
 | `fileType` | a file's MIME type isn't in `allowedTypes` | `This file type isn't allowed.` |
 | `fileCount` | attached count outside `minFiles`/`maxFiles` (`{min}`/`{max}` placeholders) | `Attach between {min} and {max} files.` |
 | `sending` | submit button while in flight | `Sending…` |
-| `back` *(deprecated)* | wizard Previous button — use `form.prev` | `Back` |
-| `next` *(deprecated)* | wizard Next button — use `form.next` | `Next` |
 | `error` | generic submission failure | `Something went wrong. Please try again in a moment.` |
 | `invalidForm` | mailer validation failure, no details | `Some fields need your attention. Please check the form.` |
 | `configError` | missing endpoint config | varies by mailer |
@@ -824,7 +839,7 @@ Every hard-coded size is themeable — compact minimums by default:
 
 Layout: the form is a 12-column grid — use `size` on each field spec for its
 width (default `50`, any of
-`100 | 90 | 80 | 75 | 70 | 67 | 66 | 60 | 50 | 40 | 33 | 30 | 25 | 20 | 10`).
+`100 | 90 | 80 | 75 | 70 | 67 | 60 | 50 | 40 | 33 | 30 | 25 | 20 | 10`).
 Sizes map to the nearest column span. Fields and `description` elements
 collapse to a single column below `48rem`.
 

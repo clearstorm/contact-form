@@ -13,6 +13,7 @@
  * ```
  */
 import { attachForm, initForms, type AttachOptions } from "./engine";
+import { createAnalytics, type AnalyticsSubscription, type AnalyticsTracker } from "./analytics";
 import {
   renderDecor,
   renderElement,
@@ -33,6 +34,10 @@ export {
   attachForm,
   initForms,
   type AttachOptions,
+  // analytics seam over the rf:* bus
+  createAnalytics,
+  type AnalyticsTracker,
+  type AnalyticsSubscription,
   // markup builders
   renderDecor,
   renderElement,

@@ -395,11 +395,13 @@ export function renderFormShell({ form, config = {}, prefill }: ShellOptions): s
 
   // Buttons: form.submit / form.next / form.prev accept a plain label or
   // `{ label?, variant? }`. Only the last marker's submit label is honoured
-  // (enforced in `toSteps`); legacy copy.back / copy.next stay label-only.
+  // (enforced in `toSteps`); labels come from the button specs alone — the
+  // legacy `copy.back` / `copy.next` fallbacks are gone (use `form.prev` /
+  // `form.next`).
   const singleSubmitLabel = buttonLabel(form.submit, "Submit");
   const finalSubmitLabel = layout.steps[layout.steps.length - 1]?.submit ?? singleSubmitLabel;
-  const nextLabel = buttonLabel(form.next, form.copy?.next ?? "Next");
-  const prevLabel = buttonLabel(form.prev, form.copy?.back ?? "Back");
+  const nextLabel = buttonLabel(form.next, "Next");
+  const prevLabel = buttonLabel(form.prev, "Back");
   const submitVariant = buttonVariant(form.submit, "primary");
   const nextVariant = buttonVariant(form.next, "primary");
   const prevVariant = buttonVariant(form.prev, "secondary");

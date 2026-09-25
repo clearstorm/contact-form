@@ -1061,5 +1061,75 @@ check(
   `${noHookCalls.join(",")}`,
 );
 
+/* ---- 11. M6: analytics seam + deprecation cleanup ---- */
+
+const { createAnalytics } = await import("../src/runtime/analytics");
+
+/* 11a. createAnalytics forwards the rf:* bus to a consumer adapter. */
+const tracked: Array<{ event: string; detail: Record<string, unknown> }> = [];
+const analytics = createAnalytics({
+  adapter: { track: (event, detail) => tracked.push({ event, detail }) },
+});
+const aform = mount(
+  renderFormShell({ form: jsonSpec([{ type: "text", id: "a", name: "a", label: "A" }], { name: "engine-m6-analytics" }) }),
+);
+attachForm(aform); // the engine emits; the seam only forwards
+const analyticsSub = analytics.attach(aform);
+submit(aform);
+check(
+  "analytics receives rf:submit-start with the form identity",
+  await until(() => tracked.some((t) => t.event === "rf:submit-start")) &&
+    tracked.find((t) => t.event === "rf:submit-start")?.detail?.name === "engine-m6-analytics",
+  JSON.stringify(tracked),
+);
+check(
+  "analytics receives rf:submit-success on a valid submit",
+  await until(() => tracked.some((t) => t.event === "rf:submit-success")),
+  JSON.stringify(tracked),
+);
+input(aform, "a").value = "hi";
+fire(input(aform, "a"), "input");
+check(
+  "analytics receives rf:fields-change with the control value",
+  tracked.some((t) => t.event === "rf:fields-change" && (t.detail as { value?: string }).value === "hi"),
+  JSON.stringify(tracked),
+);
+analyticsSub.detach();
+const trackedAfterDetach = tracked.length;
+input(aform, "a").value = "bye";
+fire(input(aform, "a"), "input");
+submit(aform);
+await tick();
+check("analytics detach stops the feed", tracked.length === trackedAfterDetach, `tracked=${tracked.length}`);
+
+/* 11b. legacy copy.back / copy.next no longer leak through the engine. */
+const legacyNextWiz = {
+  ...jsonSpec(
+    [
+      { type: "step", label: "Step 1" },
+      { type: "text", id: "legacy_name", name: "legacy_name", label: "Name" },
+      { type: "step", label: "Step 2" },
+    ],
+    { name: "engine-m6-copynext" },
+  ),
+  copy: { next: "Legacy Continue", back: "Legacy Back" },
+};
+const legacyForm = mount(renderFormShell({ form: legacyNextWiz }));
+attachForm(legacyForm);
+check(
+  "legacy copy labels no longer drive the rendered wizard buttons",
+  legacyForm.querySelector("[data-next-label]")?.textContent === "Next" &&
+    legacyForm.querySelector("[data-step-back]")?.textContent?.includes("Back") === true,
+  legacyForm.querySelector("[data-step-next]")?.textContent ?? "",
+);
+input(legacyForm, "legacy_name").value = "Jane";
+submit(legacyForm);
+await until(() => !legacyForm.querySelector<HTMLElement>(`[data-pane="1"]`)!.hidden);
+check(
+  "the final pane's button carries the submit label, never legacy copy",
+  legacyForm.querySelector("[data-next-label]")?.textContent === "Send",
+  String(legacyForm.querySelector("[data-next-label]")?.textContent),
+);
+
 console.log(failures === 0 ? "\nENGINE ALL PASS" : `\nENGINE ${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);

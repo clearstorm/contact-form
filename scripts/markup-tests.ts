@@ -36,7 +36,7 @@ const singleSpec: FormSpec = {
   submit: "Send message",
   status: "Thanks — we'll be in touch.",
   endpoint: "https://example.test/send",
-  copy: { sending: "Sending…", back: "Back", next: "Continue" },
+  copy: { sending: "Sending…" },
   fields: [
     { type: "heading", text: "Project details", align: "left" },
     { type: "description", text: "Tell us about the project & budget." },
@@ -375,6 +375,18 @@ if (RECORD) {
     }) === shell,
   );
   check("no data-hooks attribute leaks into markup", !shell.includes("data-hooks"));
+
+  /* ---- legacy copy.back / copy.next no longer reach markup ---- */
+  const legacyCopyShell = renderFormShell({
+    form: { ...wizardSpec, copy: { back: "Legacy Back", next: "Legacy Next" } },
+  });
+  const legacyBackLabel = /←<\/span> ([^<]+)/.exec(legacyCopyShell)?.[1];
+  const legacyNextLabel = /data-next-label>([^<]*)<\/span>/.exec(legacyCopyShell)?.[1];
+  check(
+    "legacy copy.back / copy.next no longer leak into wizard footer labels",
+    legacyBackLabel === "Back" && legacyNextLabel === "Next",
+    `back=${legacyBackLabel} next=${legacyNextLabel}`,
+  );
 
   /* ---- repeater invariants ---- */
   const repeaterShell = snapshots.find((s) => s.name === "shell-repeater")!.html;

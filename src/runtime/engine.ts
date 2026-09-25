@@ -624,8 +624,8 @@ const stepsMetaFromSpec = (form: FormSpec): StepsMeta => {
   const layout = toSteps(form.fields);
   return {
     steps: layout.steps.map((step) => ({ label: step.label, submit: step.submit })),
-    next: { label: buttonLabel(form.next, form.copy?.next ?? "Next"), variant: buttonVariant(form.next, "primary") },
-    prev: { label: buttonLabel(form.prev, form.copy?.back ?? "Back"), variant: buttonVariant(form.prev, "secondary") },
+    next: { label: buttonLabel(form.next, "Next"), variant: buttonVariant(form.next, "primary") },
+    prev: { label: buttonLabel(form.prev, "Back"), variant: buttonVariant(form.prev, "secondary") },
     submit: {
       label: layout.steps[layout.steps.length - 1]?.submit ?? buttonLabel(form.submit, "Submit"),
       variant: buttonVariant(form.submit, "primary"),
@@ -820,7 +820,7 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): Att
     const nextLabel = next?.querySelector<HTMLElement>("[data-next-label]");
     if (nextLabel) {
       nextLabel.textContent =
-        step < stepCount - 1 ? (stepsMeta?.next.label ?? copy.next ?? "Next") : (stepsMeta?.submit.label ?? "");
+        step < stepCount - 1 ? (stepsMeta?.next.label ?? "Next") : (stepsMeta?.submit.label ?? "");
     }
     // On the final step the button also takes the submit button's variant.
     if (next && stepsMeta) {

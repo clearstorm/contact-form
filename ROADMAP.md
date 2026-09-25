@@ -33,6 +33,13 @@ in [FEATURES.md](FEATURES.md) as implemented:
   `submit-success` / `submit-error`). `FormSpec.hooks` hook-ref *names*
   resolve against the attach options' named registry, so specs stay
   serialisable.
+- **M6 — analytics seam + deprecation cleanup.** `createAnalytics({ adapter })`
+  — a zero-dependency seam that forwards the `rf:*` bus to a consumer-supplied
+  tracker (`attach(form)` via native `addEventListener`, returns a detach),
+  flipping `analytics-seam` to implemented. Plus the cleanup: the legacy
+  `copy.back` / `copy.next` label fallbacks are gone (`FormSpec.prev` /
+  `FormSpec.next` are the only way to label wizard buttons) and the `66` size
+  alias was removed (keep `67`).
 
 ---
 
@@ -50,17 +57,6 @@ The package is currently `private: true` and installed via immutable git tags.
 Ship a versioned build to the npm registry (drop `private`, publish with the
 existing `files: ["src"]` layout) so consumers can install `@clearstorm/
 contact-form` by version. Flip `release-npm-publish` when done.
-
-## M6 — Analytics + deprecation cleanup
-
-- **Analytics seam.** `createAnalytics({ adapter })` — a zero-dependency
-  helper that subscribes a consumer-supplied adapter to the M5 `rf:*` bus
-  (step progress, row interaction, submit outcomes), flip `analytics-seam`
-  to `implemented` when it lands.
-- **Deprecation cleanup.**
-  - Remove the legacy `copy.back` / `copy.next` label fallbacks (superseded by
-    `FormSpec.prev` / `FormSpec.next`).
-  - Remove the `66` size alias once no spec or demo depends on it (keep `67`).
 
 ## v1.0 stabilization
 

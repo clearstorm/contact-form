@@ -75,7 +75,7 @@ export function FieldTypesPage() {
         <code>multiple: true</code>, <code>options</code> on a text input rendering a{" "}
         <code>datalist</code> of suggestions, and two <code>file</code> inputs (single
         required + <code>multiple</code> with an <code>accept</code> hint — their
-        filenames travel in the canonical payload). The fields below span 50 / 66 / 33
+        filenames travel in the canonical payload). The fields below span 50 / 67 / 33
         / 100 to show the 12-column row. Submit posts to the local echo server — start
         it with <code>npm run demo:api</code>.
       </p>

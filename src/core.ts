@@ -41,9 +41,9 @@ export type FieldType =
 /**
  * Field/description width as a percentage of the 12-column form row. Every
  * value maps to its nearest column span (see `gridSpan`) — no per-size CSS
- * required. `66` is a legacy alias of `67` (both round to 8 columns).
+ * required.
  */
-export type FieldSize = 100 | 90 | 80 | 75 | 70 | 67 | 66 | 60 | 50 | 40 | 33 | 30 | 25 | 20 | 10;
+export type FieldSize = 100 | 90 | 80 | 75 | 70 | 67 | 60 | 50 | 40 | 33 | 30 | 25 | 20 | 10;
 
 /**
  * Map a percentage width onto the 12-column grid as its nearest span
@@ -99,16 +99,6 @@ export interface FormCopy {
   removeRow?: string;
   /** Submit button label while the request is in flight. */
   sending?: string;
-  /**
-   * @deprecated Wizard Previous label — use `FormSpec.prev` instead. Kept as
-   * a label-only fallback so existing specs keep working.
-   */
-  back?: string;
-  /**
-   * @deprecated Wizard Next label — use `FormSpec.next` instead. Kept as a
-   * label-only fallback so existing specs keep working.
-   */
-  next?: string;
   /** Generic submission failure shown to the visitor. */
   error?: string;
   /** Mailer says the form failed validation but gave no per-field details. */

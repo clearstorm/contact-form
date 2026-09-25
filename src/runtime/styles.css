@@ -119,6 +119,84 @@
     line-height: 1.4;
   }
 
+  /* Repeaters (dynamic row groups) — a fieldset whose rows repeat the same
+     row-template fields. Each row is its own 12-column grid (like `.rf-pane`)
+     so the inner fields keep their `rf-span-{n}` widths; the repeater itself
+     spans the form grid via `rf-span-{n}`. Row borders separate the copies;
+     empty bounds disable the add/remove buttons via `:disabled`. */
+  .rf-repeater {
+    min-width: 0;
+    margin: 0;
+    padding: var(--rf-repeater-padding, 0.6rem 0.75rem);
+    border: 1px solid var(--rf-field-border, #d1d5db);
+    border-radius: 2px;
+  }
+
+  .rf-repeater > .rf-label {
+    margin-bottom: var(--rf-repeater-label-margin, 0.25rem);
+  }
+
+  .rf-repeater-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    column-gap: var(--rf-gap-x);
+    row-gap: var(--rf-gap-y);
+    min-width: 0;
+    padding: 0 0 var(--rf-repeater-row-gap, 0.375rem);
+  }
+
+  .rf-repeater-row + .rf-repeater-row {
+    padding-top: var(--rf-repeater-row-gap, 0.375rem);
+    border-top: 1px solid var(--rf-repeater-row-border, var(--rf-field-border, #d1d5db));
+  }
+
+  .rf-repeater-add,
+  .rf-repeater-remove {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    border: 1px solid var(--rf-button-secondary-border);
+    border-radius: 2px;
+    background: transparent;
+    color: var(--rf-button-secondary-color);
+    padding: 0.4rem 0.75rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  .rf-repeater-add:hover,
+  .rf-repeater-remove:hover {
+    background: var(--rf-button-secondary-hover-bg);
+    border-color: var(--rf-button-secondary-hover-bg);
+    color: var(--rf-button-secondary-hover-color);
+  }
+
+  .rf-repeater-add:disabled,
+  .rf-repeater-remove:disabled {
+    cursor: default;
+    opacity: 0.55;
+  }
+
+  .rf-repeater-add {
+    margin-top: var(--rf-repeater-add-margin, 0.25rem);
+  }
+
+  .rf-repeater-remove {
+    grid-column: 1 / -1;
+    justify-self: end;
+    margin-top: var(--rf-repeater-row-gap, 0.375rem);
+  }
+
+  /* Row checkboxes/radios keep their compact sizing inside repeaters. */
+  .rf-repeater-row .rf-field input[type="checkbox"],
+  .rf-repeater-row .rf-field input[type="radio"] {
+    width: auto;
+    min-height: auto;
+  }
+
   /* 12-column row spans on desktop — the wrapper carries `rf-span-{1..12}`
      (the span comes from `gridSpan` in the renderer). Below 48rem the grid is
      a single column and every element stacks full-width. */

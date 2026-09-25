@@ -93,6 +93,10 @@ export interface FormCopy {
   fileType?: string;
   /** The number of attached files is outside `minFiles`/`maxFiles` — `{min}`/`{max}` placeholders. */
   fileCount?: string;
+  /** Repeater "add row" button label (spec `addLabel` beats it). */
+  addRow?: string;
+  /** Repeater "remove row" button label (spec `removeLabel` beats it). */
+  removeRow?: string;
   /** Submit button label while the request is in flight. */
   sending?: string;
   /**
@@ -272,6 +276,66 @@ export interface FormFieldSpec {
   maxFiles?: number;
 }
 
+/* ---- Repeaters (dynamic row groups) ---- */
+
+/**
+ * A repeater — an array-valued field (e.g. "team members" or "work entries")
+ * whose rows the visitor can add and remove on the client.
+ *
+ * A repeater is a layout *container*, not an input primitive: each row repeats
+ * the same row-template fields (`fields`), and the canonical payload carries
+ * the rows as a JSON array (`[{…}, …]`), which is what separates it from the
+ * scalar 20 input types. It is deliberately not a `FieldType` — it sits next
+ * to the structural elements in `FormElement`, but unlike them it has a
+ * `name`, validates its rows and reaches the payload.
+ *
+ * The rows are rendered by the markup builders (`.rf-repeater` +
+ * `data-add-row` / `data-remove-row`) and wired by the client engine, which
+ * also enforces `minRows`/`maxRows` (the add button disables at `maxRows`, the
+ * remove buttons at `minRows`).
+ */
+export interface RepeaterSpec {
+  type: "repeater";
+  id: string;
+  /** Key in the canonical payload — the JSON-array entry name. */
+  name: string;
+  /** Fieldset legend; optional (a bare repeater renders no label). */
+  label?: string;
+  /** Width within the row — the same FieldSize as fields (defaults to 100). */
+  size?: FieldSize;
+  /**
+   * Minimum number of rows (default 0 — an empty repeater is valid and yields
+   * `[]`). Remove buttons disable at this count; a submit below it is a block
+   * error (defence-in-depth — the buttons normally prevent it).
+   */
+  minRows?: number;
+  /**
+   * Maximum number of rows (default unlimited). The add button disables at
+   * this count.
+   */
+  maxRows?: number;
+  /**
+   * Add-row button label override — resolution order is `addLabel` →
+   * `copy.addRow` → "Add another".
+   */
+  addLabel?: string;
+  /**
+   * Remove-row button label override — resolution order is `removeLabel` →
+   * `copy.removeRow` → "Remove".
+   */
+  removeLabel?: string;
+  /**
+   * The row template: standard fields (the 20 input types) repeated per
+   * row; structural elements are allowed as static row chrome. Wizard `step`
+   * markers are dropped.
+   */
+  fields: FormElement[];
+  /** Show the whole repeater only while the condition(s) hold (conditional fields). */
+  showWhen?: VisibilityRule;
+  /** Per-repeater message override (used for the min/max-rows block error). */
+  message?: string;
+}
+
 /* ---- Structural elements (heading, description, divider, section) ---- */
 
 /**
@@ -360,15 +424,19 @@ export interface StepSpec extends StepHeaderSpec {
   submit?: string;
 }
 
-/** A field, structural element, or step marker — the members of `FormSpec.fields`. */
-export type FormElement = FormFieldSpec | DecorSpec | StepSpec;
+/**
+ * A member of `FormSpec.fields`: a field, a structural element, a wizard
+ * `step` marker, or a repeater (dynamic row group).
+ */
+export type FormElement = FormFieldSpec | DecorSpec | StepSpec | RepeaterSpec;
 
 /**
- * True when a fields-array entry is a real field rather than a structural
- * element. Every field carries a `name`; structural elements
- * (`heading`, `description`, `divider`, `section`) and wizard `step` markers
- * never do — that single check is the discriminator used everywhere a field
- * is required (serialisation, rules, payload).
+ * True when a fields-array entry is a payload-bearing field rather than a
+ * structural element. Every field — the 20 scalar input types plus the
+ * `repeater` row group — carries a `name`; structural elements (`heading`,
+ * `description`, `divider`, `section`) and wizard `step` markers never do —
+ * that single check is the discriminator used everywhere a field is required
+ * (serialisation, rules, payload).
  */
 export function isFieldSpec(element: FormElement): element is FormFieldSpec {
   return typeof (element as FormFieldSpec).name === "string";
@@ -530,6 +598,17 @@ export interface FieldSpec {
   /** Maximum attached files (`multiple` file inputs). */
   maxFiles?: number;
   /**
+   * Repeater rows: the client-side specs of the row-template fields. Present
+   * only on `type: "repeater"` specs — the engine validates each row's
+   * controls against these (row-scoped) and the canonical payload groups them
+   * into a JSON array.
+   */
+  repeater?: FieldSpec[];
+  /** Minimum row count for a repeater (default 0). */
+  minRows?: number;
+  /** Maximum row count for a repeater (default: unlimited). */
+  maxRows?: number;
+  /**
    * Conditional fields: the normalized (always-array) showWhen rules —
    * conditions and/or `anyOf` / `noneOf` / `not` wrappers. Absent on
    * unconditional fields.
@@ -571,37 +650,54 @@ export function visibilityFields(rules: VisibilityConditionLike[]): string[] {
 /** The client-side field spec (validation + mailers) for a form's fields. */
 export function toFieldSpecs(fields: FormElement[]): FieldSpec[] {
   // Structural elements are render-time only — they never reach the client.
-  return fields.filter(isFieldSpec).map((field) => {
-    const visibility = field.showWhen
-      ? (Array.isArray(field.showWhen) ? field.showWhen : [field.showWhen])
-      : undefined;
-    return {
-      name: field.name,
-      type: field.type ?? "text",
-      required: Boolean(field.required),
-      label: field.label,
-      message: field.message,
-      min: field.min,
-      max: field.max,
-      pattern: field.pattern,
-      minLength: field.minLength,
-      maxLength: field.maxLength,
-      sameAs: field.sameAs,
-      minSelect: field.minSelect,
-      maxSelect: field.maxSelect,
-      multiple: field.multiple,
-      maxSize: field.maxSize,
-      allowedTypes: field.allowedTypes,
-      minFiles: field.minFiles,
-      maxFiles: field.maxFiles,
-      ...(visibility && visibility.length > 0
-        ? {
-            visibility,
-            dependsOn: visibilityFields(visibility),
-          }
-        : {}),
-    };
-  });
+  return fields
+    .filter((field): field is RepeaterSpec | FormFieldSpec => isFieldSpec(field))
+    .map((field) => {
+      const visibility = field.showWhen
+        ? (Array.isArray(field.showWhen) ? field.showWhen : [field.showWhen])
+        : undefined;
+      const visibilityKeys = visibility && visibility.length > 0
+        ? { visibility, dependsOn: visibilityFields(visibility) }
+        : {};
+      // A repeater is a container, not a scalar input: the row template
+      // serialises as nested client specs (`repeater`) plus the row bounds.
+      // `addLabel`/`removeLabel` are render-time only — the engine never
+      // re-renders the buttons, so they don't ride in data-rules.
+      if (field.type === "repeater") {
+        return {
+          name: field.name,
+          type: "repeater",
+          required: false,
+          label: field.label,
+          message: field.message,
+          repeater: toFieldSpecs(field.fields),
+          ...(field.minRows !== undefined ? { minRows: field.minRows } : {}),
+          ...(field.maxRows !== undefined ? { maxRows: field.maxRows } : {}),
+          ...visibilityKeys,
+        };
+      }
+      return {
+        name: field.name,
+        type: field.type ?? "text",
+        required: Boolean(field.required),
+        label: field.label,
+        message: field.message,
+        min: field.min,
+        max: field.max,
+        pattern: field.pattern,
+        minLength: field.minLength,
+        maxLength: field.maxLength,
+        sameAs: field.sameAs,
+        minSelect: field.minSelect,
+        maxSelect: field.maxSelect,
+        multiple: field.multiple,
+        maxSize: field.maxSize,
+        allowedTypes: field.allowedTypes,
+        minFiles: field.minFiles,
+        maxFiles: field.maxFiles,
+        ...visibilityKeys,
+      };
+    });
 }
 
 /** Serialise the field spec for the data-rules attribute. */
@@ -1002,6 +1098,17 @@ export function buildRules(fields: FieldSpec[], copy: FormCopy = {}): Record<str
   };
 
   for (const field of fields) {
+    // Repeaters are row-group containers, not scalar inputs: no rule exists
+    // under the repeater's own name — instead the row template's inner rules
+    // flatten under `{repeater}.{inner}` keys. The engine looks those up per
+    // row, so two repeaters whose rows share an inner field name can't
+    // collide, and cross-row `sameAs` targets stay row-local.
+    if (field.type === "repeater" && field.repeater) {
+      for (const [innerName, rule] of Object.entries(buildRules(field.repeater, copy))) {
+        rules[`${field.name}.${innerName}`] = rule;
+      }
+      continue;
+    }
     const name = field.name;
     // Hidden fields receive no user input — never validate them.
     if (field.type === "hidden") continue;
@@ -1242,6 +1349,48 @@ export function parseTime(raw: string): string {
 export function canonicalData(data: FormData, fields: FieldSpec[]): FormData {
   const payload = new FormData();
   for (const field of fields) {
+    // Repeaters group their rows into one JSON-array entry. Each rendered
+    // row contributes a sentinel entry (`name` = the repeater's name, emitted
+    // by the markup builders), so row boundaries reconstruct from the
+    // FormData's tree-ordered iteration without renaming the row fields
+    // themselves. Files inside a row travel as their filenames, exactly like
+    // scalar file fields.
+    if (field.type === "repeater" && field.repeater) {
+      const innerNames = new Set(field.repeater.map((inner) => inner.name));
+      const rows: Record<string, string>[] = [];
+      let current: Record<string, string> | null = null;
+      for (const [key, value] of data.entries()) {
+        if (key === field.name) {
+          current = {};
+          rows.push(current);
+          continue;
+        }
+        if (!current || !innerNames.has(key)) continue;
+        const text = value instanceof File ? value.name : String(value).trim();
+        if (!text) continue;
+        current[key] = current[key] ? `${current[key]}, ${text}` : text;
+      }
+      // Entirely-empty rows (e.g. an untouched starter row) don't pollute the
+      // array — unless the spec mandates a floor, in which case the earliest
+      // blank rows pad the output back up to `minRows`, preserving order.
+      const empty = (row: Record<string, string>): boolean => Object.keys(row).length === 0;
+      const floor = field.minRows ?? 0;
+      let pad = 0;
+      if (floor > 0) {
+        const nonEmpty = rows.filter((row) => !empty(row)).length;
+        if (nonEmpty < floor) pad = floor - nonEmpty;
+      }
+      const kept: Record<string, string>[] = [];
+      for (const row of rows) {
+        if (!empty(row)) kept.push(row);
+        else if (pad > 0) {
+          kept.push(row);
+          pad--;
+        }
+      }
+      payload.set(field.name, JSON.stringify(kept));
+      continue;
+    }
     const values = data
       .getAll(field.name)
       // File fields travel as the attached filename(s) in the canonical

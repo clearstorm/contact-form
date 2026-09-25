@@ -686,5 +686,141 @@ check(
   `a=${fieldError(vform, "a")}`,
 );
 
+/* ---- 9. Repeaters (dynamic row groups) ---- */
+
+const repeaterSpec = jsonSpec([
+  {
+    type: "repeater",
+    id: "members",
+    name: "members",
+    label: "Team members",
+    minRows: 1,
+    maxRows: 3,
+    message: "Need at least one member.",
+    fields: [
+      { type: "text", id: "member_name", name: "member_name", label: "Name", required: true },
+      { type: "email", id: "member_email", name: "member_email", label: "Email", required: true },
+    ],
+  },
+]);
+
+const repform = mount(renderFormShell({ form: repeaterSpec }));
+const detachR = attachForm(repform);
+const rows = () => Array.from(repform.querySelectorAll<HTMLElement>("[data-repeater-row]"));
+const addBtn = () => repform.querySelector<HTMLButtonElement>("[data-add-row]");
+const removeBtns = () => Array.from(repform.querySelectorAll<HTMLButtonElement>("[data-remove-row]"));
+const rowInput = (row: HTMLElement, name: string) =>
+  row.querySelector<HTMLInputElement>(`[name="${name}"]`);
+
+check("repeater renders the starter rows (max(1, minRows))", rows().length === 1, String(rows().length));
+check("remove button disabled at minRows", removeBtns()[0]?.disabled === true);
+check("add button enabled under maxRows", addBtn()?.disabled === false);
+
+// Row-scoped validation: only the flagged row's controls show errors.
+rowInput(rows()[0], "member_name")!.value = "Jane";
+rowInput(rows()[0], "member_email")!.value = "jane@example.com";
+addBtn()!.click();
+await tick();
+check("add clones another row", rows().length === 2, String(rows().length));
+check("clone re-indexes ids (-row1__)", rows()[1].querySelector("[id$='-row1__member_name']") !== null, rows()[1].outerHTML.slice(0, 200));
+const sentinels = Array.from(repform.querySelectorAll<HTMLInputElement>("[data-repeater-sentinel]"));
+check("clone re-indexes its sentinel value", sentinels[1]?.value === "1", `sentinels=${sentinels.map((s) => s.value).join(",")}`);
+check(
+  "clone starts empty (no copying from the template row)",
+  rowInput(rows()[1], "member_name")!.value === "" && rowInput(rows()[1], "member_email")!.value === "",
+);
+
+// Empty second row blocks submit — and only row 1 gets flagged.
+submit(repform);
+await until(() => errorCount(repform) === 1);
+check(
+  "row-scoped validation flags only the empty row's field",
+  rows()[1].querySelector(".rf-field-error") !== null && rows()[0].querySelector(".rf-field-error") === null,
+  `errors=${errorCount(repform)}`,
+);
+
+// Fill row 1 and succeed — the mailer receives the rows as a JSON array.
+rowInput(rows()[1], "member_name")!.value = "Joe";
+rowInput(rows()[1], "member_email")!.value = "joe@example.com";
+const beforeSubmit = calls.length;
+submit(repform);
+const submitted = await until(() => calls.length === beforeSubmit + 1);
+check(
+  "valid row set submits",
+  submitted && (await until(() => !find(repform, ".rf-status")!.hidden)) && !find(repform, ".rf-status")!.hidden,
+);
+const reppayload = calls[calls.length - 1].data;
+const membersRows = Array.isArray(reppayload.members) ? reppayload.members : JSON.parse(String(reppayload.members ?? "[]"));
+check(
+  "canonical payload carries the rows as a JSON array",
+  membersRows.length === 2 && membersRows[0].member_name === "Jane" && membersRows[1].member_name === "Joe",
+  JSON.stringify(reppayload),
+);
+check("row array omits the honeypot", !("website" in reppayload), JSON.stringify(reppayload));
+
+// Bounds: add disables at maxRows, remove re-disables at minRows.
+addBtn()!.click();
+check("add up to maxRows", rows().length === 3, String(rows().length));
+check("add disabled at maxRows", addBtn()?.disabled === true);
+addBtn()!.click();
+check("add does nothing past maxRows", rows().length === 3, String(rows().length));
+removeBtns()[0]!.click();
+check("remove a row above minRows", rows().length === 2, String(rows().length));
+removeBtns()[0]!.click();
+removeBtns()[0]!.click();
+check("remove down to minRows", rows().length === 1, String(rows().length));
+check("remove disabled at minRows again", removeBtns()[0]?.disabled === true);
+removeBtns()[0]!.click();
+check("remove does nothing below minRows", rows().length === 1, String(rows().length));
+
+// Defence-in-depth: a DOM-level removal (bypassing the disabled button) still
+// cannot submit below minRows — the block error names the spec message.
+rows()[0]!.remove();
+submit(repform);
+await until(() => find(repform, ".rf-repeater-error") !== null);
+check(
+  "submit below minRows shows the repeater block error",
+  find(repform, ".rf-repeater-error")?.textContent?.trim() === "Need at least one member.",
+  `got=${find(repform, ".rf-repeater-error")?.textContent}`,
+);
+detachR();
+
+/* ---- 9b. Conditional repeaters (showWhen row groups) ---- */
+
+const condRepeaterSpec = jsonSpec([
+  { type: "checkbox", id: "need_team", name: "need_team", label: "Add a team section" },
+  {
+    type: "repeater",
+    id: "team",
+    name: "team",
+    showWhen: { field: "need_team", operator: "filled" },
+    fields: [{ type: "text", name: "member", label: "Member", required: true }],
+  },
+]);
+
+const cform = mount(renderFormShell({ form: condRepeaterSpec }));
+attachForm(cform);
+const teamFieldset = find<HTMLElement>(cform, '[data-repeater="team"]')!;
+check("conditional repeater starts hidden", teamFieldset.hidden === true);
+input(cform, "need_team")!.checked = true;
+fire(input(cform, "need_team"), "change");
+check("conditional repeater reveals when the condition holds", teamFieldset.hidden === false);
+
+// With the repeater hidden, its rows neither validate nor submit.
+const cform2 = mount(renderFormShell({ form: condRepeaterSpec }));
+attachForm(cform2);
+const beforeHidden = calls.length;
+submit(cform2);
+const hiddenSubmit = await until(() => calls.length === beforeHidden + 1);
+const hiddenPayload = calls[calls.length - 1]?.data ?? {};
+check(
+  "hidden repeater rows are excluded from validation and payload",
+  hiddenSubmit &&
+    !("team" in hiddenPayload) &&
+    !find(cform2, ".rf-repeater-error") &&
+    !find(cform2, ".rf-field-error"),
+  JSON.stringify(hiddenPayload),
+);
+
 console.log(failures === 0 ? "\nENGINE ALL PASS" : `\nENGINE ${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);

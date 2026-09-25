@@ -20,6 +20,7 @@
     "rules-file-bounds": { "status": "implemented", "notes": "maxSize (bytes or 5MB-style units) + allowedTypes MIME globs per file, minFiles/maxFiles counts on multiple inputs — all read ctx.files; minFiles > 0 implies required." },
     "button-specs": { "status": "implemented", "notes": "Label or { label, variant } for submit/next/prev." },
     "grid-sizing": { "status": "implemented", "notes": "12-column spans from size percentage via gridSpan." },
+    "repeaters": { "status": "implemented", "notes": "Repeater row groups — add/remove rows with minRows/maxRows bounds, row-scoped validation, structured JSON-array payload per group." },
     "binding-astro": { "status": "implemented", "notes": ".astro shells over the runtime builders + initForms." },
     "binding-react": { "status": "implemented", "notes": "Uncontrolled ContactForm + Field; StrictMode-safe detach." },
     "binding-vanilla": { "status": "implemented", "notes": "renderForm / attachForm / initForms with detach lifecycle." },

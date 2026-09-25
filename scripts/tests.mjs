@@ -580,6 +580,124 @@ check(
     validateValue(fRules.art, "1", fileBoundCtx([png, png, png, png])) !== null,
 );
 
+// --- 4d. Repeaters: toFieldSpecs / buildRules / canonicalData ---
+const teamSpec = [
+  {
+    type: "repeater",
+    id: "members",
+    name: "members",
+    label: "Team members",
+    minRows: 1,
+    maxRows: 3,
+    addLabel: "Add teammate",
+    fields: [
+      { type: "text", id: "member_name", name: "member_name", label: "Name", required: true },
+      { type: "heading", text: "row chrome" },
+      { type: "email", id: "member_email", name: "member_email", label: "Email", required: true },
+    ],
+  },
+  {
+    type: "repeater",
+    id: "links",
+    name: "links",
+    fields: [{ type: "url", id: "link_url", name: "link_url", label: "Link" }],
+  },
+];
+const teamFields = toFieldSpecs(teamSpec);
+const members = teamFields.find((f) => f.name === "members");
+check("repeaters are payload fields (isFieldSpec)", isFieldSpec(teamSpec[0]) && isFieldSpec(teamSpec[1]));
+check("repeater serialises with type 'repeater'", members.type === "repeater", members.type);
+check("repeater serialises the row template as nested specs", members.repeater.length === 2, String(members.repeater?.length));
+check("repeater row template drops structural chrome", members.repeater.every((f) => f.name), JSON.stringify(members.repeater));
+check("repeater row template keeps field rules config", members.repeater[0].required === true && members.repeater[0].label === "Name");
+check("repeater carries row bounds", members.minRows === 1 && members.maxRows === 3);
+const linksField = teamFields.find((f) => f.name === "links");
+check("bounds-less repeater omits minRows/maxRows", !("minRows" in linksField) && !("maxRows" in linksField));
+const teamRound = parseFieldSpec(serializeRules(teamFields));
+check(
+  "data-rules round-trip keeps nested repeater specs",
+  JSON.stringify(teamRound.find((f) => f.name === "members").repeater) === JSON.stringify(members.repeater),
+);
+
+const teamRules = buildRules(teamFields);
+check("repeater rules flatten under qualified keys", teamRules["members.member_name"].required === true && teamRules["members.member_email"].required === true);
+check("no rule under the repeater's own name", !("members" in teamRules) && !("links" in teamRules));
+check("qualified row rule enforces required", validateValue(teamRules["members.member_name"], "") !== null && validateValue(teamRules["members.member_name"], "Jane") === null);
+check("qualified row rule enforces format", validateValue(teamRules["members.member_email"], "nope@") !== null && validateValue(teamRules["members.member_email"], "jane@example.com") === null);
+check(
+  "repeater row rules resolve copy",
+  buildRules(teamFields, { email: "Bad email." })["members.member_email"].message === "Bad email.",
+);
+const sharedInnerSpec = toFieldSpecs([
+  { type: "repeater", id: "g", name: "guests", fields: [{ type: "text", name: "email", label: "Guest email", required: true }] },
+  { type: "repeater", id: "t", name: "team", fields: [{ type: "text", name: "email", label: "Team email", required: true }] },
+]);
+const sharedInnerRules = buildRules(sharedInnerSpec);
+check(
+  "repeaters sharing an inner name stay row-scoped in rules",
+  "guests.email" in sharedInnerRules && "team.email" in sharedInnerRules &&
+    sharedInnerRules["guests.email"] !== sharedInnerRules["team.email"],
+);
+const condRepeater = toFieldSpecs([
+  { type: "repeater", id: "r", name: "team", showWhen: { field: "has_team", operator: "filled" }, fields: [{ type: "text", name: "member", label: "Member" }] },
+]);
+check(
+  "repeater showWhen serialises into visibility/dependsOn",
+  condRepeater[0].visibility?.length === 1 && condRepeater[0].dependsOn?.[0] === "has_team",
+  JSON.stringify(condRepeater[0]),
+);
+
+// canonicalData: rows group into one JSON-array entry, in tree order.
+const teamData = new FormData();
+teamData.append("members", "0"); // row sentinel (as the markup emits)
+teamData.append("member_name", "Jane");
+teamData.append("member_email", "jane@example.com");
+teamData.append("members", "1");
+teamData.append("member_name", "Joe");
+teamData.append("member_email", "joe@example.com");
+teamData.append("links", "0");
+teamData.append("link_url", "");
+const teamPayload = canonicalData(teamData, teamFields);
+const teamRows = JSON.parse(teamPayload.get("members"));
+check("repeater payload is a JSON array with the rows in order", Array.isArray(teamRows) && teamRows.length === 2, JSON.stringify(teamRows));
+check("row objects carry inner values by name", teamRows[0].member_name === "Jane" && teamRows[0].member_email === "jane@example.com" && teamRows[1].member_name === "Joe");
+check("multi-value row field comma-joined", (() => {
+  const multiData = new FormData();
+  multiData.append("members", "0");
+  multiData.append("member_name", "Jane");
+  multiData.append("member_email", "jane@example.com");
+  multiData.append("member_email", "jane2@example.com");
+  return JSON.parse(canonicalData(multiData, teamFields).get("members"))[0].member_email === "jane@example.com, jane2@example.com";
+})());
+check("entirely-empty rows drop from the array (minRows 0)", JSON.parse(teamPayload.get("links")).length === 0);
+check("blank starter row pads back up to minRows (1)", (() => {
+  const floorData = new FormData();
+  floorData.append("members", "0");
+  floorData.append("member_email", "");
+  return JSON.parse(canonicalData(floorData, teamFields).get("members")).length === 1;
+})());
+check("minRows 0 with zero rows yields []", (() => {
+  const noneData = new FormData();
+  noneData.append("links", "0");
+  return JSON.parse(canonicalData(noneData, teamFields).get("links")).length === 0;
+})());
+const uploadSpec = toFieldSpecs([
+  { type: "repeater", id: "docs", name: "docs", fields: [{ type: "file", name: "attach", label: "Attachment" }] },
+]);
+const uploadData = new FormData();
+uploadData.append("docs", "0");
+uploadData.append("attach", new File(["a"], "a.pdf"), "a.pdf");
+uploadData.append("attach", new File(["b"], "b.pdf"), "b.pdf");
+uploadData.append("docs", "1");
+uploadData.append("attach", new File(["c"], "c.pdf"), "c.pdf");
+const uploadPayload = canonicalData(uploadData, uploadSpec);
+const uploadRows = JSON.parse(uploadPayload.get("docs"));
+check(
+  "row files travel as filenames (comma-joined per row)",
+  uploadRows[0].attach === "a.pdf, b.pdf" && uploadRows[1].attach === "c.pdf",
+  JSON.stringify(uploadRows),
+);
+
 // --- 2.13. Validation rule expansion: pattern / length / sameAs / selection bounds ---
 
 const vSpec = [

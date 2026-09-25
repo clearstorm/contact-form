@@ -166,6 +166,11 @@ export function buildValidators(
   const rules = provider.buildRules(fields, copy);
   const validators: Record<string, FieldValidator> = {};
   for (const field of fields) {
+    // Repeaters are row-group containers, not scalar inputs — their rules
+    // flatten under `{repeater}.{inner}` and the bridge tracks one value per
+    // name, so a repeater gets no validator here (TanStack-driven repeaters
+    // are a documented non-goal; consumers manage those values themselves).
+    if (field.type === "repeater") continue;
     const rule = rules[field.name];
     validators[field.name] = (props) => {
       // TanStack v1 forwards the whole form state on formApi.state.values —
@@ -286,12 +291,20 @@ export interface ContactFormBridge {
 export function useContactForm(form: FormSpec, options: TanStackBridgeOptions = {}): ContactFormBridge {
   const fieldSpecs = useMemo(() => form.fields.filter(isFieldSpec), [form]);
   const fields = useMemo(() => toFieldSpecs(form.fields), [form]);
+  // Repeaters are a DOM-engine feature (row add/remove, row-scoped
+  // validation); this bridge tracks one scalar value per field name, so row
+  // groups are excluded from validators, initial values and the payload.
+  const scalarFields = useMemo(() => fields.filter((field) => field.type !== "repeater"), [fields]);
+  const scalarNames = useMemo(() => new Set(scalarFields.map((field) => field.name)), [scalarFields]);
   const copy = form.copy ?? {};
   const validators = useMemo(
-    () => options.validators ?? buildValidators(fields, copy, options.validation),
-    [fields, copy, options.validators, options.validation],
+    () => options.validators ?? buildValidators(scalarFields, copy, options.validation),
+    [scalarFields, copy, options.validators, options.validation],
   );
-  const initialValues = useMemo(() => buildInitialValues(fieldSpecs), [fieldSpecs]);
+  const initialValues = useMemo(
+    () => buildInitialValues(fieldSpecs.filter((field) => scalarNames.has(field.name))),
+    [fieldSpecs, scalarNames],
+  );
   const mailerConfig: MailerConfig = useMemo(
     () => ({
       endpoint: options.config?.endpoint ?? form.endpoint,
@@ -317,11 +330,11 @@ export function useContactForm(form: FormSpec, options: TanStackBridgeOptions = 
       // conditional fields stay out of the payload (same contract as the
       // engine's DOM-driven path).
       const visible = visibleFieldNames(fields, values);
-      const mailerFields = fields.filter((field) => visible.has(field.name));
-      const data = valuesToFormData(values, fields);
+      const mailerFields = scalarFields.filter((field) => visible.has(field.name));
+      const data = valuesToFormData(values, scalarFields);
       return getMailer(form.mailer).submit({ data, fields: mailerFields, config: mailerConfig });
     },
-    [fields, form.mailer, mailerConfig],
+    [scalarFields, form.mailer, mailerConfig],
   );
 
   return {
@@ -330,7 +343,7 @@ export function useContactForm(form: FormSpec, options: TanStackBridgeOptions = 
     initialValues,
     isVisible,
     visibleFieldNames: (values) => visibleFieldNames(fields, values),
-    toFormData: (values) => valuesToFormData(values, fields),
+    toFormData: (values) => valuesToFormData(values, scalarFields),
     submit,
     mailerConfig,
   };

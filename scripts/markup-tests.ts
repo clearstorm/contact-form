@@ -15,7 +15,7 @@
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { parseFieldSpec, serializeRules, toFieldSpecs, type FormSpec } from "../src/core";
-import { renderDecor, renderField, renderFormShell } from "../src/runtime/markup";
+import { renderDecor, renderField, renderFormShell, renderRepeater } from "../src/runtime/markup";
 
 const RECORD = process.env.RECORD === "1";
 
@@ -222,6 +222,52 @@ const replacePrefillSpec: FormSpec = {
   ],
 };
 
+const repeaterSpec: FormSpec = {
+  name: "snapshot-team",
+  mailer: "json",
+  submit: "Send",
+  status: "Saved.",
+  endpoint: "https://example.test/team",
+  copy: { addRow: "Add member", removeRow: "Drop" },
+  fields: [
+    { type: "heading", text: "Team" },
+    {
+      type: "repeater",
+      id: "members",
+      name: "members",
+      label: "Team members",
+      minRows: 1,
+      maxRows: 3,
+      addLabel: "Add teammate",
+      fields: [
+        {
+          type: "text",
+          id: "member_name",
+          name: "member_name",
+          label: "Name",
+          required: true,
+          size: 50,
+        },
+        {
+          type: "email",
+          id: "member_email",
+          name: "member_email",
+          label: "Email",
+          required: true,
+          size: 50,
+        },
+      ],
+    },
+    // Bounds-less repeater — defaults (minRows 0 → one starter row, no max).
+    {
+      type: "repeater",
+      id: "links",
+      name: "links",
+      fields: [{ type: "url", id: "link_url", name: "link_url", label: "Link" }],
+    },
+  ],
+};
+
 /* ---- standalone builder cases ---- */
 
 const fieldCases: [string, string][] = [
@@ -232,6 +278,21 @@ const fieldCases: [string, string][] = [
   ["field-hidden", renderField({ label: "", id: "h", name: "hid", type: "hidden", value: "x" })],
   ["field-counter", renderField({ label: "Promo code", id: "c", name: "code", type: "text", maxLength: 8, value: "ab", span: 6 })],
   ["field-counter-textarea", renderField({ label: "Message", id: "m2", name: "message", type: "textarea", maxLength: 120, span: 8 })],
+  [
+    "field-repeater",
+    renderRepeater({
+      type: "repeater",
+      id: "members",
+      name: "members",
+      label: "Members",
+      minRows: 2,
+      maxRows: 4,
+      fields: [
+        { type: "text", id: "name", name: "name", label: "Name", required: true, size: 50 },
+        { type: "email", id: "email", name: "email", label: "Email", size: 50 },
+      ],
+    }),
+  ],
 ];
 
 const decorCases: [string, string][] = [
@@ -263,6 +324,7 @@ const snapshots: Snapshot[] = [
   { name: "shell-single", html: renderFormShell({ form: singleSpec }) },
   { name: "shell-wizard", html: renderFormShell({ form: wizardSpec }) },
   { name: "shell-replace-prefill", html: renderFormShell({ form: replacePrefillSpec, prefill: "datetime" }) },
+  { name: "shell-repeater", html: renderFormShell({ form: repeaterSpec }) },
   ...fieldCases.map(([name, html]) => ({ name, html })),
   ...decorCases.map(([name, html]) => ({ name, html })),
 ];
@@ -304,6 +366,42 @@ if (RECORD) {
   check("shell data-rules round-trips to spec fields", serializeRules(parsed) === expected);
   check("shell carries endpoint + mailer", shell.includes("data-mailer=\"json\"") && shell.includes("data-endpoint=\"https://example.test/send\""));
   check("single-page shell has no data-steps", !shell.includes("data-steps="));
+
+  /* ---- repeater invariants ---- */
+  const repeaterShell = snapshots.find((s) => s.name === "shell-repeater")!.html;
+  const repeaterRulesAttr = /data-rules="([^"]*)"/.exec(repeaterShell)?.[1] ?? "";
+  const repeaterRulesJson = repeaterRulesAttr.replace(/&quot;/g, '"').replace(/&amp;/g, "&");
+  const repeaterParsed = parseFieldSpec(repeaterRulesJson);
+  const repeaterExpected = serializeRules(toFieldSpecs(repeaterSpec.fields));
+  check("repeater data-rules round-trips to spec fields", serializeRules(repeaterParsed) === repeaterExpected);
+  check(
+    "repeater rules carry the row template + bounds",
+    repeaterRulesJson.includes("\"member_name\"") &&
+      repeaterRulesJson.includes("\"member_email\"") &&
+      repeaterRulesJson.includes("\"minRows\":1") &&
+      repeaterRulesJson.includes("\"maxRows\":3"),
+  );
+  const firstRepeater =
+    /<fieldset class="rf-repeater[^"]*" data-repeater="members" data-repeater-min="1"[^>]*>/.exec(repeaterShell)?.[0] ?? "";
+  check("bounded repeater renders data-repeater-max", firstRepeater.includes("data-repeater-max=\"3\""));
+  const linksRepeater =
+    /<fieldset class="rf-repeater[^"]*" data-repeater="links" data-repeater-min="0"[^>]*>/.exec(repeaterShell)?.[0] ?? "";
+  check("unbounded repeater omits data-repeater-max", linksRepeater !== "" && !linksRepeater.includes("data-repeater-max"));
+  check(
+    "repeater row sentinels carry the repeater name",
+    (repeaterShell.match(/<input type="hidden" name="members" value="\d" data-repeater-sentinel \/>/g) ?? []).length === 1,
+  );
+  check(
+    "repeater rows stamp row-scoped ids",
+    repeaterShell.includes("id=\"snapshot-team__members-row0__member_name\"") &&
+      repeaterShell.includes("id=\"snapshot-team__members-row0__member_email\""),
+  );
+  check(
+    "copy + spec labels resolve onto the add/remove buttons",
+    repeaterShell.includes(">+ Add teammate</button>") &&
+      repeaterShell.includes(">Drop</button>") &&
+      repeaterShell.includes("aria-label=\"Drop\""),
+  );
 }
 
 console.log(failures === 0 ? "MARKUP ALL PASS" : `MARKUP ${failures} FAILURES`);

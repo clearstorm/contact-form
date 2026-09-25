@@ -31,6 +31,7 @@ Status vocabulary: `implemented` · `partial` · `planned` · `deprecated`.
 | `rules-file-bounds` | File upload bounds | `maxSize` (bytes or `"5MB"` units) and `allowedTypes` (MIME allow-list, `image/*` globs) per file, plus `minFiles` / `maxFiles` count bounds on `multiple` file inputs — all read `ctx.files`; `minFiles > 0` implies required | implemented |
 | `button-specs` | Button specs | `submit` / `next` / `prev` as plain label or `{ label, variant }` (`primary` \| `secondary` \| `ghost`), default variants per role | implemented |
 | `grid-sizing` | 12-column field sizing | `size` percentage → nearest column span via `gridSpan` (`rf-span-1..12`); fields collapse below `48rem` | implemented |
+| `repeaters` | Repeaters (row groups) | `type: "repeater"` containers holding any field types; dynamic add/remove rows with `minRows`/`maxRows` bounds, per-row validate-by-row, and a structured JSON-array canonical payload per group | implemented |
 
 ## Bindings
 

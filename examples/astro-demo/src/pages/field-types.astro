@@ -7,6 +7,7 @@ import { getForm } from "../lib/forms";
 const allFields = getForm(fieldTypesSpec, "All 20 field types");
 const structure = getForm(fieldTypesSpec, "Structural field types");
 const validationExtras = getForm(fieldTypesSpec, "Validation extras");
+const repeaters = getForm(fieldTypesSpec, "Repeat rows");
 
 const structureRows: Array<[string, string, string]> = [
   ["heading", '{ "type": "heading", "text": "…", "line": false }', "a full-width <code>&lt;h3&gt;</code> title; its rule is on by default (left → line on the right, right → line on the left, center → both sides), <code>line: false</code> renders text only"],
@@ -16,13 +17,14 @@ const structureRows: Array<[string, string, string]> = [
 ];
 ---
 <DemoLayout title="Field types demo">
-  <p class="demo-kicker">every input type · structural types · validation extras</p>
+  <p class="demo-kicker">every input type · structural types · validation extras · repeaters</p>
   <h1>Field types</h1>
   <p class="lead">
-    Three named forms in one spec file (<code>examples/specs/field-types.json</code>):
-    the full 20-type kitchen sink, the structural field types and a validation-extras
-    form — every element a form can render, from a text input to a section break,
-    plus the custom validation rules that layer on top of any field.
+    Four named forms in one spec file (<code>examples/specs/field-types.json</code>):
+    the full 20-type kitchen sink, the structural field types, a validation-extras
+    form and a repeat-rows form — every element a form can render, from a text
+    input to a section break, plus the custom validation rules that layer on top
+    of any field and the dynamic row groups that repeat them.
   </p>
 
   <h2>All 20 field types</h2>
@@ -138,4 +140,23 @@ const structureRows: Array<[string, string, string]> = [
       <tr><td><code>minSelect</code> / <code>maxSelect</code></td><td><code>{ "{ \"minSelect\": 2, \"maxSelect\": 3 }" }</code></td><td>allowed checked/selected count on checkbox/radio groups and multi-selects; <code>minSelect &gt; 0</code> implies required</td></tr>
     </tbody>
   </table>
+
+  <h2>Repeat rows</h2>
+  <p class="lead">
+    A <code>repeater</code> renders a row group: any field types nest inside its
+    <code>fields</code>, and the visitor can add and remove rows. Below, a team
+    members group is bounded with <code>minRows: 1</code> /
+    <code>maxRows: 3</code> (the add button disables at the ceiling, remove at
+    the floor), and an unbounded links group starts as a single row with no
+    limit. Each row validates by itself (an empty required field flags only
+    that row), and on submit every row group travels in the canonical payload
+    as one structured JSON array under its own name — an empty row is dropped
+    (or padded back to <code>minRows</code>). Row labels come from
+    <code>addLabel</code> / <code>removeLabel</code>, falling back to the
+    form-level <code>copy.addRow</code> / <code>copy.removeRow</code> keys.
+  </p>
+
+  <div class="demo-card">
+    <FormDemo form={repeaters} />
+  </div>
 </DemoLayout>

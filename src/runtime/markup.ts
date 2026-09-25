@@ -20,10 +20,12 @@ import {
   toFieldSpecs,
   toSteps,
   type DecorSpec,
+  type FormCopy,
   type FormElement,
   type FormFieldSpec,
   type FormSpec,
   type MailerName,
+  type RepeaterSpec,
   type StepHeaderSpec,
 } from "../core";
 
@@ -234,6 +236,44 @@ export function renderDecor(decor: DecorSpec): string {
   }
 }
 
+/* ---- Repeaters (dynamic row groups) ---- */
+
+/**
+ * Render a repeater: a `<fieldset class="rf-repeater">` holding `max(1,
+ * minRows)` initial rows plus add/remove buttons the client engine wires
+ * (`data-add-row` / `data-remove-row`). Every row repeats the row-template
+ * fields under a row-scoped id prefix (`{idPrefix}__{name}-row{i}`) so ids
+ * stay unique across rows — the engine's add-row clones re-index by rewriting
+ * the `-row{i}__` token. A hidden sentinel input per row (`name` = the
+ * repeater's own name) is how `canonicalData` reconstructs row boundaries
+ * from tree-ordered FormData without renaming the row fields themselves.
+ */
+export function renderRepeater(repeater: RepeaterSpec, idPrefix = "", copy: FormCopy = {}): string {
+  const rows = Math.max(1, repeater.minRows ?? 0);
+  const addLabel = repeater.addLabel ?? copy.addRow ?? "Add another";
+  const removeLabel = repeater.removeLabel ?? copy.removeRow ?? "Remove";
+  const span = gridSpan(repeater.size ?? 100);
+  const row = (i: number): string =>
+    `<div class="rf-repeater-row" data-repeater-row data-row="${i}">` +
+    `<input type="hidden" name="${esc(repeater.name)}" value="${i}" data-repeater-sentinel />` +
+    renderElements(repeater.fields, `${idPrefix}__${repeater.name}-row${i}`, copy) +
+    `<button class="rf-repeater-remove" type="button" data-remove-row aria-label="${esc(removeLabel)}">${esc(removeLabel)}</button>` +
+    `</div>`;
+
+  let out =
+    `<fieldset class="rf-repeater rf-span-${span}"` +
+    ` data-repeater="${esc(repeater.name)}" data-repeater-min="${esc(repeater.minRows ?? 0)}"` +
+    `${attr("data-repeater-max", repeater.maxRows)}>` +
+    (repeater.label ? `<legend class="rf-label">${esc(repeater.label)}</legend>` : "") +
+    `<div class="rf-repeater-rows" data-repeater-rows>`;
+  for (let i = 0; i < rows; i++) out += row(i);
+  out +=
+    `</div>` +
+    `<button class="rf-repeater-add" type="button" data-add-row>+ ${esc(addLabel)}</button>` +
+    `</fieldset>`;
+  return out;
+}
+
 /* ---- Element lists (was FormElements.astro) ---- */
 
 /**
@@ -270,8 +310,15 @@ export const fieldRenderProps = (field: FormFieldSpec, idPrefix: string): Render
   multiple: field.multiple,
 });
 
-/** Render one form element — a field via `renderField`, structural via `renderDecor`. */
-export function renderElement(element: FormElement, idPrefix = ""): string {
+/**
+ * Render one form element — a repeater via `renderRepeater`, a field via
+ * `renderField`, structural via `renderDecor`. The optional `copy` only feeds
+ * the repeater's add/remove button labels.
+ */
+export function renderElement(element: FormElement, idPrefix = "", copy: FormCopy = {}): string {
+  // Repeaters carry a `name`, so the `isFieldSpec` discriminator would catch
+  // them too — route them first.
+  if (element.type === "repeater") return renderRepeater(element, idPrefix, copy);
   if (isFieldSpec(element)) return renderField(fieldRenderProps(element, idPrefix));
   // Step markers are consumed by `toSteps` during layout — they never render.
   if (element.type === "step") return "";
@@ -279,8 +326,8 @@ export function renderElement(element: FormElement, idPrefix = ""): string {
 }
 
 /** Render an ordered list of elements (the layout zones: shared, panes, hoisted). */
-export function renderElements(elements: FormElement[], idPrefix = ""): string {
-  return elements.map((element) => renderElement(element, idPrefix)).join("");
+export function renderElements(elements: FormElement[], idPrefix = "", copy: FormCopy = {}): string {
+  return elements.map((element) => renderElement(element, idPrefix, copy)).join("");
 }
 
 /* ---- Form shell (was ContactForm.astro frontmatter + template) ---- */
@@ -404,7 +451,7 @@ export function renderFormShell({ form, config = {}, prefill }: ShellOptions): s
 
   if (isWizard) {
     if (layout.shared.length > 0) {
-      out += `<div class="rf-shared" data-shared>${renderElements(layout.shared, form.name)}</div>`;
+      out += `<div class="rf-shared" data-shared>${renderElements(layout.shared, form.name, form.copy)}</div>`;
     }
 
     out +=
@@ -435,12 +482,12 @@ export function renderFormShell({ form, config = {}, prefill }: ShellOptions): s
           `<h3 class="rf-heading rf-heading--${header.align}${header.line ? " rf-heading--rule" : ""}">${esc(step.title ?? step.label)}</h3>` +
           `</header>`;
       }
-      out += renderElements(step.elements, form.name);
+      out += renderElements(step.elements, form.name, form.copy);
       out += `</section>`;
     });
 
     if (layout.hoisted.length > 0) {
-      out += renderElements(layout.hoisted, form.name);
+      out += renderElements(layout.hoisted, form.name, form.copy);
     }
 
     out +=
@@ -450,7 +497,7 @@ export function renderFormShell({ form, config = {}, prefill }: ShellOptions): s
       `</div>`;
   } else {
     /* ---- single-page ---- */
-    out += renderElements(flatElements, form.name);
+    out += renderElements(flatElements, form.name, form.copy);
     out +=
       `<div class="rf-submit-row">` +
       `<button class="rf-submit rf-submit--${submitVariant}" type="submit">${esc(singleSubmitLabel)} <span aria-hidden="true">→</span></button>` +

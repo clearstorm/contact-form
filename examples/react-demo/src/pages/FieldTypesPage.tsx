@@ -5,7 +5,9 @@ import { getForm, type NamedForms } from "../lib/forms";
 
 const allFields = getForm(fieldTypesSpec as NamedForms, "All 20 field types");
 const structure = getForm(fieldTypesSpec as NamedForms, "Structural field types");
-const pageShellTitle = "every input type · structural types";
+const validationExtras = getForm(fieldTypesSpec as NamedForms, "Validation extras");
+const repeaters = getForm(fieldTypesSpec as NamedForms, "Repeat rows");
+const pageShellTitle = "every input type · structural types · repeaters";
 
 const typeRows: Array<[string, string]> = [
   ["text", "text input — required (2+ chars applies only to first_name / last_name)"],
@@ -55,9 +57,10 @@ export function FieldTypesPage() {
     <PageShell title={pageShellTitle}>
       <h1>Field types</h1>
       <p className="lead">
-        Two named forms in one spec file (<code>examples/specs/field-types.json</code>):
-        the full 20-type kitchen sink and the structural field types — every element
-        a form can render, from a text input to a section break.
+        Four named forms in one spec file (<code>examples/specs/field-types.json</code>):
+        the full 20-type kitchen sink, the structural field types, a validation-extras
+        form and a repeat-rows form — every element a form can render, from a text
+        input to a section break.
       </p>
 
       <h2>All 20 field types</h2>
@@ -129,6 +132,25 @@ export function FieldTypesPage() {
         Note the invisible spacer at the end of the structure form, which controls the
         gap before the submit row.
       </p>
+
+      <h2>Repeat rows</h2>
+      <p className="lead">
+        A <code>repeater</code> renders a row group: any field types nest inside its{" "}
+        <code>fields</code>, and the visitor can add and remove rows. Below, a team
+        members group is bounded with <code>minRows: 1</code> /{" "}
+        <code>maxRows: 3</code> (the add button disables at the ceiling, remove at the
+        floor), and an unbounded links group starts as a single row with no limit. Each
+        row validates by itself (an empty required field flags only that row), and on
+        submit every row group travels in the canonical payload as one structured JSON
+        array under its own name — an empty row is dropped (or padded back to{" "}
+        <code>minRows</code>). Row labels come from <code>addLabel</code> /{" "}
+        <code>removeLabel</code>, falling back to the form-level{" "}
+        <code>copy.addRow</code> / <code>copy.removeRow</code> keys.
+      </p>
+
+      <div className="demo-card">
+        <FormDemonstration form={repeaters} />
+      </div>
     </PageShell>
   );
 }

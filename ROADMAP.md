@@ -10,6 +10,24 @@ the code's deprecation markers — reorder, rename or drop them freely.
 
 ---
 
+## Delivered milestones (sequencing so far)
+
+The milestone sequence pursued in the current development cycle, each tracked
+in [FEATURES.md](FEATURES.md) as implemented:
+
+- **M1 — conditional logic expansion.** The newer `showWhen` operators plus
+  the `anyOf` / `noneOf` / `not` wrappers that nest freely.
+- **M2 — validation rule expansion.** `pattern`, `minLength` / `maxLength`
+  (with live character counters), `sameAs`, `minSelect` / `maxSelect`.
+- **M3 — file-upload rule bounds.** `maxSize` (bytes or `"5MB"` units),
+  `allowedTypes` MIME globs, `minFiles` / `maxFiles` counts.
+- **M4 — repeaters (row groups).** `type: "repeater"` containers holding any
+  field types, visitor add/remove rows with `minRows` / `maxRows` bounds,
+  row-scoped validation, and one structured JSON-array canonical payload
+  entry per row group.
+
+---
+
 ## v0.4.0 — Nodemailer mail-delivery adapter
 
 The README's documented follow-up ("A first-party Nodemailer delivery adapter

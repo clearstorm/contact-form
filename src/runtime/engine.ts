@@ -70,12 +70,36 @@ const setInvalid = (control: Control, message: string): void => {
 };
 
 // Checkbox/radio groups share a name — the "value" is whether any option is
-// selected, collapsed to "1" / "" before validation.
-const selectionState = (form: HTMLFormElement, name: string): string => {
-  const checked = Array.from(form.querySelectorAll<HTMLInputElement>(`input[name="${name}"]`)).some(
+// selected, collapsed to "1" / "" before validation. When `row` is given (a
+// repeater row), only that row's members count, so parallel rows don't leak
+// into each other's group state.
+const selectionState = (form: HTMLFormElement, name: string, row: HTMLElement | null = null): string => {
+  const scope = row ?? form;
+  const checked = Array.from(scope.querySelectorAll<HTMLInputElement>(`input[name="${name}"]`)).some(
     (el) => el.checked,
   );
   return checked ? "1" : "";
+};
+
+/**
+ * Trimmed, non-empty values of the controls named `name` within `root` (the
+ * form, or a single repeater row). Checkbox/radio groups contribute only
+ * their checked option values; controls inside a hidden wrapper contribute
+ * nothing (so chains stay predictable); file inputs can't drive values.
+ */
+const valuesWithin = (root: ParentNode, name: string, isHidden: (control: Control) => boolean): string[] => {
+  const values: string[] = [];
+  for (const control of root.querySelectorAll<Control>("input, select, textarea")) {
+    if (control.name !== name || isHidden(control)) continue;
+    if (control instanceof HTMLInputElement && control.type === "file") continue;
+    if (control instanceof HTMLInputElement && control.type === "checkbox") {
+      if (control.checked && control.value.trim()) values.push(control.value.trim());
+    } else {
+      const value = control.value.trim();
+      if (value) values.push(value);
+    }
+  }
+  return values;
 };
 
 /* ---- Conditional fields (showWhen) ---- */
@@ -115,21 +139,7 @@ const createVisibilityEngine = (
   // Trimmed, non-empty values of the controls named `name`. Checkbox/radio
   // groups contribute only their checked option values; controls inside a
   // currently-hidden wrapper contribute nothing (so chains stay predictable).
-  const valuesOf = (name: string): string[] => {
-    const values: string[] = [];
-    for (const control of form.querySelectorAll<Control>("input, select, textarea")) {
-      if (control.name !== name || isHiddenControl(control)) continue;
-      // File inputs can't sensibly drive conditions — skip them.
-      if (control instanceof HTMLInputElement && control.type === "file") continue;
-      if (control instanceof HTMLInputElement && control.type === "checkbox") {
-        if (control.checked && control.value.trim()) values.push(control.value.trim());
-      } else {
-        const value = control.value.trim();
-        if (value) values.push(value);
-      }
-    }
-    return values;
-  };
+  const valuesOf = (name: string): string[] => valuesWithin(form, name, isHiddenControl);
 
   const currentValues = (): Record<string, string[]> =>
     Object.fromEntries([...controllerNames].map((name) => [name, valuesOf(name)]));
@@ -145,18 +155,29 @@ const createVisibilityEngine = (
   };
 
   // A control is out of scope while its field wrapper is hidden — it is not
-  // validated, not sent, and does not drive other conditions.
+  // validated, not sent, and does not drive other conditions. Repeater rows
+  // carry their controls in `.rf-repeater-row` wrappers rather than a
+  // `.rf-field`, so a hidden repeater fieldset hides every row's controls too.
   const isHiddenControl = (control: Control): boolean => {
     const wrapper = control.closest<HTMLElement>(".rf-field");
-    return wrapper !== null && (wrapper.hidden || wrapper.classList.contains("rf-field--hidden"));
+    if (wrapper !== null && (wrapper.hidden || wrapper.classList.contains("rf-field--hidden"))) return true;
+    const repeater = control.closest<HTMLElement>("[data-repeater]");
+    return repeater !== null && (repeater.hidden || repeater.classList.contains("rf-field--hidden"));
   };
 
   const apply = (): void => {
     if (visibilityByField.size === 0) return;
     const values = currentValues();
     for (const [fieldName, conditions] of visibilityByField) {
+      const field = fields.find((candidate) => candidate.name === fieldName);
+      // Scalar fields live in a `.rf-field` wrapper; repeater fields wrap
+      // themselves in a `<fieldset data-repeater="…">`. Both toggle the same
+      // hidden state and clear their in-scope errors when hidden.
       const control = form.querySelector<Control>(`[name="${CSS.escape(fieldName)}"]`);
-      const wrapper = control?.closest<HTMLElement>(".rf-field");
+      const wrapper =
+        field?.type === "repeater"
+          ? form.querySelector<HTMLElement>(`[data-repeater="${CSS.escape(fieldName)}"]`)
+          : (control?.closest<HTMLElement>(".rf-field") ?? null);
       if (!wrapper) continue;
       const visible = evaluateVisibility(conditions, values);
       const wasHidden = wrapper.hidden || wrapper.classList.contains("rf-field--hidden");
@@ -191,9 +212,11 @@ const createVisibilityEngine = (
  * The field's own current values for RuleContext.selfValues: every checked
  * option of a checkbox/radio group, every selected option of a multi-select,
  * else the single trimmed value. Required by the `minSelect`/`maxSelect`
- * rules; the collapsed "1"/"" string is what the required check reads.
+ * rules; the collapsed "1"/"" string is what the required check reads. When
+ * `row` is given (a repeater row), the group's members are those of that row
+ * only, so parallel rows validate their own selections.
  */
-const selfValuesFor = (control: Control, form: HTMLFormElement): string[] => {
+const selfValuesFor = (control: Control, form: HTMLFormElement, row: HTMLElement | null = null): string[] => {
   if (control instanceof HTMLSelectElement) {
     return control.multiple
       ? Array.from(control.selectedOptions).map((o) => o.value.trim()).filter(Boolean)
@@ -201,8 +224,9 @@ const selfValuesFor = (control: Control, form: HTMLFormElement): string[] => {
   }
   if (control instanceof HTMLInputElement && control.type === "file") return [];
   if (control instanceof HTMLInputElement && (control.type === "checkbox" || control.type === "radio")) {
+    const scope = row ?? form;
     return Array.from(
-      form.querySelectorAll<HTMLInputElement>(`input[name="${CSS.escape(control.name)}"]`),
+      scope.querySelectorAll<HTMLInputElement>(`input[name="${CSS.escape(control.name)}"]`),
     )
       .filter((el) => el.checked)
       .map((el) => el.value.trim())
@@ -216,6 +240,7 @@ const validateField = (
   rule: Rule | undefined,
   form: HTMLFormElement,
   getValues?: () => Record<string, string[]>,
+  row: HTMLElement | null = null,
 ): boolean => {
   clearError(control);
   let value: string;
@@ -226,13 +251,13 @@ const validateField = (
     control instanceof HTMLInputElement &&
     (control.type === "checkbox" || control.type === "radio")
   ) {
-    value = selectionState(form, control.name);
+    value = selectionState(form, control.name, row);
   } else {
     value = control instanceof HTMLSelectElement ? control.value : control.value.trim();
   }
   const ctx: RuleContext = {
     values: getValues?.() ?? {},
-    selfValues: selfValuesFor(control, form),
+    selfValues: selfValuesFor(control, form, row),
     // File bounds (maxSize / allowedTypes / minFiles / maxFiles) read the
     // attached files' descriptors — never the bytes, so no payload copies.
     files:
@@ -254,6 +279,56 @@ const updateCounter = (control: Control): void => {
   const max = counter?.dataset.max;
   if (!counter || max === undefined) return;
   counter.textContent = `${String(control.value).length} / ${max}`;
+};
+
+/* ---- Repeaters (dynamic row groups) ---- */
+
+// A block-level error pinned to a repeater fieldset (its row count left
+// minRows..maxRows). It is appended straight under the fieldset — outside any
+// `.rf-field` — so it never collides with a row's per-control error.
+const findRepeaterError = (repeater: HTMLElement): HTMLElement | null =>
+  Array.from(repeater.children).find(
+    (el): el is HTMLElement => el.classList.contains("rf-repeater-error"),
+  ) ?? null;
+
+const clearRepeaterErrors = (scope: ParentNode): void => {
+  scope.querySelectorAll(".rf-repeater-error").forEach((el) => el.remove());
+};
+
+const showRepeaterError = (repeater: HTMLElement, message: string): void => {
+  let el = findRepeaterError(repeater);
+  if (!el) {
+    el = document.createElement("p");
+    el.className = "rf-field-error rf-repeater-error";
+    repeater.appendChild(el);
+  }
+  el.textContent = message;
+};
+
+/**
+ * Re-index a cloned repeater row. The markup stamps each row's ids with a
+ * `-row{i}__` token (`{prefix}__{repeater}-row{i}__{field}`), so a clone must
+ * rewrite that token — plus its own `data-row` and sentinel value — to its new
+ * index, keeping ids unique across rows. `for` / `aria-labelledby` / `list`
+ * point at ids, so they are rewritten too.
+ */
+const reindexRow = (clone: HTMLElement, index: number): void => {
+  const from = clone.dataset.row ?? "0";
+  clone.dataset.row = String(index);
+  const sentinel = clone.querySelector<HTMLInputElement>("[data-repeater-sentinel]");
+  if (sentinel) sentinel.value = String(index);
+  const token = `-row${from}__`;
+  const next = `-row${index}__`;
+  const rewrite = (el: Element): void => {
+    for (const attrName of ["id", "for", "aria-labelledby", "list"] as const) {
+      const attr = el.getAttribute(attrName);
+      if (attr && attr.includes(token)) el.setAttribute(attrName, attr.split(token).join(next));
+    }
+  };
+  clone.querySelectorAll<Element>("[id]").forEach(rewrite);
+  clone.querySelectorAll<Element>("[for]").forEach(rewrite);
+  clone.querySelectorAll<Element>("[aria-labelledby]").forEach(rewrite);
+  clone.querySelectorAll<Element>("[list]").forEach(rewrite);
 };
 
 /* ---- Status box ---- */
@@ -287,6 +362,8 @@ async function handleSubmit(
   copy: FormCopy,
   visibility: VisibilityEngine,
   scopedControls?: Control[],
+  /** Row-aware per-control validation (supplied by `attachForm`). */
+  validateControl?: (control: Control) => boolean,
 ): Promise<void> {
   const form = event.currentTarget;
   if (!(form instanceof HTMLFormElement)) return;
@@ -323,15 +400,43 @@ async function handleSubmit(
   // Fields inside hidden wrappers are out of scope — a hidden conditional
   // field can never block the form, and it never reaches the payload.
   const scoped = controls.filter((control) => !visibility.isHiddenControl(control));
-  const getValues = (): Record<string, string[]> => visibility.allValues();
 
-  const invalidControls = scoped.filter(
-    (control) => !validateField(control, rules[control.name], form, getValues),
-  );
+  const validate = validateControl ?? ((control: Control) => validateField(control, rules[control.name], form, () => visibility.allValues()));
+
+  const invalidControls = scoped.filter((control) => !validate(control));
 
   if (invalidControls.length > 0) {
     invalidControls[0].focus();
     return;
+  }
+
+  // Repeaters must hold minRows..maxRows rows — normally enforced by the
+  // add/remove button bounds, but a stale clone or a tight spec could get
+  // here, so guard the submitted state (defence-in-depth; disabled buttons
+  // already prevent it in normal use).
+  clearRepeaterErrors(form);
+  for (const repeaterEl of Array.from(form.querySelectorAll<HTMLElement>("[data-repeater]"))) {
+    if (repeaterEl.hidden || repeaterEl.classList.contains("rf-field--hidden")) continue;
+    const repeaterName = repeaterEl.dataset.repeater ?? "";
+    const specField = fields.find((field) => field.name === repeaterName);
+    const min = Number(repeaterEl.dataset.repeaterMin ?? 0);
+    const max = repeaterEl.dataset.repeaterMax ? Number(repeaterEl.dataset.repeaterMax) : Infinity;
+    const count = repeaterEl.querySelectorAll<HTMLElement>("[data-repeater-row]").length;
+    if (count < min) {
+      const defaultMin =
+        min === 1 ? "Please add at least 1 row." : `Please add at least ${min} rows.`;
+      showRepeaterError(repeaterEl, specField?.message ?? defaultMin);
+      (repeaterEl.querySelector<HTMLElement>("[data-add-row]") ?? repeaterEl.querySelector<HTMLElement>("input, select, textarea"))?.focus();
+      return;
+    }
+    if (count > max) {
+      const overshoot = count - max;
+      const defaultMax =
+        overshoot === 1 ? "Please remove at least 1 row." : `Please remove at least ${overshoot} rows.`;
+      showRepeaterError(repeaterEl, specField?.message ?? defaultMax);
+      (repeaterEl.querySelector<HTMLElement>("[data-remove-row]") ?? repeaterEl.querySelector<HTMLElement>("input, select, textarea"))?.focus();
+      return;
+    }
   }
 
   const originalLabel = button?.textContent ?? "";
@@ -363,6 +468,7 @@ async function handleSubmit(
       showSuccess(status, successMessage);
       form.reset();
       controls.forEach((control) => clearError(control));
+      clearRepeaterErrors(form);
       // replace mode — the success box takes the form's place entirely.
       if (form.dataset.statusMode === "replace") {
         form.classList.add("rf-form--success");
@@ -486,6 +592,48 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): () 
     el instanceof HTMLTextAreaElement ||
     el instanceof HTMLSelectElement;
 
+  /* ---- Repeaters (dynamic row groups): row-scoped validation ---- */
+
+  // Repeater rules are keyed `{repeater}.{inner}` in `buildRules`; the row
+  // the control sits in tells us which repeater's qualified lookup to use.
+  // Cross-field rules inside a row read the row's *own* values (parallel rows
+  // stay separate: a confirm-email matches the email of its own row).
+  const repeaterInnerNames = new Map<string, Set<string>>();
+  for (const field of fields) {
+    if (field.type === "repeater" && field.repeater) {
+      repeaterInnerNames.set(field.name, new Set(field.repeater.map((inner) => inner.name)));
+    }
+  }
+
+  const ruleForControl = (control: Control): Rule | undefined => {
+    const row = control.closest<HTMLElement>("[data-repeater-row]");
+    const repeater = row?.closest<HTMLElement>("[data-repeater]");
+    if (row && repeater) return rules[`${repeater.dataset.repeater}.${control.name}`];
+    return rules[control.name];
+  };
+
+  const rowValues = (row: HTMLElement): Record<string, string[]> => {
+    const innerNames = repeaterInnerNames.get(row.closest<HTMLElement>("[data-repeater]")?.dataset.repeater ?? "");
+    const global = visibility.allValues();
+    if (!innerNames || innerNames.size === 0) return global;
+    const scoped: Record<string, string[]> = {};
+    for (const [key, value] of Object.entries(global)) {
+      // Keep every cross-repeater/outer value, then override the row's own
+      // inner names with this row's values (all rows share inner names).
+      if (!innerNames.has(key)) scoped[key] = value;
+    }
+    for (const innerName of innerNames) {
+      const values = valuesWithin(row, innerName, visibility.isHiddenControl);
+      if (values.length) scoped[innerName] = values;
+    }
+    return scoped;
+  };
+
+  const validateControl = (control: Control): boolean => {
+    const row = control.closest<HTMLElement>("[data-repeater-row]");
+    return validateField(control, ruleForControl(control), form, row ? () => rowValues(row) : getValues, row);
+  };
+
   /* ---- Wizard (multi-step) state ----
      Panes and the shared prefix all stay in the DOM (hidden + inert), so
      cross-step showWhen conditions keep reading earlier steps' values and
@@ -555,7 +703,7 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): () 
 
   on(form, "submit", (event) => {
     if (!isWizard) {
-      void handleSubmit(event, fields, rules, mailerName, successMessage, copy, visibility);
+      void handleSubmit(event, fields, rules, mailerName, successMessage, copy, visibility, undefined, validateControl);
       return;
     }
     // Wizard: the submit button advances the current step; the last step
@@ -566,7 +714,7 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): () 
     );
     if (currentStep < stepCount - 1) {
       event.preventDefault();
-      const invalid = stepControls.filter((control) => !validateField(control, rules[control.name], form, getValues));
+      const invalid = stepControls.filter((control) => !validateControl(control));
       if (invalid.length > 0) {
         invalid[0].focus();
         return;
@@ -574,7 +722,7 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): () 
       goTo(currentStep + 1);
       return;
     }
-    void handleSubmit(event, fields, rules, mailerName, successMessage, copy, visibility, stepControls);
+    void handleSubmit(event, fields, rules, mailerName, successMessage, copy, visibility, stepControls, validateControl);
   });
 
   // Stepper: completed steps are clickable and jump back without validation
@@ -620,39 +768,122 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): () 
     }
   }
 
-  form.querySelectorAll<Control>("input, select, textarea").forEach((control) => {
-    const fieldRules = rules[control.name];
+  // Per-control re-validation: wiring is extracted into `wireControl` so
+  // cloned repeater rows can wire their controls the same way. Group lookups
+  // (checkbox/radio siblings, `sameAs` dependents) scope to the control's
+  // repeater row when it lives in one.
+  const wireControl = (control: Control): void => {
     const onInput = (): void => {
       // Re-validate on change once a field has been flagged invalid.
-      if (control.hasAttribute("aria-invalid")) validateField(control, fieldRules, form, getValues);
+      if (control.hasAttribute("aria-invalid")) validateControl(control);
       // Shared-name groups (checkbox/radio): selection count is group-level,
       // so re-check flagged siblings too when one member changes.
+      const row = control.closest<HTMLElement>("[data-repeater-row]");
       const group =
         control instanceof HTMLInputElement &&
         (control.type === "checkbox" || control.type === "radio")
-          ? form.querySelectorAll<Control>(`input[name="${CSS.escape(control.name)}"]`)
+          ? (row ?? form).querySelectorAll<Control>(`input[name="${CSS.escape(control.name)}"]`)
           : null;
       if (group) {
         for (const sibling of Array.from(group)) {
           if (sibling === control || !sibling.hasAttribute("aria-invalid")) continue;
-          validateField(sibling, rules[sibling.name], form, getValues);
+          validateControl(sibling);
         }
       }
       updateCounter(control);
       // A `sameAs` target changed — re-check flagged dependents, which only
-      // had their first error without a live peer to compare against.
+      // had their first error without a live peer to compare against. Inside
+      // a repeater the dependent lives in the same row as its target.
       const dependents = sameAsDependents.get(control.name);
       if (dependents) {
+        const scope = row ?? form;
         for (const depName of dependents) {
-          const depControl = form.querySelector<Control>(`[name="${CSS.escape(depName)}"]`);
+          const depControl = scope.querySelector<Control>(`[name="${CSS.escape(depName)}"]`);
           if (!depControl || !depControl.hasAttribute("aria-invalid")) continue;
-          validateField(depControl, rules[depName], form, getValues);
+          validateControl(depControl);
         }
       }
     };
     on(control, "input", onInput);
     on(control, "change", onInput);
-  });
+  };
+
+  form.querySelectorAll<Control>("input, select, textarea").forEach((control) => wireControl(control));
+
+  /* ---- Repeaters (dynamic row groups): row add/remove ---- */
+
+  // The markup renders the initial rows (max(1, minRows)) already; the engine
+  // owns row add/remove. The first row is the clone template — cloned rows
+  // re-index their ids, drop values/errors, wire their controls and re-sync
+  // the button bounds.
+  const configureRepeater = (repeaterEl: HTMLElement): void => {
+    const name = repeaterEl.dataset.repeater ?? "";
+    const minRows = Number(repeaterEl.dataset.repeaterMin ?? 0);
+    const maxRows = repeaterEl.dataset.repeaterMax ? Number(repeaterEl.dataset.repeaterMax) : Infinity;
+    const rowsRoot = repeaterEl.querySelector<HTMLElement>("[data-repeater-rows]");
+    const addBtn = repeaterEl.querySelector<HTMLButtonElement>("[data-add-row]");
+    if (!rowsRoot) return;
+
+    const rowCount = (): number => rowsRoot.querySelectorAll<HTMLElement>("[data-repeater-row]").length;
+
+    const sync = (): void => {
+      const count = rowCount();
+      if (addBtn) {
+        const atMax = count >= maxRows;
+        addBtn.disabled = atMax;
+        addBtn.setAttribute("aria-disabled", String(atMax));
+      }
+      for (const removeBtn of Array.from(rowsRoot.querySelectorAll<HTMLButtonElement>("[data-remove-row]"))) {
+        const atMin = count <= minRows;
+        removeBtn.disabled = atMin;
+        removeBtn.setAttribute("aria-disabled", String(atMin));
+      }
+      clearRepeaterErrors(repeaterEl);
+    };
+
+    const addRow = (): void => {
+      if (rowCount() >= maxRows) return;
+      const template = rowsRoot.querySelector<HTMLElement>("[data-repeater-row]");
+      if (!template) return;
+      const clone = template.cloneNode(true) as HTMLElement;
+      // Reset the template row's state first: values, selection, errors,
+      // flags, counters — the visitor's input (or row 0's errors) must not
+      // copy. Re-index afterwards so the rewire (ids, row markers, sentinel)
+      // reflects the clone's final index.
+      for (const control of Array.from(clone.querySelectorAll<Control>("input, select, textarea"))) {
+        if (control instanceof HTMLInputElement && control.type === "file") control.value = "";
+        else if (control instanceof HTMLInputElement && (control.type === "checkbox" || control.type === "radio")) control.checked = false;
+        else control.value = "";
+        updateCounter(control);
+      }
+      clone.querySelectorAll(".rf-field-error, .rf-repeater-error").forEach((el) => el.remove());
+      clone.querySelectorAll("[aria-invalid]").forEach((el) => el.removeAttribute("aria-invalid"));
+      clone.querySelectorAll(".rf-input-invalid").forEach((el) => el.classList.remove("rf-input-invalid"));
+      reindexRow(clone, rowCount());
+      rowsRoot.appendChild(clone);
+      for (const control of Array.from(clone.querySelectorAll<Control>("input, select, textarea"))) wireControl(control);
+      sync();
+    };
+
+    if (addBtn) on(addBtn, "click", addRow);
+
+    // Delegated remove on the persistent rows container — one listener covers
+    // every row, present and cloned (no per-row rebinding on add).
+    on(rowsRoot, "click", (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const removeBtn = target.closest<HTMLElement>("[data-remove-row]");
+      if (!removeBtn) return;
+      const row = removeBtn.closest<HTMLElement>("[data-repeater-row]");
+      if (!row || rowCount() <= minRows) return;
+      row.remove();
+      sync();
+    });
+
+    sync();
+  };
+
+  form.querySelectorAll<HTMLElement>("[data-repeater]").forEach(configureRepeater);
 
   // Step forms start on the first step: normalise the stepper state, the
   // footer labels ("Next" until the final step) and any conditional fields.

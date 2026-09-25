@@ -247,7 +247,10 @@ verbatim; every other spec field folds into `message` as a `Label: value`
 line (times normalised to 24h); `subject` becomes
 `"{subject} — {first name} {last name}"` so replies can be addressed. A filled
 honeypot field is never forwarded; checkbox groups are joined as
-`value1, value2`.
+`value1, value2`. Repeater row groups fold in as **one `Label: …` line per
+group** — the row array JSON on a single line — and file fields inside rows
+travel best-effort as their filenames (only top-level file fields re-attach
+their real bytes).
 
 ---
 
@@ -333,6 +336,51 @@ never blocks submit; `optional: true` additionally renders a muted
 “(optional)” suffix on the label so visitors know they can skip it.
 `/field-types`'s “All 20 field types” form and the wizard's “Every field type” form pair required and
 `optional: true` instances of every optional-capable type side by side.
+
+---
+
+## Repeaters (row groups)
+
+A `repeater` element lets any field types repeat as rows the visitor can add
+and remove — a team-member list, a set of named links, an order line table:
+
+```jsonc
+{
+  "type": "repeater",
+  "id": "members",
+  "name": "members",               // payload key: one JSON array of rows
+  "minRows": 1,                     // default 0 — a bound floors the row count;
+                                    //   the renderer always starts max(1, minRows)
+  "maxRows": 3,                     // omitted = unbounded
+  "addLabel": "Add a team member",  // falls back to copy.addRow, then “Add another”
+  "fields": [
+    { "type": "text",  "name": "member_name", "label": "Name",  "required": true },
+    { "type": "email", "name": "member_email", "label": "Email", "required": true }
+  ]
+}
+```
+
+`fields` nests any field types (validation keys included — they resolve per
+row). The shared script renders one starter row (or `minRows`) and an
+`+ Add` / `Remove` button per row; `maxRows` disables add at the ceiling and
+`minRows` disables remove at the floor. Rows validate **in isolation** — an
+empty required field flags only its own row, and cross-field rules (`sameAs`,
+`minSelect`/`maxSelect`) stay scoped to the row's own values. A submit that
+would land outside `minRows`/`maxRows` is blocked with a block-level row-count
+error. Repeaters nest the same rules as any other spec field: `showWhen`
+conditionally hides a repeater as a whole (its rows validate and submit only
+while visible). Repeaters don't nest inside repeaters, and — being a
+DOM-engine feature — row groups aren't driven by the TanStack bridge or the
+Zod adapter (scalar-only bindings skip the container; the DOM engine owns row
+validation).
+
+**Payload:** each row group submits as **one structured JSON array** under its
+own `name` — the `json` mailer sends
+`"members": "[{\"member_name\":\"Jane\",\"member_email\":\"jane@…\"}, …]"`.
+Inner fields keep their plain names inside each row object, multiple values
+are comma-joined, and file fields inside rows travel as their filenames.
+Entirely empty rows are dropped (a `minRows` bound pads the count back to the
+floor). The cf7 mailer folds each array onto one `Label: …` line.
 
 ---
 
@@ -617,6 +665,8 @@ built-in default**. Put project-specific copy in the form spec:
 | `invalidForm` | mailer validation failure, no details | `Some fields need your attention. Please check the form.` |
 | `configError` | missing endpoint config | varies by mailer |
 | `submitError` | HTTP-error fallback (`{status}` token) | `Submission failed (HTTP {status}). Please try again.` |
+| `addRow` | repeater “add a row” button (falls back per-repeater to its `addLabel`, then this key) | `Add another` |
+| `removeRow` | repeater “remove this row” button (falls back per-repeater to its `removeLabel`, then this key) | `Remove` |
 
 ---
 

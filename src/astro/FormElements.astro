@@ -6,7 +6,7 @@
  * markers here (consumed by `toSteps`); every element is a field or a decor.
  */
 import { renderElements } from "../runtime/markup";
-import type { FormElement } from "../core";
+import type { FormCopy, FormElement } from "../core";
 
 interface Props {
   elements: FormElement[];
@@ -17,9 +17,11 @@ interface Props {
    * payloads) are untouched. Defaults to no prefix.
    */
   idPrefix?: string;
+  /** Form-level copy overrides — feeds repeater add/remove button labels. */
+  copy?: FormCopy;
 }
 
-const { elements, idPrefix = "" } = Astro.props;
+const { elements, idPrefix = "", copy = {} } = Astro.props;
 ---
 
-<Fragment set:html={renderElements(elements, idPrefix)} />
+<Fragment set:html={renderElements(elements, idPrefix, copy)} />

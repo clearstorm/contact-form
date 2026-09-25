@@ -84,6 +84,11 @@ export function zodValidation(schema: ZodObjectLike): ValidationProvider {
       const rules = vanillaValidation.buildRules(fields, copy);
       for (const field of fields) {
         if (field.type === "hidden") continue;
+        // Repeaters are row-group containers, not scalar inputs — their rules
+        // flatten under `{repeater}.{inner}` and are already in the vanilla
+        // base; there is no single scalar zodField for a row group, so leave
+        // them to the vanilla rules (the DOM engine owns row validation).
+        if (field.type === "repeater") continue;
         const zodField = schema.shape[field.name];
         if (!zodField) continue;
         rules[field.name] = {

@@ -520,7 +520,7 @@ floor). The cf7 mailer folds each array onto one `Label: …` line.
 
 ---
 
-## Structural field types (headings, descriptions, dividers, sections)
+## Structural field types (headings, descriptions, dividers, sections, callouts, html)
 
 `fields` is the ordered layout of the form — it mixes data fields with the
 **structural field types** that shape the page without taking input. They
@@ -535,7 +535,10 @@ the payload, and never reach the shared script.
   { "type": "section",    "label": "Contact details" },                     // section break, centered label
   { "type": "text",       "id": "name", "name": "name", "label": "Name" },  // real field
   { "type": "divider" },                                                     // thin rule
-  { "type": "divider",    "visible": false, "min": "2rem" }                 // invisible spacer (rhythm control)
+  { "type": "divider",    "visible": false, "min": "2rem" },                 // invisible spacer (rhythm control)
+  // M10 structural additions:
+  { "type": "callout", "text": "We only reply to real enquiries.", "variant": "info" }, // note box
+  { "type": "html", "html": "<details><summary>Consent</summary>…</details>" }           // raw block (see below)
 ]
 ```
 
@@ -545,14 +548,25 @@ the payload, and never reach the shared script.
 | `description` | `text`, optional `size` (100 \| 90 \| 80 \| 75 \| 70 \| 67 \| 60 \| 50 \| 40 \| 33 \| 30 \| 25 \| 20 \| 10, default 100) | muted helper text sharing the field grid spans |
 | `divider` | optional `visible` (default `true`), optional `min` (CSS length) | thin rule, or with `visible: false` an invisible spacer |
 | `section` | optional `label` | section break; the label sits centered on the rule |
+| `callout` | `text`, optional `variant` (`info` \| `warning` \| `success` \| `danger`, default `info`) | highlighted note (`<div class="rf-callout rf-callout--{variant}" role="note">`), tinted via `--rf-callout-*` tokens |
+| `html` | `html` — **verbatim**, see the sanitization note below | raw block (`<div class="rf-html rf-span-12">`) for arbitrary embedded content |
+
+**Sanitization is your responsibility.** `html` is the package's one deliberate
+carve-out from the escape-everything rule: the string is passed through
+verbatim so you can embed tables, `details`/`summary`, inline SVGs, whatever
+you need. Never place untrusted visitor input there without running it through
+a sanitizer first (e.g. DOMPurify on the server or client) — the package does
+zero sanitization on purpose. Every other structural `text` (including
+`callout`'s) *is* escaped on render.
 
 Styling follows the same theme system with dedicated tokens —
-`--rf-heading-*`, `--rf-description-*`, `--rf-divider-*`, `--rf-section-*`
-(see [Theming](#theming-rf-custom-properties)).
+`--rf-heading-*`, `--rf-description-*`, `--rf-divider-*`, `--rf-section-*`,
+`--rf-callout-*` (see [Theming](#theming-rf-custom-properties)).
 
 > Live demo: `/field-types` renders the “Structural field types” named form in
 > [`examples/specs/field-types.json`](examples/specs/field-types.json) — all
-> four structural types in one form.
+> six structural types in one form; the wizard demos a consent `html` block +
+> `success` callout on its last step.
 
 ---
 

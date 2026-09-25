@@ -322,6 +322,46 @@
     color: var(--rf-section-label-color, var(--rf-muted, #6b7280));
   }
 
+  .rf-callout {
+    grid-column: span 12;
+    padding: var(--rf-callout-padding, 0.7rem 0.9rem);
+    margin: var(--rf-callout-margin, 0.25rem 0 0);
+    border: 1px solid var(--rf-callout-border, #c7d2fe);
+    border-radius: var(--rf-callout-radius, 0.35rem);
+    background: var(--rf-callout-bg, #eef2ff);
+    color: var(--rf-callout-color, #312e81);
+    font-size: var(--rf-callout-font-size, 0.85rem);
+    line-height: 1.45;
+  }
+
+  /* Variant tones — wall the palette behind tokens so a theme only overrides
+     variables, never selectors. */
+  .rf-callout--warning {
+    background: var(--rf-callout-warning-bg, #fefce8);
+    border-color: var(--rf-callout-warning-border, #fde047);
+    color: var(--rf-callout-warning-color, #713f12);
+  }
+
+  .rf-callout--success {
+    background: var(--rf-callout-success-bg, #f0fdf4);
+    border-color: var(--rf-callout-success-border, #86efac);
+    color: var(--rf-callout-success-color, #166534);
+  }
+
+  .rf-callout--danger {
+    background: var(--rf-callout-danger-bg, #fef2f2);
+    border-color: var(--rf-callout-danger-border, #fca5a5);
+    color: var(--rf-callout-danger-color, #7f1d1d);
+  }
+
+  /* Raw-HTML blocks are full-width within the row by default; embedded
+     content (tables, details, consent boxes) styles itself. */
+  .rf-html {
+    grid-column: span 12;
+    font-size: var(--rf-description-size, 0.82rem);
+    color: var(--rf-description-color, var(--rf-muted, #6b7280));
+  }
+
 /* ---- Contact form shell (namespaced; themeable via --rf-* custom props) ---- */
 
   /* Default theme — generic, compact, light. Hosts override any --rf-*
@@ -403,6 +443,23 @@
     --rf-section-gap: 0.75rem;
     --rf-section-label-size: 0.78rem;
     --rf-section-label-color: #6b7280;
+    /* callout notes — the whole palette is themeable via these tokens */
+    --rf-callout-bg: #eef2ff;
+    --rf-callout-border: #c7d2fe;
+    --rf-callout-color: #312e81;
+    --rf-callout-padding: 0.7rem 0.9rem;
+    --rf-callout-margin: 0.25rem 0 0;
+    --rf-callout-radius: 0.35rem;
+    --rf-callout-font-size: 0.85rem;
+    --rf-callout-warning-bg: #fefce8;
+    --rf-callout-warning-border: #fde047;
+    --rf-callout-warning-color: #713f12;
+    --rf-callout-success-bg: #f0fdf4;
+    --rf-callout-success-border: #86efac;
+    --rf-callout-success-color: #166534;
+    --rf-callout-danger-bg: #fef2f2;
+    --rf-callout-danger-border: #fca5a5;
+    --rf-callout-danger-color: #7f1d1d;
   }
 
   .rf-form {

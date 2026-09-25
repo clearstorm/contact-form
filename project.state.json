@@ -6,7 +6,9 @@
   "features": {
     "json-spec": { "status": "implemented", "notes": "FormSpec / FormFieldSpec / FormElement — the JSON source of truth." },
     "field-types-20": { "status": "implemented", "notes": "All 20 field types with rendering + validation." },
-    "structural-types": { "status": "implemented", "notes": "heading, description, divider, section — render-only, never validated or sent." },
+    "structural-types": { "status": "implemented", "notes": "heading, description, divider, section, callout, html — render-only, never validated or sent." },
+    "struct-callout": { "status": "implemented", "notes": "callout note block: rf-callout rf-callout--{variant} role=note, escaped text, --rf-callout-* tokens per variant (info/warning/success/danger)." },
+    "struct-html": { "status": "implemented", "notes": "html embed block: rf-html rf-span-12 wrapping the string verbatim (escape-EVERYWHERE carve-out — consumer sanitizes), fixture-pinned, dropped from the client spec." },
     "wizard-steps": { "status": "implemented", "notes": "step markers, shared prefix, hoisted hidden fields, step-scoped validation." },
     "stepper-chrome": { "status": "implemented", "notes": "stepper.nav + stepper.header, per-marker overrides, clickable completed steps." },
     "conditional-steps": { "status": "implemented", "notes": "showWhen on step markers — skipped panes hidden + inert, struck-through rf-step--skipped chip, out of validation/payload/chains; authored indices stable, traversal walks the visible sequence, rf:step-change total = visible count, current-step-skipped reflows, re-reveal flips the final button back to a submit." },

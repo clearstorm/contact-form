@@ -353,6 +353,11 @@
         "size": 100
       },
       {
+        "type": "callout",
+        "text": "Haven't found a field type you need? The `html` block lets you embed pretty much anything — see the wizard's consent notice.",
+        "variant": "info"
+      },
+      {
         "type": "heading",
         "text": "Anything else?",
         "line": false,

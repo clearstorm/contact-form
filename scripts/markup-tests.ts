@@ -15,7 +15,7 @@
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { parseFieldSpec, serializeRules, toFieldSpecs, type FormSpec } from "../src/core";
-import { renderDecor, renderField, renderFormShell, renderRepeater } from "../src/runtime/markup";
+import { renderCallout, renderDecor, renderField, renderFormShell, renderHtml, renderRepeater } from "../src/runtime/markup";
 
 const RECORD = process.env.RECORD === "1";
 
@@ -409,6 +409,30 @@ const mailerDirectSpec: FormSpec = {
 
 /* ---- standalone builder cases ---- */
 
+// M10: structural `callout` + `html` inside a full shell — pins both the
+// decor route (they render through renderElement like every element) and the
+// drop-from-client-spec behaviour (no data-rules entry for either).
+const structSpec: FormSpec = {
+  name: "snapshot-struct",
+  mailer: "json",
+  submit: "Send",
+  status: "Thanks.",
+  endpoint: "https://example.test/send",
+  fields: [
+    { type: "callout", text: "We only use your data to reply to your message.", variant: "info" },
+    { type: "html", html: "<details open><summary>Consent</summary><p>By submitting you agree to the privacy policy.</p></details>" },
+    {
+      type: "text",
+      id: "name",
+      name: "name",
+      label: "Name",
+      required: true,
+      size: 50,
+    },
+    { type: "callout", text: "Deadline: end of the month.", variant: "warning" },
+  ],
+};
+
 const fieldCases: [string, string][] = [
   ["field-text", renderField({ label: "Name", id: "n", name: "name", type: "text", required: true, placeholder: "Jane", span: 6 })],
   ["field-single-checkbox", renderField({ label: "I agree", id: "c", name: "consent", type: "checkbox", required: true })],
@@ -442,6 +466,19 @@ const decorCases: [string, string][] = [
   ["decor-spacer", renderDecor({ type: "divider", visible: false, min: "3rem" })],
   ["decor-section", renderDecor({ type: "section" })],
   ["decor-section-labeled", renderDecor({ type: "section", label: "Details" })],
+  // M10: structural `callout` + `html`, pinned through both the named builders
+  // and the shared renderDecor route (so the decor path can never drift).
+  ["struct-callout", renderCallout({ type: "callout", text: "Please review the privacy notice before submitting." })],
+  ["struct-callout-warning", renderCallout({ type: "callout", text: "Notice: no raw HTML is ever interpolated here.", variant: "warning" })],
+  ["struct-callout-danger", renderDecor({ type: "callout", text: "Declined.", variant: "danger" })],
+  [
+    "struct-html",
+    renderHtml({
+      type: "html",
+      html: "<details><summary>Consent</summary><p>By submitting you agree to the <a href=\"/terms\">terms</a>.</p></details>",
+    }),
+  ],
+  ["struct-html-decor", renderDecor({ type: "html", html: "<b>verbatim</b> & <i>unescaped</i>" })],
 ];
 
 /* ---- run ---- */
@@ -468,6 +505,7 @@ const snapshots: Snapshot[] = [
   { name: "shell-autosave", html: renderFormShell({ form: autoSaveSpec }) },
   { name: "shell-mailer-config", html: renderFormShell({ form: mailerConfigSpec }) },
   { name: "shell-mailer-wpforms", html: renderFormShell({ form: mailerDirectSpec }) },
+  { name: "shell-struct", html: renderFormShell({ form: structSpec }) },
   ...fieldCases.map(([name, html]) => ({ name, html })),
   ...decorCases.map(([name, html]) => ({ name, html })),
 ];

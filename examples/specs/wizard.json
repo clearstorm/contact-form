@@ -542,6 +542,15 @@
         "show": false
       },
       {
+        "type": "html",
+        "html": "<details open><summary>How we use your data</summary><p>We reply to your enquiry by email and keep the details for <strong>30 days</strong>. We never sell or share your data. <a href=\"/privacy\">Full privacy policy</a>.</p></details>"
+      },
+      {
+        "type": "callout",
+        "text": "Submitting confirms the details above — you'll get a confirmation email.",
+        "variant": "success"
+      },
+      {
         "type": "checkbox",
         "id": "consent",
         "name": "consent",

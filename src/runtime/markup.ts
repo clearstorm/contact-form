@@ -27,6 +27,8 @@ import {
   type FormElement,
   type FormFieldSpec,
   type FormSpec,
+  type CalloutSpec,
+  type HtmlSpec,
   type RepeaterSpec,
   type StepHeaderSpec,
 } from "../core";
@@ -214,7 +216,26 @@ export function renderField(prop: RenderFieldProps): string {
 
 /* ---- Structural markup (was Decor.astro) ---- */
 
-/** Render a structural element (`heading`, `description`, `divider`, `section`). */
+/**
+ * Render a `callout` note: `<div class="rf-callout rf-callout--{variant}"
+ * role="note">` with the text escaped (same rule as every structural text).
+ * Styling is driven entirely by `--rf-callout-*` theme tokens.
+ */
+export function renderCallout(callout: CalloutSpec): string {
+  const variant = callout.variant ?? "info";
+  return `<div class="rf-callout rf-callout--${variant}" role="note">${esc(callout.text)}</div>`;
+}
+
+/**
+ * Render a raw-HTML block: `<div class="rf-html rf-span-12">` containing the
+ * spec's `html` **verbatim** — the package's one documented escape carve-out
+ * (sanitization is the consumer's responsibility; see `HtmlSpec` in core.ts).
+ */
+export function renderHtml(html: HtmlSpec): string {
+  return `<div class="rf-html rf-span-12">${html.html}</div>`;
+}
+
+/** Render a structural element (`heading`, `description`, `divider`, `section`, `callout`, `html`). */
 export function renderDecor(decor: DecorSpec): string {
   switch (decor.type) {
     case "heading": {
@@ -234,6 +255,10 @@ export function renderDecor(decor: DecorSpec): string {
         (decor.label ? `<span class="rf-section-label">${esc(decor.label)}</span>` : "") +
         `</div>`
       );
+    case "callout":
+      return renderCallout(decor);
+    case "html":
+      return renderHtml(decor);
     default:
       return "";
   }

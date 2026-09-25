@@ -379,7 +379,7 @@ export interface RepeaterSpec {
   message?: string;
 }
 
-/* ---- Structural elements (heading, description, divider, section) ---- */
+/* ---- Structural elements (heading, description, divider, section, callout, html) ---- */
 
 /**
  * Non-field elements that shape a form's layout. They render static markup
@@ -420,7 +420,45 @@ export interface SectionSpec {
   label?: string;
 }
 
-export type DecorSpec = HeadingSpec | DescriptionSpec | DividerSpec | SectionSpec;
+export type DecorSpec =
+  | HeadingSpec
+  | DescriptionSpec
+  | DividerSpec
+  | SectionSpec
+  | CalloutSpec
+  | HtmlSpec;
+
+/**
+ * A highlighted note (`role="note"`): `{ "type": "callout", "text": "…",
+ * "variant": "info" }`. Renders static markup via the `rf-callout`
+ * (`rf-callout--{variant}`) classes with `--rf-callout-*` theme tokens; like
+ * every structural element it carries no `name`, so it never validates or
+ * reaches the payload.
+ */
+export interface CalloutSpec {
+  type: "callout";
+  /** The note's text (escaped on render, like every structural text). */
+  text: string;
+  /** Visual tone (defaults to "info"): `info` | `warning` | `success` | `danger`. */
+  variant?: "info" | "warning" | "success" | "danger";
+}
+
+/**
+ * A raw-HTML block: `{ "type": "html", "html": "<details>…</details>" }`.
+ *
+ * **This is the one deliberate carve-out from the package's escape-everywhere
+ * rule:** the `html` string is passed through verbatim (only the `rf-html`
+ * wrappers are flavour text), because the point of the element is arbitrary
+ * embedded content. Sanitization is the *consumer's* responsibility — never
+ * put untrusted visitor input in `html` without running it through a
+ * sanitizer (e.g. `DOMPurify` / `isomorphic-dompurify`) first. Like other
+ * structural elements it never validates and never enters the payload.
+ */
+export interface HtmlSpec {
+  type: "html";
+  /** Verbatim HTML — escape/sanitize consumer-side (see note above). */
+  html: string;
+}
 
 /** Global defaults for a wizard step pane's header (see `StepHeaderSpec`). */
 export interface StepHeaderDefaults {
@@ -478,7 +516,10 @@ export interface StepSpec extends StepHeaderSpec {
 
 /**
  * A member of `FormSpec.fields`: a field, a structural element, a wizard
- * `step` marker, or a repeater (dynamic row group).
+ * `step` marker, or a repeater (dynamic row group). Structural elements —
+ * `heading`, `description`, `divider`, `section`, plus the M10 `callout` and
+ * `html` blocks — never carry a `name`, so they never validate, never
+ * serialise into `data-rules` and never reach the payload.
  */
 export type FormElement = FormFieldSpec | DecorSpec | StepSpec | RepeaterSpec;
 

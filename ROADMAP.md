@@ -40,6 +40,18 @@ in [FEATURES.md](FEATURES.md) as implemented:
   `copy.back` / `copy.next` label fallbacks are gone (`FormSpec.prev` /
   `FormSpec.next` are the only way to label wizard buttons) and the `66` size
   alias was removed (keep `67`).
+- **M7 — conditional wizard steps + draft persistence & prefill.** `step`
+  markers accept `showWhen`: a pane whose conditions don't hold is skipped
+  (hidden + `inert`, struck-through `rf-step--skipped` chip, out of
+  validation, the payload and cross-field chains) while authored step indices
+  never change — the engine walks a *visible* sequence for Next/Back/jumps,
+  a step that collapses underfoot reflows to a visible neighbour, and
+  re-revealing a later step flips the final button back to a submit. Plus
+  `autoSave` — debounced localStorage drafts (current wizard step, repeater
+  row counts, every visible value; restored on attach, cleared on
+  `rf:submit-success`) — and the runtime `values` prefill option that beats a
+  stored draft. The demo flagship wizard grows a conditional "Company" pane
+  and opts into `autoSave`.
 
 ---
 

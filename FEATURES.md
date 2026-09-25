@@ -20,6 +20,7 @@ Status vocabulary: `implemented` · `partial` · `planned` · `deprecated`.
 | `structural-types` | Structural field types | `heading`, `description`, `divider`, `section` — static render-only markup, never validated or sent, dropped from the client spec | implemented |
 | `wizard-steps` | Multi-step wizard via `step` markers | `toSteps` layout: shared prefix, hoisted hidden fields, pane-per-step, step-scoped "Next" validation, final-step submit | implemented |
 | `stepper-chrome` | Opt-in `stepper` key | `nav` strip (`variant`/`line`/`number`/`label`/`clickable`/`background`) + `header` pane-header defaults, per-marker overrides, clickable completed steps | implemented |
+| `conditional-steps` | Conditional wizard steps (`showWhen` on `step` markers) | A marker's `showWhen` skips its entire pane — hidden + `inert`, struck-through `rf-step--skipped` chip, excluded from validation, the payload and cross-field chains. Authored indices never change: the engine walks a *visible* sequence (Next/Back/jumps and `rf:step-change`'s `total` follow it), a current step that becomes skipped reflows to a visible neighbour, and re-revealing a later step flips the final button back to a submit | implemented |
 | `showwhen` | Conditional fields (`showWhen`) | 16 operators (equality, value-in-list, multi-value `includes`/`containsAny`/`containsAll`, numeric + lexicographic comparisons, `startsWith`/`endsWith`/`regex`, `filled`/`empty`); `anyOf` (OR) / `noneOf` (NOR) / `not` wrappers that nest; arrays AND together; hidden fields out of scope (not validated, not in payload, don't drive chains); unknown operators fail safe to hidden | implemented |
 | `parsetime` | Time normalisation | `parseTime` — 12h ("7:00 pm") and 24h ("19:30") input → 24-hour `HH:MM` for the email path | implemented |
 | `canonical-data` | Payload normalisation | `canonicalData` — trimmed values, multi-value fields comma-joined, file fields as filenames, honeypot never forwarded | implemented |
@@ -40,6 +41,13 @@ Status vocabulary: `implemented` · `partial` · `planned` · `deprecated`.
 | `event-bus` | `rf:*` event bus | Namespaced `rf:*` `CustomEvent`s on the form — `rf:fields-change`, `rf:row-add` / `rf:row-remove`, `rf:step-change`, `rf:submit-start` / `rf:submit-success` / `rf:submit-error`. `attachForm` / `renderForm` return `on(event, handler)` riding the detach-safe listener registry (native `addEventListener` parity); `initForms` collects everything | implemented |
 | `wizard-hooks` | Lifecycle hooks | `beforeValidateStep` / `afterStepChange` / `beforeSubmit` / `afterSubmit` in `attachForm` / `renderForm` options and the `react` `hooks` prop (step/submit hooks veto by returning `false`); `FormSpec.hooks` hook-ref *names* resolve against the options' named registry (specs stay serialisable); the TanStack bridge mirrors the submit hooks + `rf:submit-*` events | implemented |
 | `analytics-seam` | `createAnalytics({ adapter })` | Zero-dependency analytics seam over the `rf:*` bus: a consumer-supplied tracker (`track(event, detail)`) receives every event with its detail via `attach(form)` through native `addEventListener`; returns a detach. No fabricated events, no new `data-*` hooks — it only consumes the bus the engine emits | implemented |
+
+## Persistence & prefill — `src/runtime/persist.ts`
+
+| ID | Feature | Scope | Status |
+| --- | --- | --- | --- |
+| `autosave` | localStorage draft persistence (`autoSave`) | `autoSave: true` → key `rf:draft:{formName}`, or an explicit string key. Debounced (~400 ms) saves capture the current wizard step, repeater row counts and every visible control's value; drafts restore on attach (explicit `values` win) and clear on `rf:submit-success` (a pending save is cancelled too). localStorage is feature-detected and wrapped in try/catch — persistence never throws | implemented |
+| `prefill-values` | Runtime `values` prefill | `values?: Record<string, string \| string[]>` on `renderForm` / `attachForm` / the React `<ContactForm />` fills text-like controls, checkbox/radio groups, multi-selects and lone toggles at attach; applied after any stored draft, never serialised | implemented |
 
 ## Bindings
 

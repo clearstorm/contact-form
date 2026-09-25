@@ -714,6 +714,31 @@
     color: var(--rf-submit-text);
   }
 
+  /* Conditional steps whose `showWhen` doesn't hold (engine-set): the chip is
+     struck through, muted and permanently locked — it is never current, never
+     done and never clickable. */
+  .rf-step--skipped .rf-step-index,
+  .rf-step--skipped .rf-step-label {
+    opacity: 0.35;
+  }
+
+  .rf-step--skipped .rf-step-index {
+    text-decoration: line-through;
+  }
+
+  .rf-step--skipped .rf-step-label {
+    text-decoration: line-through;
+  }
+
+  .rf-step--skipped .rf-step-btn {
+    cursor: not-allowed;
+  }
+
+  .rf-step--skipped .rf-step-btn:hover .rf-step-index {
+    background: transparent;
+    color: var(--rf-step-color, #9ca3af);
+  }
+
   /* Step pane header — number chip + heading, reuse the heading rule tokens. */
   .rf-step-header {
     grid-column: span 12;

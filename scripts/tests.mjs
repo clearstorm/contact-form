@@ -358,6 +358,65 @@ check(
     wizardSpecNames.sort().join() === "budget,msg,name,referrer",
 );
 
+// --- 2.10b. toSteps: conditional steps (`showWhen` on a marker, M7) ---
+const conditionalLayout = toSteps([
+  { type: "select", id: "acct", name: "acct", label: "Account", options: ["Personal", "Business"] },
+  { type: "step", label: "Contact" },
+  { type: "text", id: "name", name: "name", label: "Name" },
+  { type: "step", label: "Company", showWhen: { field: "acct", operator: "equals", value: "Business" } },
+  { type: "text", id: "company", name: "company", label: "Company name" },
+  { type: "step", label: "Details", showWhen: [
+    { field: "acct", operator: "equals", value: "Business" },
+    { field: "company", operator: "filled" },
+  ] },
+  { type: "textarea", id: "msg", name: "msg", label: "Message" },
+]);
+check(
+  "toSteps: a single step condition normalises to a 1-element array",
+  JSON.stringify(conditionalLayout.steps[1].showWhen) ===
+    JSON.stringify([{ field: "acct", operator: "equals", value: "Business" }]),
+);
+check(
+  "toSteps: a step condition AND array passes through unchanged",
+  conditionalLayout.steps[2].showWhen?.length === 2,
+);
+check(
+  "toSteps: unconditional markers carry no showWhen",
+  conditionalLayout.steps[0].showWhen === undefined &&
+    wizardLayout.steps.every((s) => s.showWhen === undefined),
+);
+check(
+  "toSteps: step conditions evaluate against shared-prefix values",
+  evaluateVisibility(conditionalLayout.steps[1].showWhen ?? [], { acct: ["Business"] }) &&
+    !evaluateVisibility(conditionalLayout.steps[1].showWhen ?? [], { acct: ["Personal"] }),
+);
+// Steps still keep their authored numbers — skipping is the engine's job.
+check(
+  "toSteps: authored step indices are untouched by conditions",
+  conditionalLayout.steps.map((s) => s.label).join() === "Contact,Company,Details",
+);
+// The wiring guard warns once per offending same/later-step reference.
+{
+  const originalWarn = globalThis.console.warn;
+  const warnings = [];
+  globalThis.console.warn = (...args) => warnings.push(args.join(" "));
+  toSteps([
+    { type: "step", label: "One" },
+    { type: "step", label: "Two", showWhen: { field: "a", operator: "filled" } },
+    { type: "text", id: "a", name: "a", label: "A" },
+  ]);
+  toSteps([
+    { type: "step", label: "One" },
+    { type: "text", id: "b", name: "b", label: "B" },
+    { type: "step", label: "Two", showWhen: { field: "b", operator: "filled" } },
+  ]);
+  globalThis.console.warn = originalWarn;
+  check(
+    "toSteps warns once about a later-step condition reference",
+    warnings.length === 1 && warnings[0].includes('"a"') && !warnings[0].includes('"b"'),
+  );
+}
+
 // --- 2.11. Buttons (submit / next / prev) + step headers ---
 check("buttonLabel: plain string passes through", buttonLabel("Send", "Submit") === "Send");
 check("buttonLabel: object label wins", buttonLabel({ label: "Go", variant: "primary" }, "Submit") === "Go");

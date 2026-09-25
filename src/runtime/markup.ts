@@ -8,7 +8,10 @@
  *
  * The output mirrors what the former `.astro` templates emitted, exactly:
  * same classes, same attributes, same attribute hooks (`data-rules`,
- * `data-copy`, `data-steps`, `data-pane`, `data-step-jump`, …).
+ * `data-copy`, `data-steps`, `data-pane`, `data-step-jump`, `data-autosave`,
+ * …). The engine additionally sets runtime state on the rendered DOM:
+ * `data-step-skipped` panes and `rf-step--skipped` chips for conditional steps
+ * whose `showWhen` doesn't hold.
  */
 import {
   buttonLabel,
@@ -405,7 +408,11 @@ export function renderFormShell({ form, config = {}, prefill }: ShellOptions): s
   const submitVariant = buttonVariant(form.submit, "primary");
   const nextVariant = buttonVariant(form.next, "primary");
   const prevVariant = buttonVariant(form.prev, "secondary");
-  const stepsMeta = layout.steps.map((step) => ({ label: step.label, submit: step.submit }));
+  const stepsMeta = layout.steps.map((step) => ({
+    label: step.label,
+    submit: step.submit,
+    ...(step.showWhen ? { showWhen: step.showWhen } : {}),
+  }));
 
   // Wizard chrome (opt-in `stepper` form key): nav strip flags and pane-header
   // defaults. Marker-level keys override per step.
@@ -428,6 +435,15 @@ export function renderFormShell({ form, config = {}, prefill }: ShellOptions): s
   const cf7FormId = config.cf7FormId ?? form.cf7?.formId;
   const formEndpoint = config.endpoint ?? form.endpoint;
 
+  // Opt-in draft persistence (`autoSave`): `true` scopes the draft to the form
+  // name; a string names the exact localStorage key. Absent → no data-autosave.
+  const autoSaveKey =
+    form.autoSave === true
+      ? `rf:draft:${form.name}`
+      : typeof form.autoSave === "string" && form.autoSave.trim()
+        ? form.autoSave.trim()
+        : undefined;
+
   warnMissingConfig(formName, mailerName, wpUrl, cf7FormId, formEndpoint);
 
   /* ---- form open tag ---- */
@@ -436,7 +452,7 @@ export function renderFormShell({ form, config = {}, prefill }: ShellOptions): s
     `<form id="${esc(formId)}" class="rf-form" data-mail-form="${esc(formName)}" data-mailer="${esc(mailerName)}"` +
     `${attr("data-status-mode", statusMode === "inline" ? undefined : statusMode)}` +
     `${attr("data-prefill", prefill)}${attr("data-endpoint", formEndpoint)}` +
-    `${attr("data-wp-url", wpUrl)}${attr("data-form-id", cf7FormId)}` +
+    `${attr("data-wp-url", wpUrl)}${attr("data-form-id", cf7FormId)}${attr("data-autosave", autoSaveKey)}` +
     ` data-rules="${esc(serializeRules(fieldConfig))}"` +
     `${attr("data-copy", form.copy ? JSON.stringify(form.copy) : undefined)}` +
     `${attr("data-steps", isWizard

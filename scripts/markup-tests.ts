@@ -268,6 +268,96 @@ const repeaterSpec: FormSpec = {
   ],
 };
 
+// Conditional wizard — step markers with `showWhen` (M7): the "Company" and
+// "Details" panes only appear for Business accounts. Steps keep authored
+// numbers; the engine computes the visible sequence.
+const conditionalStepsSpec: FormSpec = {
+  name: "snapshot-conditional-steps",
+  mailer: "json",
+  submit: "Send enquiry",
+  status: "Submitted.",
+  endpoint: "https://example.test/send",
+  fields: [
+    { type: "heading", text: "Project enquiry" },
+    {
+      type: "select",
+      id: "account_type",
+      name: "account_type",
+      label: "Account type",
+      required: true,
+      options: ["Personal", "Business"],
+      size: 50,
+    },
+    { type: "step", label: "Contact" },
+    {
+      type: "text",
+      id: "name",
+      name: "name",
+      label: "Name",
+      required: true,
+      size: 50,
+    },
+    {
+      type: "step",
+      label: "Company",
+      title: "Your company",
+      showWhen: { field: "account_type", operator: "equals", value: "Business" },
+    },
+    {
+      type: "text",
+      id: "company",
+      name: "company",
+      label: "Company name",
+      optional: true,
+    },
+    {
+      type: "step",
+      label: "Details",
+      submit: "Send enquiry",
+      showWhen: [
+        { field: "account_type", operator: "equals", value: "Business" },
+        { field: "company", operator: "filled" },
+      ],
+    },
+    {
+      type: "textarea",
+      id: "message",
+      name: "message",
+      label: "Project brief",
+      size: 100,
+    },
+  ],
+};
+
+// Opt-in draft persistence (M7): `autoSave: true` resolves to the auto-scoped
+// `rf:draft:{name}` key; a string names an explicit key (asserted separately).
+const autoSaveSpec: FormSpec = {
+  name: "snapshot-autosave",
+  mailer: "json",
+  submit: "Send",
+  status: "Saved.",
+  endpoint: "https://example.test/send",
+  autoSave: true,
+  fields: [
+    {
+      type: "text",
+      id: "name",
+      name: "name",
+      label: "Name",
+      required: true,
+      size: 50,
+    },
+    { type: "step", label: "Details", submit: "Send" },
+    {
+      type: "textarea",
+      id: "message",
+      name: "message",
+      label: "Message",
+      size: 100,
+    },
+  ],
+};
+
 /* ---- standalone builder cases ---- */
 
 const fieldCases: [string, string][] = [
@@ -325,6 +415,8 @@ const snapshots: Snapshot[] = [
   { name: "shell-wizard", html: renderFormShell({ form: wizardSpec }) },
   { name: "shell-replace-prefill", html: renderFormShell({ form: replacePrefillSpec, prefill: "datetime" }) },
   { name: "shell-repeater", html: renderFormShell({ form: repeaterSpec }) },
+  { name: "shell-conditional-steps", html: renderFormShell({ form: conditionalStepsSpec }) },
+  { name: "shell-autosave", html: renderFormShell({ form: autoSaveSpec }) },
   ...fieldCases.map(([name, html]) => ({ name, html })),
   ...decorCases.map(([name, html]) => ({ name, html })),
 ];
@@ -422,6 +514,56 @@ if (RECORD) {
     repeaterShell.includes(">+ Add teammate</button>") &&
       repeaterShell.includes(">Drop</button>") &&
       repeaterShell.includes("aria-label=\"Drop\""),
+  );
+
+  /* ---- conditional steps (M7): data-steps carries showWhen ---- */
+  const conditionalShell = snapshots.find((s) => s.name === "shell-conditional-steps")!.html;
+  const stepsAttr = /data-steps="([^"]*)"/.exec(conditionalShell)?.[1] ?? "";
+  const stepsJson = stepsAttr.replace(/&quot;/g, '"').replace(/&amp;/g, "&");
+  check(
+    "conditional data-steps normalises a single step condition to an array",
+    stepsJson.includes('"showWhen":[{"field":"account_type","operator":"equals","value":"Business"}]'),
+  );
+  check(
+    "conditional data-steps carries a step condition AND array",
+    stepsJson.includes(
+      '"showWhen":[{"field":"account_type","operator":"equals","value":"Business"},{"field":"company","operator":"filled"}]',
+    ),
+  );
+  check(
+    "conditional steps serialise two of three steps",
+    (stepsJson.match(/"showWhen"/g) ?? []).length === 2,
+  );
+  check(
+    "unconditional steps stay showWhen-free in data-steps",
+    !stepsJson.includes('"label":"Contact","showWhen"'),
+  );
+  check(
+    "conditional wizard still renders a pane + chip per authored step",
+    (conditionalShell.match(/<section class="rf-pane" data-pane=/g) ?? []).length === 3 &&
+      (conditionalShell.match(/<li class="rf-step" data-step=/g) ?? []).length === 3,
+  );
+
+  /* ---- autoSave (M7): data-autosave resolution ---- */
+  const autoSaveShell = snapshots.find((s) => s.name === "shell-autosave")!.html;
+  const wizardShell = snapshots.find((s) => s.name === "shell-wizard")!.html;
+  check(
+    "autoSave: true resolves to the auto-scoped rf:draft:{name} key",
+    autoSaveShell.includes('data-autosave="rf:draft:snapshot-autosave"'),
+  );
+  check(
+    "autoSave: absent → no data-autosave leaks into unstyled shells",
+    !shell.includes("data-autosave") && !wizardShell.includes("data-autosave"),
+  );
+  check(
+    "autoSave: explicit string key renders verbatim",
+    renderFormShell({ form: { ...autoSaveSpec, autoSave: "shared-hello-draft" } }).includes(
+      'data-autosave="shared-hello-draft"',
+    ),
+  );
+  check(
+    "autoSave: false renders no data-autosave",
+    !renderFormShell({ form: { ...autoSaveSpec, autoSave: false } }).includes("data-autosave"),
   );
 }
 

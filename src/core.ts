@@ -412,6 +412,15 @@ export interface StepSpec extends StepHeaderSpec {
    * honoured — earlier ones are ignored (`form.submit` is the fallback).
    */
   submit?: string;
+  /**
+   * Conditional step: the whole pane is skipped (hidden + inert, dropped from
+   * validation and the payload) while these conditions don't hold. Takes the
+   * same shape as a field's `showWhen` — a single condition/wrapper or an AND
+   * array. Conditions may only read the shared prefix or *earlier* steps (the
+   * engine warns once about same/later-step references); authored step numbers
+   * never change — the engine computes a visible sequence over them.
+   */
+  showWhen?: VisibilityRule;
 }
 
 /**
@@ -566,6 +575,17 @@ export interface FormSpec {
    * analytics never loses visibility (see FEATURES `event-bus`).
    */
   hooks?: Partial<Record<HookName, string>>;
+  /**
+   * Opt-in draft persistence: the engine saves the visitor's in-scope values
+   * (plus the current wizard step) to localStorage as they type, restores them
+   * on the next load, and clears the draft on a successful submit.
+   * - `true` → the key `rf:draft:{name}` (auto-scoped per form).
+   * - a string → an explicit localStorage key to share/split drafts by.
+   *
+   * Storage is guarded (feature-detect + try/catch), so a blocked `localStorage`
+   * quietly disables persistence. The draft never survives a successful submit.
+   */
+  autoSave?: boolean | string;
   /**
    * The ordered layout of the form: real fields plus (optionally) structural
    * elements — `heading`, `description`, `divider`, `section` — and wizard
@@ -730,6 +750,12 @@ export interface FormStep extends StepHeaderSpec {
   label: string;
   /** Submit label for this step's button — kept only on the final step. */
   submit?: string;
+  /**
+   * Conditional-step conditions, normalised to an AND array (a single
+   * condition is wrapped) — mirrors `FieldSpec.visibility`. When present and
+   * unsatisfied the step's pane is skipped by the engine.
+   */
+  showWhen?: VisibilityConditionLike[];
   elements: FormElement[];
 }
 
@@ -749,7 +775,9 @@ export interface FormLayout {
  * below a marker belongs to that step's group until the next marker.
  * `type: "hidden"` fields are hoisted outside the panes. Only the LAST
  * marker keeps its `submit` label. Step header options (`show`, `title`,
- * `align`, `line`) flow through onto each `FormStep`. With no markers the
+ * `align`, `line`) flow through onto each `FormStep`, and a marker's
+ * `showWhen` flows through normalised to an AND array (single conditions
+ * wrapped) — the same shape field conditions serialise as. With no markers the
  * result is a single-page layout — the elements unchanged, hidden fields left
  * in place — so the renderer stays fully backwards compatible.
  */
@@ -760,9 +788,10 @@ export function toSteps(elements: FormElement[]): FormLayout {
   const shared: FormElement[] = [];
   const hoisted: FormElement[] = [];
   const steps: FormStep[] = [];
+  const markerIndex: number[] = [];
   let current: FormStep | undefined;
 
-  for (const element of elements) {
+  for (const [index, element] of elements.entries()) {
     if (element.type === "step") {
       current = {
         label: element.label,
@@ -771,9 +800,13 @@ export function toSteps(elements: FormElement[]): FormLayout {
         title: element.title,
         align: element.align,
         line: element.line,
+        ...(element.showWhen !== undefined
+          ? { showWhen: Array.isArray(element.showWhen) ? element.showWhen : [element.showWhen] }
+          : {}),
         elements: [],
       };
       steps.push(current);
+      markerIndex.push(index);
       continue;
     }
     if (element.type === "hidden") {
@@ -788,6 +821,31 @@ export function toSteps(elements: FormElement[]): FormLayout {
   const last = steps[steps.length - 1];
   for (const step of steps) {
     if (step !== last) step.submit = undefined;
+  }
+
+  // Conditional steps may only read the shared prefix or earlier steps — a
+  // condition aimed at its own pane (or a later one) has no stable value when
+  // the engine computes the visible sequence. Warn once per offending field;
+  // downstream evaluation is best-effort from whatever values exist.
+  const conditional = steps.some((step) => step.showWhen && step.showWhen.length > 0);
+  if (conditional) {
+    const nameAt = new Map<string, number>();
+    elements.forEach((element, index) => {
+      if (typeof (element as FormFieldSpec).name === "string") nameAt.set((element as FormFieldSpec).name, index);
+    });
+    const warned = new Set<string>();
+    steps.forEach((step, i) => {
+      if (!step.showWhen) return;
+      for (const name of visibilityFields(step.showWhen)) {
+        const at = nameAt.get(name);
+        if (at === undefined || at <= markerIndex[i] || warned.has(name)) continue;
+        warned.add(name);
+        console.warn(
+          `[ContactForm] step "${step.label}" showWhen reads "${name}", which sits on the same or a later step — ` +
+            "step conditions may only read the shared prefix or earlier steps.",
+        );
+      }
+    });
   }
   return { shared, hoisted, steps };
 }

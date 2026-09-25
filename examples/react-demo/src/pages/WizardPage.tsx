@@ -8,7 +8,7 @@ const forms = getForms(wizardSpec as NamedForms);
 const pageShellTitle = "step markers · stepper · pane grouping";
 
 const demoRows: Array<[string, string]> = [
-  ["Flagship wizard", "centered rule-flanked stepper; global stepper.header defaults with per-marker overrides; step-scoped “Next” validation; a cross-step showWhen reveal and a hoisted hidden field"],
+  ["Flagship wizard", "a conditional Company pane revealed by account_type = “Business” (skipped → hidden + inert, struck-through chip, out of validation and the payload); a centered rule-flanked stepper; global stepper.header defaults with per-marker overrides; step-scoped “Next” validation; a cross-step showWhen reveal and a hoisted hidden field; autoSave progress drafts"],
   ["Every field type", "all 19 types across three panes with required + optional: true twins; variant: \"even\" + line: \"center\" stepper (equal full-width slices with rules between the chips) on a background band; a cross-step showWhen reveal and a hoisted hidden field"],
   ["Compact chrome", "nav.number: false and nav.clickable: false; custom “Continue” button label with a ghost “Back”; an align: \"full\" pane-header rule; a bare show: false pane"],
 ];
@@ -21,6 +21,7 @@ const markerRows: Array<[string, string, string]> = [
   ["shared prefix", "{fields before the first «step» marker}", "rendered once above the stepper — visible on every step, included in every step's validation"],
   ["hoisted hidden", '{ "type": "hidden", "name": "referrer", "value": "wizard-demo" }', "hidden fields render once outside the panes and are present on every step's payload"],
   ["cross-step showWhen", '{ "showWhen": { "field": "rush", "operator": "filled" } }', "a field on a later step whose conditions read a checkbox from an earlier step"],
+  ["conditional step", '{ "type": "step", "label": "Company", "showWhen": { "field": "account_type", "operator": "equals", "value": "Business" } }', "a marker's showWhen skips its whole pane — hidden + inert, struck-through chip, out of validation, the payload and cross-field chains; authored indices never change, so rf:step-change reports the visible total and a step that collapses underfoot reflows"],
 ];
 
 function markCode(text: string) {
@@ -98,10 +99,13 @@ export function WizardPage() {
 
       <p className="lead">
         See <code>examples/specs/wizard.json</code> for all three specs. The flagship
-        form walks the marker model end to end: three steps, a centered, rule-flanked
-        stepper, step-scoped validation and a hoisted hidden field. Try leaving a
-        required field empty and pressing “Next”, then come back with “Previous” or by
-        clicking a completed chip in the stepper.
+        form walks the marker model end to end: a conditional Company pane that only
+        appears for Business accounts, a centered, rule-flanked stepper, step-scoped
+        validation, a hoisted hidden field and auto-saved progress. Pick “Business”
+        on the first step to reveal the extra pane, switch back to collapse it again
+        (the submit returns), and reload mid-wizard to watch the draft restore. Try
+        leaving a required field empty and pressing “Next”, then come back with
+        “Previous” or by clicking a completed chip in the stepper.
       </p>
     </PageShell>
   );

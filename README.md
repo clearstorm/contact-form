@@ -159,7 +159,9 @@ import "@clearstorm/contact-form/styles.css";
 ```
 
 `hooks` is optional and accepts the engine's lifecycle hooks (plus a named
-registry for spec hook-refs); `Field` renders a single field from the spec.
+registry for spec hook-refs); `values` prefills controls at attach (see
+[Draft autosave + prefilled values](#draft-autosave--prefilled-values));
+`Field` renders a single field from the spec.
 
 ### Vanilla JS (`renderForm`)
 
@@ -176,7 +178,8 @@ detach();
 ```
 
 `attachForm(formEl, options)` is the lower-level entry — attach the engine to
-existing `rf-*` markup, or pass `options.spec` for the exact rendered form. It
+existing `rf-*` markup, or pass `options.spec` for the exact rendered form, or
+`options.values` to prefill controls at attach. It
 returns `{ on(event, handler), detach() }`: `on` subscribes to the `rf:*`
 event bus through the engine's detach-safe registry (`detach()` removes
 subscriptions with every other listener; native `addEventListener` on the form
@@ -238,7 +241,7 @@ receives them too. `detach()` removes subscriptions with every other listener.
 | --- | --- | --- |
 | `rf:fields-change` | a control's `input` / `change` | `{ name, value }` |
 | `rf:row-add` / `rf:row-remove` | a repeater row added / removed | `{ name, count }` |
-| `rf:step-change` | wizard step transition (Next, Back, stepper jump) | `{ from, to, total }` |
+| `rf:step-change` | wizard step transition (Next, Back, stepper jump) | `{ from, to, total }` — `total` counts the *visible* steps, so conditional panes shrink it |
 | `rf:submit-start` | after validation passes, before the mailer | `{ name, id, form }` |
 | `rf:submit-success` | the mailer accepted the submission | `{ name, id }` |
 | `rf:submit-error` | the mailer failed | `{ name, id, message }` |
@@ -560,14 +563,102 @@ Behaviour:
   `--rf-step-*` / `--rf-steps-*` tokens (see
   [Theming](#theming-rf-custom-properties)).
 
+#### Conditional steps (skip whole panes)
+
+A `step` marker may carry the same `showWhen` conditions as a field — the
+whole pane is **skipped** while its conditions don't hold. Conditions reuse
+the field-level operators and AND-array / `anyOf` / `noneOf` / `not`
+wrappers, and are evaluated against earlier steps' and the shared prefix's
+values (referencing a same-or-later step's fields is a spec warning).
+
+```jsonc
+{ "type": "step", "label": "Contact" },
+{ "type": "select", "id": "account_type", "name": "account_type",
+  "label": "Account type", "options": ["Personal", "Business"] },
+{ "type": "step", "label": "Company",
+  "showWhen": { "field": "account_type", "operator": "equals", "value": "Business" } },
+{ "type": "text", "id": "company", "name": "company", "label": "Company name", "required": true }
+```
+
+Behaviour:
+
+- A skipped pane is **hidden + `inert`** and its chip is struck through
+  (`rf-step--skipped`) — never current, done or clickable. Its fields are
+  fully **out of scope**: a skipped pane's `required` field can't block a
+  step, and nothing in it reaches the payload or drives `showWhen` chains.
+- **Authored step indices never change** — the engine computes which steps
+  are visible and walks that sequence: Next/Back and completed-step jumps
+  skip skipped panes, and `rf:step-change`'s `total` counts the *visible*
+  steps (so it can be 3, then 4, when a later pane reveals).
+- **Reveal is live**: flipping a controller reveals its pane immediately, and
+  the final button flips back to "Next" (a re-reveal re-applies the current
+  step). If the visitor is standing on a step when it becomes skipped, they
+  reflow to the previous visible step.
+- Conflicting conditions are a spec error — a pane that can never fulfil its
+  conditions is permanently skipped and never blocks navigation.
+
 > Live demo: `/wizard` renders all three named forms in
 > [`examples/specs/wizard.json`](examples/specs/wizard.json) on one page —
-> the flagship wizard (three steps, a centered rule-flanked stepper,
-> pane-header defaults with per-marker overrides, a cross-step conditional
-> reveal and a hoisted hidden field), every field type with required +
-> `optional: true` twins on an `even`-slice stepper with a `background` band,
-> and the compact chrome options (no numbers, no jump-backs, custom button
-> labels, a `full` header rule and a bare `show: false` pane).
+> the flagship wizard (four step markers including a conditional **Company**
+> pane revealed by `account_type = "Business"`, a centered rule-flanked
+> stepper, pane-header defaults with per-marker overrides, a cross-step
+> conditional reveal, a hoisted hidden field, and `autoSave` progress
+> drafts), every field type with required + `optional: true` twins on an
+> `even`-slice stepper with a `background` band, and the compact chrome
+> options (no numbers, no jump-backs, custom button labels, a `full` header
+> rule and a bare `show: false` pane).
+
+---
+
+## Draft autosave + prefilled values
+
+### `autoSave` — localStorage drafts
+
+Progress is cheap to give back. `autoSave` on the spec drafts the form to
+`localStorage` and restores it the next time the page loads:
+
+```jsonc
+{
+  "name": "enquiry",
+  "autoSave": true,                // key: rf:draft:{formName}
+  // "autoSave": "contact-draft",  // …or an explicit key, verbatim
+  "fields": [ … ]
+}
+```
+
+- **What's saved** — a debounced (~400 ms) snapshot after typing, row
+  add/remove or wizard step changes: every visible control's value, the
+  current wizard step (so a multi-step form resumes where it was left), and
+  repeater row counts + per-row values. File inputs and `type: "hidden"`
+  controls are never captured; a form on a skipped step reflows on restore.
+- **Restore** happens at attach; **`values` (below) beats a stored draft**,
+  and a successful submit clears the draft (a pending debounced save is
+  cancelled too).
+- localStorage is feature-detected and every interaction is wrapped in
+  `try/catch` — persistence can never break a form.
+
+### `values` — prefilled controls at attach
+
+Pass a `values` map to `renderForm`, `attachForm` or the React component to
+prefill controls without touching the spec (great for edit forms, query
+params, or restoring a rejected submission):
+
+```js
+renderForm("#root", spec, {
+  config: { endpoint },
+  values: {
+    name: "Jane",
+    topics: ["Design", "Ops"],        // checkbox group
+    tier: "Pro",                       // radio
+    team: ["A", "C"],                  // multi-select (multiple: true)
+    consent: "on",                     // lone checkbox toggle
+  },
+});
+```
+
+Values apply at attach (after any stored `autoSave` draft, so explicit
+values win) and are never serialised or persisted — reloading without a draft
+starts fresh.
 
 ---
 

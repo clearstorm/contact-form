@@ -94,6 +94,12 @@ const find = <T extends Element = HTMLElement>(form: HTMLFormElement, sel: strin
 const fire = (el: Element, type: string) =>
   el.dispatchEvent(new Event(type, { bubbles: true, cancelable: true }));
 const submit = (form: HTMLFormElement) => fire(form, "submit");
+const getCheckboxValues = (form: HTMLFormElement, name: string) =>
+  [...form.querySelectorAll<HTMLInputElement>(`[name="${name}"]`)]
+    .filter((c) => c.checked)
+    .map((c) => c.value)
+    .sort()
+    .join();
 
 const jsonSpec = (fields: unknown[], extra: Record<string, unknown> = {}) => ({
   name: "engine",
@@ -1130,6 +1136,324 @@ check(
   legacyForm.querySelector("[data-next-label]")?.textContent === "Send",
   String(legacyForm.querySelector("[data-next-label]")?.textContent),
 );
+
+/* ---- 12. M7: conditional steps + draft persistence + values prefill ---- */
+
+// 12a. Conditional wizard steps (`showWhen` on markers): skipped panes are
+// never validated, travelled or navigated; authored indices + visible totals.
+const condStepSpec = jsonSpec(
+  [
+    { type: "select", id: "account", name: "account", label: "Account", options: ["Personal", "Business"] },
+    { type: "step", label: "Contact" },
+    { type: "text", id: "name", name: "name", label: "Name", required: true },
+    {
+      type: "step",
+      label: "Company",
+      showWhen: { field: "account", operator: "equals", value: "Business" },
+    },
+    { type: "text", id: "company", name: "company", label: "Company name", required: true },
+    {
+      type: "step",
+      label: "Details",
+      submit: "Send enquiry",
+      showWhen: [
+        { field: "account", operator: "equals", value: "Business" },
+        { field: "company", operator: "filled" },
+      ],
+    },
+    { type: "textarea", id: "msg", name: "msg", label: "Message", required: true },
+  ],
+  { name: "engine-m7-steps" },
+);
+
+form = mount(renderFormShell({ form: condStepSpec }));
+const condAttached = attachForm(form);
+const stepEvents: Array<{ from: number; to: number; total: number }> = [];
+condAttached.on("rf:step-change", (e) => stepEvents.push((e as CustomEvent).detail));
+
+const pane7 = (i: number) => form.querySelector<HTMLElement>(`[data-pane="${i}"]`) as HTMLElement;
+const chip7 = (i: number) => form.querySelector<HTMLElement>(`[data-step="${i}"]`) as HTMLElement;
+const lastStepEvent = () => stepEvents[stepEvents.length - 1];
+
+// Account defaults to "Personal" → both conditional panes are skipped at attach.
+check(
+  "conditional panes are skipped when their conditions don't hold",
+  pane7(1).hasAttribute("data-step-skipped") && pane7(1).hidden && pane7(2).hasAttribute("data-step-skipped"),
+);
+check(
+  "skipped chips carry rf-step--skipped, never aria-current",
+  chip7(1).classList.contains("rf-step--skipped") && !chip7(1).hasAttribute("aria-current") &&
+    !chip7(1).classList.contains("rf-step--done"),
+);
+check(
+  "skipped jump chips stay disabled",
+  (form.querySelector('[data-step-jump="1"]') as HTMLButtonElement).disabled,
+);
+check(
+  "a sole visible step is already the final step (submit label)",
+  find(form, "[data-next-label]")!.textContent === "Send enquiry",
+);
+check("starts on the first visible step", !pane7(0).hidden && pane7(1).hidden && pane7(2).hidden);
+
+// Re-reveal: Business reveals the Company pane (Details still needs company).
+input(form, "account").value = "Business";
+fire(input(form, "account"), "change");
+check("revealed step loses its skip marker + chip state", !pane7(1).hasAttribute("data-step-skipped") && !chip7(1).classList.contains("rf-step--skipped"));
+check("dependent step stays skipped until its own condition holds", pane7(2).hasAttribute("data-step-skipped"));
+check("label resets to Next once a later step is visible", find(form, "[data-next-label]")!.textContent === "Next");
+
+// Advance to the revealed Company pane; skipped Details stays out of scope.
+input(form, "name").value = "Jane";
+fire(input(form, "name"), "input");
+submit(form);
+await until(() => !pane7(1).hidden);
+check("Next lands on the revealed Company pane", !pane7(1).hidden && pane7(0).hidden);
+check(
+  "step-change reports authored indices + visible total (2 visible)",
+  lastStepEvent()?.from === 0 && lastStepEvent()?.to === 1 && lastStepEvent()?.total === 2,
+  JSON.stringify(stepEvents),
+);
+check("a skipped step's required field can't block the advance", errorCount(form) === 0, `errors=${errorCount(form)}`);
+
+// Filling company reveals Details; advancing there adds it to the sequence.
+input(form, "company").value = "Acme";
+fire(input(form, "company"), "input");
+check("Details reveals once company is filled", !pane7(2).hasAttribute("data-step-skipped"));
+submit(form);
+await until(() => !pane7(2).hidden);
+check("advanced to the now-visible Details pane", !pane7(2).hidden && pane7(1).hidden);
+check(
+  "step-change total grows to 3 once every step is visible",
+  lastStepEvent()?.from === 1 && lastStepEvent()?.to === 2 && lastStepEvent()?.total === 3,
+  JSON.stringify(stepEvents),
+);
+
+// Back and forward again — a completed visible step stays a valid Back target,
+// and the forward path re-validates what it crosses. Run BEFORE any successful
+// submit: handleSubmit calls form.reset(), which would flip the account toggle
+// back to "Personal" and re-skip the revealed panes underneath us.
+fire(find(form, "[data-step-back]")!, "click");
+check("Back returns to the previous visible step", !pane7(1).hidden && pane7(2).hidden && pane7(0).hidden);
+submit(form);
+await until(() => !pane7(2).hidden);
+check("forward re-validates and returns to the now-visible Details pane", !pane7(2).hidden && pane7(1).hidden);
+
+// The third step submits; the payload carries every visible step's fields.
+input(form, "msg").value = "Full enquiry flow";
+fire(input(form, "msg"), "input");
+submit(form);
+check("conditional wizard submits from its final visible step", await until(() => !find(form, ".rf-status")!.hidden));
+check(
+  "visible sequence travelled, skipped pane excluded",
+  calls[calls.length - 1].data.name === "Jane" &&
+    calls[calls.length - 1].data.company === "Acme" &&
+    calls[calls.length - 1].data.msg === "Full enquiry flow" &&
+    calls[calls.length - 1].data.account === "Business",
+  JSON.stringify(calls[calls.length - 1].data),
+);
+condAttached.detach();
+
+// Scenario B — collapsing the step the visitor stands on reflows the visible
+// sequence, and the skipped panes' fields leave the payload. Fresh mount: the
+// successful submit above reset the wizard (account back to "Personal"), which
+// would taint this scenario's state.
+form = mount(renderFormShell({ form: condStepSpec }));
+const condB = attachForm(form);
+const reflowEvents: Array<{ from: number; to: number; total: number }> = [];
+condB.on("rf:step-change", (e) => reflowEvents.push((e as CustomEvent).detail));
+// Reveal Company and advance to it…
+input(form, "account").value = "Business";
+fire(input(form, "account"), "change");
+input(form, "name").value = "Jane";
+fire(input(form, "name"), "input");
+submit(form);
+await until(() => !pane7(1).hidden);
+// …then collapse the step the visitor stands on.
+input(form, "account").value = "Personal";
+fire(input(form, "account"), "change");
+check(
+  "a current step that becomes skipped reflows to the previous visible step",
+  !pane7(0).hidden && pane7(1).hasAttribute("data-step-skipped") && pane7(1).hidden && pane7(2).hidden,
+  `pane0.hidden=${pane7(0).hidden} pane1.skipped=${pane7(1).hasAttribute("data-step-skipped")}`,
+);
+check(
+  "step-change reflow reports the collapsed visible sequence (total 1)",
+  reflowEvents[reflowEvents.length - 1]?.from === 1 &&
+    reflowEvents[reflowEvents.length - 1]?.to === 0 &&
+    reflowEvents[reflowEvents.length - 1]?.total === 1,
+  JSON.stringify(reflowEvents),
+);
+check("reflowed final step carries the submit label again", find(form, "[data-next-label]")!.textContent === "Send enquiry");
+submit(form);
+check("reflowed form submits with skipped-step fields out of the payload", await until(() => !find(form, ".rf-status")!.hidden));
+check(
+  "skipped-step fields never reach the payload",
+  calls[calls.length - 1].data.name === "Jane" &&
+    calls[calls.length - 1].data.account === "Personal" &&
+    !("company" in calls[calls.length - 1].data) &&
+    !("msg" in calls[calls.length - 1].data),
+  JSON.stringify(calls[calls.length - 1].data),
+);
+condB.detach();
+
+/* 12b. Runtime `values` prefill: scalars, groups, multi-selects, lone toggles. */
+const prefillSpec = jsonSpec(
+  [
+    { type: "text", id: "pname", name: "pname", label: "Name" },
+    { type: "email", id: "pemail", name: "pemail", label: "Email" },
+    { type: "checkbox", id: "interest", name: "interest", label: "Topics", options: ["Design", "Dev", "Ops"] },
+    { type: "radio", id: "tier", name: "tier", label: "Tier", options: ["Free", "Pro"] },
+    { type: "select", id: "team", name: "team", label: "Team", multiple: true, options: ["A", "B", "C"] },
+    { type: "checkbox", id: "consent", name: "consent", label: "I agree" },
+  ],
+  { name: "engine-m7-prefill" },
+);
+form = mount(renderFormShell({ form: prefillSpec }));
+attachForm(form, {
+  values: { pname: "Pre-filled", interest: ["Design", "Ops"], tier: "Pro", team: ["A", "C"], consent: "on" },
+});
+check("values prefills a scalar control", input(form, "pname").value === "Pre-filled");
+check("values checks the listed checkbox members", getCheckboxValues(form, "interest") === "Design,Ops", getCheckboxValues(form, "interest"));
+check("values checks a radio by value", getCheckboxValues(form, "tier") === "Pro");
+const teamSel = find(form, 'select[name="team"]') as HTMLSelectElement;
+check("values selects the listed multi-select options", [...teamSel.selectedOptions].map((o) => o.value).sort().join() === "A,C");
+check("values checks a lone toggle with its default value", input(form, "consent").checked === true);
+check("unlisted fields stay empty", input(form, "pemail").value === "");
+
+/* 12c. autoSave drafts: debounced write, restore, step, override, clear. */
+const autoSpec = jsonSpec(
+  [
+    { type: "step", label: "Contact" },
+    { type: "text", id: "a_name", name: "a_name", label: "Name", required: true },
+    { type: "step", label: "Details", submit: "Send" },
+    { type: "textarea", id: "a_msg", name: "a_msg", label: "Message" },
+  ],
+  { name: "engine-m7-autosave", autoSave: true },
+);
+const autoKey = "rf:draft:engine-m7-autosave";
+localStorage.removeItem(autoKey);
+
+form = mount(renderFormShell({ form: autoSpec }));
+attachForm(form);
+input(form, "a_name").value = "Draft-first";
+fire(input(form, "a_name"), "input");
+fire(input(form, "a_name"), "change");
+await new Promise((r) => setTimeout(r, 450));
+const draftAfterType = JSON.parse(localStorage.getItem(autoKey) ?? "{}") as {
+  v: number;
+  savedAt: number;
+  step?: number;
+  values: Array<{ key: string; value: string | string[] }>;
+};
+check(
+  "autoSave writes a versioned draft after a debounced change",
+  draftAfterType.v === 1 && draftAfterType.values.some((v) => v.key === "a_name" && v.value === "Draft-first"),
+  JSON.stringify(draftAfterType),
+);
+
+submit(form);
+await until(() => !form.querySelector<HTMLElement>(`[data-pane="1"]`)!.hidden);
+await new Promise((r) => setTimeout(r, 450));
+check(
+  "autoSave records the wizard step on transitions",
+  (JSON.parse(localStorage.getItem(autoKey) ?? "{}") as { step?: number }).step === 1,
+);
+
+form = mount(renderFormShell({ form: autoSpec }));
+attachForm(form);
+check("draft restores a saved value on attach", input(form, "a_name").value === "Draft-first");
+check("draft resumes the saved wizard step", !form.querySelector<HTMLElement>(`[data-pane="1"]`)!.hidden && form.querySelector<HTMLElement>(`[data-pane="0"]`)!.hidden);
+
+form = mount(renderFormShell({ form: autoSpec }));
+attachForm(form, { values: { a_name: "Explicit wins" } });
+check("explicit values override a stored draft", input(form, "a_name").value === "Explicit wins");
+
+// Clear on success: re-mount fresh, re-type, submit.
+form = mount(renderFormShell({ form: autoSpec }));
+attachForm(form);
+input(form, "a_name").value = "Re-check";
+fire(input(form, "a_name"), "input");
+await new Promise((r) => setTimeout(r, 450));
+check("draft is present before the clearing submit", localStorage.getItem(autoKey) !== null);
+input(form, "a_msg").value = "Longer message here";
+fire(input(form, "a_msg"), "input");
+submit(form);
+check("successful submit clears the draft", (await until(() => !find(form, ".rf-status")!.hidden)) && localStorage.getItem(autoKey) === null);
+
+// Explicit string key + specless (initForms) path.
+form = mount(renderFormShell({ form: { ...autoSpec, autoSave: "my-explicit-draft" } }));
+attachForm(form);
+input(form, "a_name").value = "Keyed";
+fire(input(form, "a_name"), "input");
+await new Promise((r) => setTimeout(r, 450));
+check(
+  "a string autoSave key is honoured verbatim",
+  localStorage.getItem("my-explicit-draft") !== null && localStorage.getItem(autoKey) === null,
+  `explicit=${localStorage.getItem("my-explicit-draft")} auto=${localStorage.getItem(autoKey)}`,
+);
+localStorage.removeItem("my-explicit-draft");
+
+document.body.innerHTML = '<div id="root"></div>';
+root()!.innerHTML = renderFormShell({ form: autoSpec });
+initForms();
+form = root()!.querySelector<HTMLFormElement>("form")!;
+input(form, "a_name").value = "No-spec";
+fire(input(form, "a_name"), "input");
+await new Promise((r) => setTimeout(r, 450));
+check("specless initForms still persists drafts via data-autosave", localStorage.getItem(autoKey) !== null);
+localStorage.removeItem(autoKey);
+
+/* 12d. Repeaters in drafts: row counts + row-correlated values survive. */
+const autoRepSpec = jsonSpec(
+  [
+    {
+      type: "repeater",
+      id: "members",
+      name: "members",
+      label: "Members",
+      minRows: 1,
+      maxRows: 3,
+      fields: [
+        { type: "text", id: "member_name", name: "member_name", label: "Name", required: true, size: 50 },
+        { type: "email", id: "member_email", name: "member_email", label: "Email", size: 50 },
+      ],
+    },
+  ],
+  { name: "engine-m7-autorep", autoSave: true },
+);
+const autoRepKey = "rf:draft:engine-m7-autorep";
+localStorage.removeItem(autoRepKey);
+form = mount(renderFormShell({ form: autoRepSpec }));
+attachForm(form);
+input(form, "member_name").value = "First";
+fire(input(form, "member_name"), "input");
+fire(form.querySelectorAll("[data-add-row]")[0] as HTMLElement, "click");
+const repRows = form.querySelectorAll<HTMLElement>("[data-repeater-row]");
+const row1Name = repRows[1].querySelector<HTMLInputElement>('[name="member_name"]')!;
+row1Name.value = "Second";
+fire(row1Name, "input");
+await new Promise((r) => setTimeout(r, 450));
+const repDraft = JSON.parse(localStorage.getItem(autoRepKey) ?? "{}") as {
+  rows: Record<string, number>;
+  values: Array<{ key: string; value: string | string[] }>;
+};
+check("draft captures repeater row counts", repDraft.rows?.members === 2, JSON.stringify(repDraft));
+check(
+  "draft captures row-correlated values",
+  repDraft.values.some((v) => v.key === "members::0::member_name" && v.value === "First") &&
+    repDraft.values.some((v) => v.key === "members::1::member_name" && v.value === "Second"),
+  JSON.stringify(repDraft.values),
+);
+
+form = mount(renderFormShell({ form: autoRepSpec }));
+attachForm(form);
+check("draft re-creates repeater rows on restore", form.querySelectorAll("[data-repeater-row]").length === 2);
+check(
+  "draft fills each row's own values",
+  [...form.querySelectorAll<HTMLInputElement>('[name="member_name"]')].map((c) => c.value).join() === "First,Second",
+  JSON.stringify([...form.querySelectorAll<HTMLInputElement>('[name="member_name"]')].map((c) => c.value)),
+);
+localStorage.removeItem(autoRepKey);
 
 console.log(failures === 0 ? "\nENGINE ALL PASS" : `\nENGINE ${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);

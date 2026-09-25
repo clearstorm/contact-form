@@ -41,6 +41,14 @@ import {
   type VisibilityConditionLike,
 } from "../core";
 import { getMailer, type MailerConfig } from "../mailers";
+import {
+  applyDraft,
+  applyValues,
+  captureDraft,
+  countRepeaterRows,
+  createDraftStore,
+  type DraftEntry,
+} from "./persist";
 
 type Control = HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
 type Status = HTMLElement | null;
@@ -236,11 +244,15 @@ const createVisibilityEngine = (
   // validated, not sent, and does not drive other conditions. Repeater rows
   // carry their controls in `.rf-repeater-row` wrappers rather than a
   // `.rf-field`, so a hidden repeater fieldset hides every row's controls too.
+  // A control inside a *skipped* wizard pane (`data-step-skipped`, set by the
+  // engine when a step's `showWhen` doesn't hold) is equally out of scope —
+  // conditional steps and conditional fields share the same semantics.
   const isHiddenControl = (control: Control): boolean => {
     const wrapper = control.closest<HTMLElement>(".rf-field");
     if (wrapper !== null && (wrapper.hidden || wrapper.classList.contains("rf-field--hidden"))) return true;
     const repeater = control.closest<HTMLElement>("[data-repeater]");
-    return repeater !== null && (repeater.hidden || repeater.classList.contains("rf-field--hidden"));
+    if (repeater !== null && (repeater.hidden || repeater.classList.contains("rf-field--hidden"))) return true;
+    return control.closest<HTMLElement>("[data-pane][data-step-skipped]") !== null;
   };
 
   const apply = (): void => {
@@ -496,7 +508,11 @@ async function handleSubmit(
   // already prevent it in normal use).
   clearRepeaterErrors(form);
   for (const repeaterEl of Array.from(form.querySelectorAll<HTMLElement>("[data-repeater]"))) {
-    if (repeaterEl.hidden || repeaterEl.classList.contains("rf-field--hidden")) continue;
+    if (
+      repeaterEl.hidden ||
+      repeaterEl.classList.contains("rf-field--hidden") ||
+      repeaterEl.closest("[data-pane][data-step-skipped]") !== null
+    ) continue;
     const repeaterName = repeaterEl.dataset.repeater ?? "";
     const specField = fields.find((field) => field.name === repeaterName);
     const min = Number(repeaterEl.dataset.repeaterMin ?? 0);
@@ -611,10 +627,17 @@ export interface AttachOptions {
    * `hooks: { beforeSubmit: "trackLead" }` wires `fn`. Inline hooks win.
    */
   hooks?: HookRegistry;
+  /**
+   * Pre-fill matching controls after attach: `{ name: value }` (or a list for
+   * checkbox/radio groups and multi-selects). Applied after draft restore, so
+   * explicit values always beat a stored `autoSave` draft. Not serialised —
+   * this is a runtime-only option.
+   */
+  values?: Record<string, string | string[]>;
 }
 
 interface StepsMeta {
-  steps: { label: string; submit?: string }[];
+  steps: { label: string; submit?: string; showWhen?: VisibilityConditionLike[] }[];
   next: { label: string; variant: ButtonVariant };
   prev: { label: string; variant: ButtonVariant };
   submit: { label: string; variant: ButtonVariant };
@@ -623,7 +646,11 @@ interface StepsMeta {
 const stepsMetaFromSpec = (form: FormSpec): StepsMeta => {
   const layout = toSteps(form.fields);
   return {
-    steps: layout.steps.map((step) => ({ label: step.label, submit: step.submit })),
+    steps: layout.steps.map((step) => ({
+      label: step.label,
+      submit: step.submit,
+      ...(step.showWhen ? { showWhen: step.showWhen } : {}),
+    })),
     next: { label: buttonLabel(form.next, "Next"), variant: buttonVariant(form.next, "primary") },
     prev: { label: buttonLabel(form.prev, "Back"), variant: buttonVariant(form.prev, "secondary") },
     submit: {
@@ -792,40 +819,207 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): Att
         return pane === null || Number(pane.dataset.pane) === step;
       });
 
+  /* ---- Conditional steps ----
+     A `showWhen` on a step marker makes its whole pane conditional: while its
+     conditions don't hold the pane is marked `data-step-skipped` (the markup
+     leaves it visible, the engine hides it), and every traversal — Next, Back,
+     jumps and the visible sequence — skips it. A skipped pane behaves exactly
+     like a hidden field wrapper downstream: `isHiddenControl` reads the marker,
+     so its controls never validate and never reach the payload. Authored step
+     indices never change — the engine computes a *visible* sequence over them,
+     and `rf:step-change`'s `total` counts only visible steps. */
+  const skipped = (step: number): boolean =>
+    form.querySelector<HTMLElement>(`[data-pane="${step}"]`)?.hasAttribute("data-step-skipped") ===
+    true;
+
+  // Step conditions may only read the shared prefix or earlier steps (core
+  // warns otherwise); their controllers join the field controllers so the same
+  // input/change listener re-evaluates both.
+  const stepControllers = new Set<string>();
+  for (const meta of stepsMeta?.steps ?? []) {
+    if (meta.showWhen?.length) {
+      for (const name of visibilityFields(meta.showWhen)) stepControllers.add(name);
+    }
+  }
+
+  // Recompute the skipped markers + stepper chips against the latest values.
+  // Runs before any traversal decides what is visible (shared-prefix values
+  // drive every step, and revisiting earlier steps re-reveals later ones).
+  // A freshly skipped step is hidden/inert, never current/done, and its jump
+  // chip is locked; a freshly revealed one loses the marker again.
+  const evaluateStepVisibility = (): void => {
+    if (!isWizard) return;
+    const values = visibility.allValues();
+    for (let i = 0; i < stepCount; i++) {
+      const pane = form.querySelector<HTMLElement>(`[data-pane="${i}"]`);
+      const conditions = stepsMeta?.steps[i]?.showWhen;
+      const visible = !conditions?.length || evaluateVisibility(conditions, values);
+      if (!pane) continue;
+      if (!visible) {
+        pane.setAttribute("data-step-skipped", "");
+        pane.hidden = true;
+        pane.setAttribute("inert", "");
+      } else {
+        pane.removeAttribute("data-step-skipped");
+      }
+      const chip = form.querySelector<HTMLElement>(`[data-step="${i}"]`);
+      if (!chip) continue;
+      chip.classList.toggle("rf-step--skipped", !visible);
+      if (visible) continue;
+      chip.classList.remove("rf-step--done");
+      chip.removeAttribute("aria-current");
+      const jump = chip.querySelector<HTMLButtonElement>("[data-step-jump]");
+      if (jump) {
+        jump.disabled = true;
+        jump.setAttribute("aria-disabled", "true");
+      }
+    }
+  };
+
+  /* ---- Visible-step sequence ----
+     Skipped steps keep their authored numbers; these helpers give the engine
+     the *visible* ordering: how many steps remain, whether one is last, and
+     where Next/Back/jump targets + the draft's saved step land. */
+  const visibleStepCount = (): number => {
+    let count = 0;
+    for (let i = 0; i < stepCount; i++) if (!skipped(i)) count++;
+    return count;
+  };
+
+  const lastVisibleStep = (): number => {
+    for (let i = stepCount - 1; i >= 0; i--) if (!skipped(i)) return i;
+    return 0;
+  };
+
+  const nextVisibleStep = (step: number): number => {
+    for (let i = step + 1; i < stepCount; i++) if (!skipped(i)) return i;
+    return -1;
+  };
+
+  const prevVisibleStep = (step: number): number => {
+    for (let i = step - 1; i >= 0; i--) if (!skipped(i)) return i;
+    return -1;
+  };
+
+  const firstVisibleStep = (): number => {
+    for (let i = 0; i < stepCount; i++) if (!skipped(i)) return i;
+    return 0;
+  };
+
+  // Draft restore target: the saved step when it's still visible, else the
+  // next visible after it, else the nearest visible before it (a stored draft
+  // may predate a condition change).
+  const clampStep = (saved: number | undefined): number => {
+    if (!isWizard || saved === undefined) return firstVisibleStep();
+    for (let i = saved; i < stepCount; i++) if (!skipped(i)) return i;
+    for (let i = saved; i >= 0; i--) if (!skipped(i)) return i;
+    return firstVisibleStep();
+  };
+
+  // Controller-change refresh: field visibility, then step visibility. If the
+  // step the visitor stands on becomes skipped (e.g. they un-check the toggle
+  // that revealed it), reflow to the next visible step in one transition.
+  // Otherwise re-apply the current step so labels/chips settle as if the step
+  // set had just changed — revealing a later step turns a final-step "Submit"
+  // back into "Next".
+  const refreshStepVisibility = (): void => {
+    if (!isWizard) return;
+    evaluateStepVisibility();
+    if (skipped(currentStep)) {
+      const next = nextVisibleStep(currentStep);
+      const fallback = prevVisibleStep(currentStep);
+      if (next !== -1 || fallback !== -1) goTo(next !== -1 ? next : fallback);
+    } else {
+      goTo(currentStep);
+    }
+  };
+
+  // Skipped-step fields are excluded from the travelled payload. `isHiddenControl`
+  // already keeps them out of validation and `allValues`; `visibleFields` needs
+  // the extra filter because the core helper only knows field-level conditions.
+  const visibilityForSubmit: VisibilityEngine = {
+    ...visibility,
+    visibleFields: (): FieldSpec[] =>
+      visibility.visibleFields().filter((field) => {
+        const control = form.querySelector<Control>(`[name="${CSS.escape(field.name)}"]`);
+        return control?.closest("[data-pane][data-step-skipped]") === null;
+      }),
+  };
+
+  /* ---- Draft persistence (opt-in `autoSave` form key) ---- */
+  let autoSaveKey: string | undefined;
+  if (spec) {
+    if (spec.autoSave === true) autoSaveKey = `rf:draft:${spec.name}`;
+    else if (typeof spec.autoSave === "string" && spec.autoSave.trim()) autoSaveKey = spec.autoSave.trim();
+    else if (spec.autoSave === undefined) autoSaveKey = form.dataset.autosave || undefined;
+  } else {
+    autoSaveKey = form.dataset.autosave || undefined;
+  }
+  const draft = autoSaveKey ? createDraftStore(autoSaveKey) : null;
+
+  // Saver is debounced (~400ms) and triggered by the `rf:fields-change` bus,
+  // row add/remove and step transitions; the timer is cancelled on detach.
+  let saveTimer: ReturnType<typeof setTimeout> | undefined;
+  const writeDraft = (): void => {
+    if (!draft) return;
+    draft.save({
+      v: 1,
+      savedAt: Date.now(),
+      step: isWizard ? currentStep : undefined,
+      rows: countRepeaterRows(form),
+      values: captureDraft(form, visibility.isHiddenControl),
+    });
+  };
+  const scheduleDraftSave = (): void => {
+    if (!draft) return;
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(writeDraft, 400);
+  };
+
   const goTo = (step: number, options?: { focus?: boolean }): void => {
+    // Step conditions may have changed since the last transition — re-evaluate
+    // first so the pane/chip/sequence logic below sees the current step set
+    // (shared-prefix values drive every step, and revisiting earlier steps can
+    // re-reveal later ones).
+    evaluateStepVisibility();
     const from = currentStep;
     currentStep = step;
+    const lastVisible = lastVisibleStep();
     form.querySelectorAll<HTMLElement>("[data-pane]").forEach((pane, i) => {
-      const active = i === step;
+      // Skipped panes stay hidden+inert (evaluateStepVisibility set that);
+      // among the visible steps only the target pane is active.
+      const active = i === step && !skipped(i);
       pane.hidden = !active;
       if (active) pane.removeAttribute("inert");
       else pane.setAttribute("inert", "");
     });
     form.querySelectorAll<HTMLElement>("[data-step]").forEach((item, i) => {
-      const done = i < step;
-      item.classList.toggle("rf-step--done", done);
-      if (i === step) item.setAttribute("aria-current", "step");
+      item.classList.toggle("rf-step--done", !skipped(i) && i < step);
+      if (i === step && !skipped(i)) item.setAttribute("aria-current", "step");
       else item.removeAttribute("aria-current");
     });
-    // Completed steps become clickable to jump back (no validation — the
-    // forward path always re-validates, so order is never bypassed).
+    // Completed, non-skipped steps become clickable to jump back (no
+    // validation — the forward path always re-validates, so order is never
+    // bypassed). Skipped steps are never navigable.
     form.querySelectorAll<HTMLButtonElement>("[data-step-jump]").forEach((btn) => {
-      const done = Number(btn.dataset.stepJump) < step;
+      const target = Number(btn.dataset.stepJump);
+      const done = target < step && !skipped(target);
       btn.disabled = !done;
       btn.setAttribute("aria-disabled", String(!done));
     });
     const back = form.querySelector<HTMLButtonElement>("[data-step-back]");
-    if (back) back.hidden = step === 0;
+    if (back) back.hidden = prevVisibleStep(currentStep) === -1;
     const next = form.querySelector<HTMLButtonElement>("[data-step-next]");
     const nextLabel = next?.querySelector<HTMLElement>("[data-next-label]");
     if (nextLabel) {
       nextLabel.textContent =
-        step < stepCount - 1 ? (stepsMeta?.next.label ?? "Next") : (stepsMeta?.submit.label ?? "");
+        step < lastVisible ? (stepsMeta?.next.label ?? "Next") : (stepsMeta?.submit.label ?? "");
     }
-    // On the final step the button also takes the submit button's variant.
+    // On the final visible step the button also takes the submit button's
+    // variant.
     if (next && stepsMeta) {
-      next.classList.toggle(`rf-submit--${stepsMeta.next.variant}`, step < stepCount - 1);
-      next.classList.toggle(`rf-submit--${stepsMeta.submit.variant}`, step === stepCount - 1);
+      next.classList.toggle(`rf-submit--${stepsMeta.next.variant}`, step < lastVisible);
+      next.classList.toggle(`rf-submit--${stepsMeta.submit.variant}`, step === lastVisible);
     }
     visibility.apply();
     if (options?.focus) {
@@ -833,26 +1027,32 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): Att
     }
     // Announce the transition on the bus (the initial `goTo(0)` at attach is
     // from === to, so it never emits) and run the `afterStepChange` hook.
+    // `total` counts the *visible* steps — skipped panes are not part of the
+    // sequence a visitor walks.
     if (from !== step) {
-      emit("rf:step-change", { from, to: step, total: stepCount });
+      emit("rf:step-change", { from, to: step, total: visibleStepCount() });
       (hookFor("afterStepChange") as StepHook | undefined)?.({ from, to: step, form });
+      scheduleDraftSave();
     }
   };
 
   on(form, "submit", (event) => {
     if (!isWizard) {
-      void handleSubmit(event, fields, rules, mailerName, successMessage, copy, visibility, undefined, validateControl, submitHooks);
+      void handleSubmit(event, fields, rules, mailerName, successMessage, copy, visibilityForSubmit, undefined, validateControl, submitHooks);
       return;
     }
-    // Wizard: the submit button advances the current step; the last step
-    // submits. Latest visibility always applies first.
+    // Wizard: the submit button advances to the next *visible* step; the last
+    // visible step submits (skipped steps are never valid destinations).
+    // Latest visibility always applies first.
     visibility.apply();
+    evaluateStepVisibility();
     const stepControls = paneScopeFor(currentStep).filter(
       (control) => !visibility.isHiddenControl(control),
     );
-    if (currentStep < stepCount - 1) {
+    if (currentStep < lastVisibleStep()) {
       event.preventDefault();
-      const nextStep = currentStep + 1;
+      const nextStep = nextVisibleStep(currentStep);
+      if (nextStep === -1) return;
       // Lifecycle hook — vetoing cancels the step advance before validation.
       if ((hookFor("beforeValidateStep") as StepHook | undefined)?.({ from: currentStep, to: nextStep, form }) === false) return;
       const invalid = stepControls.filter((control) => !validateControl(control));
@@ -863,7 +1063,7 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): Att
       goTo(nextStep);
       return;
     }
-    void handleSubmit(event, fields, rules, mailerName, successMessage, copy, visibility, stepControls, validateControl, submitHooks);
+    void handleSubmit(event, fields, rules, mailerName, successMessage, copy, visibilityForSubmit, stepControls, validateControl, submitHooks);
   });
 
   // Stepper: completed steps are clickable and jump back without validation
@@ -876,19 +1076,25 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): Att
   });
 
   // Footer Back/Previous — never validates (locked spec); focuses the target
-  // pane header like a stepper jump.
+  // pane header like a stepper jump. Goes to the previous *visible* step.
   const backButton = form.querySelector<HTMLButtonElement>("[data-step-back]");
   if (backButton) {
     on(backButton, "click", () => {
-      if (currentStep > 0) goTo(currentStep - 1, { focus: true });
+      const prev = prevVisibleStep(currentStep);
+      if (prev !== -1) goTo(prev, { focus: true });
     });
   }
 
-  // Conditional fields: re-evaluate whenever a controlling control changes.
+  // Conditional fields + conditional steps: re-evaluate whenever a controlling
+  // control changes. Step controllers join the field controllers (a toggle on
+  // the shared prefix can skip/reveal a whole pane).
   const onControllerInput = (event: Event): void => {
     const target = event.target;
     if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement)) return;
-    if (visibility.isController(target.name)) visibility.apply();
+    if (visibility.isController(target.name) || stepControllers.has(target.name)) {
+      visibility.apply();
+      refreshStepVisibility();
+    }
   };
   on(form, "input", onControllerInput);
   on(form, "change", onControllerInput);
@@ -900,6 +1106,7 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): Att
     const target = event.target;
     if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement)) return;
     emit("rf:fields-change", { name: target.name, value: target.value });
+    scheduleDraftSave();
   };
   on(form, "input", onBusFieldChange);
   on(form, "change", onBusFieldChange);
@@ -1016,9 +1223,14 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): Att
       for (const control of Array.from(clone.querySelectorAll<Control>("input, select, textarea"))) wireControl(control);
       sync();
       emit("rf:row-add", { name, count: rowCount() });
+      scheduleDraftSave();
     };
 
     if (addBtn) on(addBtn, "click", addRow);
+    // Restore path (autoSave draft): rows are re-created via these adders so
+    // cloned rows get fully wired (controls, counters, button bounds) exactly
+    // as if the visitor had clicked "Add".
+    repeaterAdders.set(name, addRow);
 
     // Delegated remove on the persistent rows container — one listener covers
     // every row, present and cloned (no per-row rebinding on add).
@@ -1032,16 +1244,43 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): Att
       row.remove();
       sync();
       emit("rf:row-remove", { name, count: rowCount() });
+      scheduleDraftSave();
     });
 
     sync();
   };
 
+  // Repeater adders by name — used by the draft restore to re-create rows.
+  const repeaterAdders = new Map<string, () => void>();
   form.querySelectorAll<HTMLElement>("[data-repeater]").forEach(configureRepeater);
 
-  // Step forms start on the first step: normalise the stepper state, the
-  // footer labels ("Next" until the final step) and any conditional fields.
-  if (isWizard) goTo(0);
+  /* ---- Draft restore + explicit prefill (`values` option) ----
+     A saved draft re-creates repeater rows (via the adders wired above), fills
+     its captured values and, on a wizard, resumes the saved step (clamped to
+     the visible sequence). Explicit `values` are applied AFTER the draft, so
+     consumers always win over a stored copy. Conditional fields and steps both
+     re-evaluate against the hydrated values inside the initial `goTo`. */
+  let draftStep: number | undefined;
+  if (draft) {
+    const entry = draft.load();
+    if (entry) {
+      applyDraft(form, entry, (repeaterName) => repeaterAdders.get(repeaterName)?.());
+      draftStep = isWizard ? entry.step : undefined;
+    }
+  }
+  if (opts.values && Object.keys(opts.values).length > 0) applyValues(form, opts.values);
+
+  // Step forms start on the first *visible* step (or the restored draft step):
+  // normalise the stepper state, the footer labels and any conditional steps.
+  if (isWizard) goTo(clampStep(draftStep));
+
+  // A successful submit clears the draft — persistence never outlives the
+  // form. Also cancel any pending (debounced) save so a timer scheduled by the
+  // pre-submit input can't resurrect a cleared draft moments later.
+  on(form, "rf:submit-success", () => {
+    if (saveTimer) clearTimeout(saveTimer);
+    draft?.clear();
+  });
 
   return {
     on(event, handler) {
@@ -1050,6 +1289,7 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): Att
       on(form, event, handler as Handler);
     },
     detach() {
+      if (saveTimer) clearTimeout(saveTimer);
       for (const [target, byType] of listeners) {
         for (const [type, handlers] of byType) {
           for (const handler of handlers) target.removeEventListener(type, handler as EventListener);

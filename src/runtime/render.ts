@@ -37,6 +37,12 @@ export interface RenderOptions extends Omit<ShellOptions, "form"> {
    * the spec's hook-ref *names* (see `attachForm` options).
    */
   hooks?: HookRegistry;
+  /**
+   * Pre-fill matching controls after render: `{ name: value }` (or a list for
+   * checkbox/radio groups and multi-selects). Applied after any stored
+   * `autoSave` draft, so explicit values win. Not serialised; runtime-only.
+   */
+  values?: Record<string, string | string[]>;
 }
 
 export interface RenderedForm {
@@ -80,7 +86,12 @@ export function renderForm(
   }
 
   root.appendChild(formEl);
-  const attached = attachForm(formEl, { spec: form, validation: options.validation, hooks: options.hooks });
+  const attached = attachForm(formEl, {
+    spec: form,
+    validation: options.validation,
+    hooks: options.hooks,
+    values: options.values,
+  });
   return {
     form: formEl,
     on: (event, handler) => attached.on(event, handler),

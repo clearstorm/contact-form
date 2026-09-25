@@ -34,10 +34,16 @@ export interface ContactFormProps {
    * the spec's hook-ref *names* (see `attachForm` options).
    */
   hooks?: HookRegistry;
+  /**
+   * Pre-fill matching controls after mount: `{ name: value }` (or a list for
+   * checkbox/radio groups and multi-selects). Applied after any stored
+   * `autoSave` draft, so explicit values win. Not serialised; runtime-only.
+   */
+  values?: Record<string, string | string[]>;
 }
 
 /** Server-rendered, engine-wired contact form for any React-based framework. */
-export function ContactForm({ form, config, prefill, validation, hooks }: ContactFormProps): ReactElement {
+export function ContactForm({ form, config, prefill, validation, hooks, values }: ContactFormProps): ReactElement {
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -46,9 +52,9 @@ export function ContactForm({ form, config, prefill, validation, hooks }: Contac
     if (!root || !formEl) return;
     // `spec` is passed explicitly so the engine never depends on the shell's
     // data-rules serialisation being present on a custom mount point.
-    const attached = attachForm(formEl, { spec: form, validation, hooks });
+    const attached = attachForm(formEl, { spec: form, validation, hooks, values });
     return () => attached.detach();
-  }, [form, validation, hooks]);
+  }, [form, validation, hooks, values]);
 
   return (
     <div

@@ -25,6 +25,7 @@
     "status": "Thanks — the multi-step form worked end to end.",
     "mailer": "json",
     "endpoint": "http://localhost:8787/submit",
+    "autoSave": true,
     "copy": {
       "sending": "Sending…",
       "submitError": "Sending failed (HTTP {status}) — is the echo server running (npm run demo:api)?"
@@ -36,11 +37,23 @@
       },
       {
         "type": "description",
-        "text": "Three quick steps. This prefix lives before the first step marker, so it stays visible on every step."
+        "text": "A few quick steps. This prefix lives before the first step marker, so it stays visible on every step. Choosing “Business” reveals a conditional Company pane, and your progress auto-saves to the browser (visible after a reload)."
       },
       {
         "type": "step",
         "label": "Contact"
+      },
+      {
+        "type": "select",
+        "id": "account_type",
+        "name": "account_type",
+        "label": "Account type",
+        "size": 50,
+        "options": [
+          "Personal",
+          "Business"
+        ],
+        "message": "Choose an account type."
       },
       {
         "type": "text",
@@ -64,6 +77,24 @@
         "name": "phone",
         "label": "Phone (optional)",
         "optional": true,
+        "size": 50
+      },
+      {
+        "type": "step",
+        "label": "Company",
+        "title": "Your company",
+        "showWhen": {
+          "field": "account_type",
+          "operator": "equals",
+          "value": "Business"
+        }
+      },
+      {
+        "type": "text",
+        "id": "company",
+        "name": "company",
+        "label": "Company name",
+        "required": true,
         "size": 50
       },
       {

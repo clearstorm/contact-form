@@ -15,6 +15,11 @@ next item instead of duplicating it.
   vanilla · TanStack). Immutable tags: `v0.1.0`, `v0.2.0`, `v0.3.0`.
 - **Branch:** `dev` (ahead of `main`), working tree clean.
 - **Most recent work (HEAD):**
+  - File upload bounds (`2c8bd54`) — `maxSize` (bytes or `"5MB"`-style units),
+    `allowedTypes` MIME allow-list with `image/*` globs, and `minFiles` /
+    `maxFiles` count bounds on file fields — all read `ctx.files`; a
+    `minFiles > 0` bound implies required. (Diff stats for the M3 tip scan are
+    under **HEAD commit** below.)
   - Validation rule expansion (`1ea47bc`) — `pattern` (regex), `minLength` /
     `maxLength` soft bounds (with a live `N / max` character counter),
     `sameAs` cross-field equality and `minSelect` / `maxSelect` selection

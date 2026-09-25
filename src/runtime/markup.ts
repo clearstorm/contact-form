@@ -72,6 +72,12 @@ export interface RenderFieldProps {
   max?: number | string;
   step?: number | string;
   maxlength?: number;
+  /**
+   * Soft maximum length — renders a live character counter below the control
+   * (validation-only; the native `maxlength` attribute stays an independent
+   * hard limit when you set it too).
+   */
+  maxLength?: number;
   pattern?: string;
   /** Accept hint for file inputs (picker filter only). */
   accept?: string;
@@ -102,6 +108,7 @@ export function renderField(prop: RenderFieldProps): string {
     max,
     step,
     maxlength,
+    maxLength,
     pattern,
     accept,
     multiple,
@@ -109,6 +116,20 @@ export function renderField(prop: RenderFieldProps): string {
 
   const isGroup = (type === "checkbox" || type === "radio") && (options?.length ?? 0) > 0;
   const isSingleCheckbox = type === "checkbox" && !((options?.length ?? 0) > 0);
+  // Live character counter — text-like controls only, driven by the new
+  // soft `maxLength` validation key (not the native `maxlength` attribute).
+  const showCounter =
+    maxLength !== undefined &&
+    (type === "text" ||
+      type === "email" ||
+      type === "tel" ||
+      type === "url" ||
+      type === "search" ||
+      type === "password" ||
+      type === "textarea");
+  const counter = showCounter
+    ? `<span class="rf-counter" data-max="${esc(maxLength)}" aria-live="polite">${esc(String(value ?? "").length)} / ${esc(maxLength)}</span>`
+    : "";
 
   let out = `<div class="rf-field rf-span-${span}${type === "hidden" ? " rf-field--hidden" : ""}">`;
 
@@ -150,6 +171,7 @@ export function renderField(prop: RenderFieldProps): string {
       `<textarea` +
       `${attr("id", id)}${attr("name", name)}${attr("rows", rows)}${attr("required", required)}${attr("placeholder", placeholder)}${attr("maxlength", maxlength)}` +
       ` class="rf-input rf-textarea"></textarea>`;
+    out += counter;
   } else if (type === "select") {
     out +=
       `<select` +
@@ -166,6 +188,7 @@ export function renderField(prop: RenderFieldProps): string {
       `${attr("pattern", pattern)}${attr("accept", accept)}${attr("multiple", multiple)}` +
       `${attr("list", options?.length ? `${id}-list` : undefined)}` +
       ` class="rf-input" />`;
+    out += counter;
   }
 
   // `options` on a non-picker input renders a <datalist> of suggestions.
@@ -241,6 +264,7 @@ export const fieldRenderProps = (field: FormFieldSpec, idPrefix: string): Render
   max: field.max,
   step: field.step,
   maxlength: field.maxlength,
+  maxLength: field.maxLength,
   pattern: field.pattern,
   accept: field.accept,
   multiple: field.multiple,

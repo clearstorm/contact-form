@@ -464,6 +464,86 @@ check(
   parseFieldSpec(serializeRules(fileFieldsFromSpec))[0].type === "file",
 );
 
+// --- 2.13. Validation rule expansion: pattern / length / sameAs / selection bounds ---
+
+const vSpec = [
+  { type: "text", name: "vat", label: "VAT", pattern: "^[A-Z]{2}\\d{9}$" },
+  { type: "text", name: "sku", label: "SKU", minLength: 4, maxLength: 8 },
+  { type: "email", name: "work_email", label: "Work email", maxLength: 30 },
+  { type: "textarea", name: "note", label: "Note", minLength: 3 },
+  { type: "password", name: "password", label: "Password" },
+  { type: "password", name: "confirm", label: "Confirm password", sameAs: "password", required: true },
+  { type: "checkbox", name: "topics", label: "Topics", options: ["News", "Events", "Offers"], minSelect: 2, maxSelect: 3 },
+  { type: "select", name: "skills", label: "Skills", multiple: true, minSelect: 2 },
+];
+const vFields = toFieldSpecs(vSpec);
+const vRules = buildRules(vFields);
+
+check("pattern matches", validateValue(vRules.vat, "GB123456789") === null);
+check("pattern mismatch flags", validateValue(vRules.vat, "123456") !== null);
+check("pattern optional empty passes", validateValue(vRules.vat, "") === null);
+check(
+  "invalid pattern fails open (spec error never blocks)",
+  validateValue(buildRules(toFieldSpecs([{ type: "text", name: "broken", label: "B", pattern: "(" }])).broken, "anything") === null,
+);
+check(
+  "pattern copy key resolves without a per-field message",
+  validateValue(
+    buildRules(toFieldSpecs([{ type: "text", name: "vat2", label: "VAT", pattern: "^[A-Z]" }]), { pattern: "That doesn't look right." }).vat2,
+    "123",
+  ) === "That doesn't look right.",
+);
+
+check("minLength too short", validateValue(vRules.sku, "ab") !== null);
+check("minLength ok", validateValue(vRules.sku, "abcd") === null);
+check("maxLength too long", validateValue(vRules.sku, "abcdefghij") !== null);
+check("email length enforced alongside format", validateValue(vRules.work_email, "jane@example.comxxxxxxxxxxxxxxxxxxxxxxxxxxx") !== null);
+check("email under maxLength passes", validateValue(vRules.work_email, "jane@example.com") === null);
+check("textarea uses explicit minLength (3), not the 10-char default", validateValue(vRules.note, "hi there") === null);
+check("textarea below explicit minLength", validateValue(vRules.note, "hi") !== null);
+check(
+  "textarea keeps its 10-char default without minLength",
+  validateValue(buildRules(toFieldSpecs([{ type: "textarea", name: "m", label: "M" }])).m, "short") !== null,
+);
+
+const sameCtx = { values: { password: ["hunter2"] }, selfValues: ["hunter2"] };
+check("sameAs passes when values are equal", validateValue(vRules.confirm, "hunter2", sameCtx) === null);
+check("sameAs mismatch flags", validateValue(vRules.confirm, "nope", sameCtx) !== null);
+check("sameAs cannot match an empty target", validateValue(vRules.confirm, "hunter2", { values: {}, selfValues: ["hunter2"] }) !== null);
+check("sameAs required empty stays a required failure", validateValue(vRules.confirm, "", sameCtx) !== null);
+check(
+  "sameAs copy override",
+  buildRules(toFieldSpecs([{ type: "password", name: "c", label: "C", sameAs: "p" }]), { sameAs: "Passwords don't match." }).c.message === "Passwords don't match.",
+);
+
+check(
+  "minSelect implied-required — zero selected fails",
+  validateValue(vRules.topics, "", { values: {}, selfValues: [] }) !== null,
+);
+check("minSelect satisfied", validateValue(vRules.topics, "1", { values: {}, selfValues: ["News", "Events"] }) === null);
+check("minSelect under the floor", validateValue(vRules.topics, "1", { values: {}, selfValues: ["News"] }) !== null);
+check("maxSelect over the ceiling", validateValue(vRules.topics, "1", { values: {}, selfValues: ["News", "Events", "Offers", "X"] }) !== null);
+check("minSelect without ctx falls back to the collapsed selection", validateValue(vRules.topics, "1") !== null);
+check("multi-select minSelect ok", validateValue(vRules.skills, "A", { values: {}, selfValues: ["A", "B"] }) === null);
+check("multi-select minSelect under", validateValue(vRules.skills, "A", { values: {}, selfValues: ["A"] }) !== null);
+check(
+  "selection copy override",
+  buildRules(toFieldSpecs([{ type: "checkbox", name: "g", label: "G", options: ["a"], minSelect: 1 }]), { selection: "Pick at least one option." }).g.message === "Pick at least one option.",
+);
+
+const vRound = parseFieldSpec(serializeRules(vFields));
+check(
+  "data-rules round-trips the new validation keys",
+  vRound.find((f) => f.name === "vat").pattern === "^[A-Z]{2}\\d{9}$" &&
+    vRound.find((f) => f.name === "sku").minLength === 4 &&
+    vRound.find((f) => f.name === "sku").maxLength === 8 &&
+    vRound.find((f) => f.name === "confirm").sameAs === "password" &&
+    vRound.find((f) => f.name === "topics").minSelect === 2 &&
+    vRound.find((f) => f.name === "topics").maxSelect === 3 &&
+    vRound.find((f) => f.name === "skills").multiple === true,
+  JSON.stringify(vRound),
+);
+
 // canonicalData reduces File entries to filenames (comma-joined when multiple)
 const fileRaw = new FormData();
 fileRaw.set("cv", new File(["hello"], "resume.pdf"), "resume.pdf");

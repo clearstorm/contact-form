@@ -33,6 +33,7 @@ import {
   type FormCopy,
   type FormSpec,
   type Rule,
+  type RuleContext,
   type ValidationProvider,
   type VisibilityConditionLike,
 } from "../core";
@@ -88,6 +89,12 @@ interface VisibilityEngine {
   isHiddenControl: (control: Control) => boolean;
   /** The spec fields the visitor currently sees — what gets validated and sent. */
   visibleFields: () => FieldSpec[];
+  /**
+   * Trimmed, non-empty values of every in-scope control (hidden wrappers and
+   * file inputs excluded) — the context cross-field validation rules
+   * (`sameAs`) read.
+   */
+  allValues: () => Record<string, string[]>;
 }
 
 const createVisibilityEngine = (
@@ -126,6 +133,16 @@ const createVisibilityEngine = (
 
   const currentValues = (): Record<string, string[]> =>
     Object.fromEntries([...controllerNames].map((name) => [name, valuesOf(name)]));
+
+  const allValues = (): Record<string, string[]> => {
+    const names = new Set<string>();
+    for (const control of form.querySelectorAll<Control>("input, select, textarea")) {
+      if (isHiddenControl(control)) continue;
+      if (control instanceof HTMLInputElement && control.type === "file") continue;
+      names.add(control.name);
+    }
+    return Object.fromEntries([...names].map((name) => [name, valuesOf(name)]));
+  };
 
   // A control is out of scope while its field wrapper is hidden — it is not
   // validated, not sent, and does not drive other conditions.
@@ -166,13 +183,39 @@ const createVisibilityEngine = (
     isController: (name) => controllerNames.has(name),
     isHiddenControl,
     visibleFields,
+    allValues,
   };
+};
+
+/**
+ * The field's own current values for RuleContext.selfValues: every checked
+ * option of a checkbox/radio group, every selected option of a multi-select,
+ * else the single trimmed value. Required by the `minSelect`/`maxSelect`
+ * rules; the collapsed "1"/"" string is what the required check reads.
+ */
+const selfValuesFor = (control: Control, form: HTMLFormElement): string[] => {
+  if (control instanceof HTMLSelectElement) {
+    return control.multiple
+      ? Array.from(control.selectedOptions).map((o) => o.value.trim()).filter(Boolean)
+      : [control.value.trim()].filter(Boolean);
+  }
+  if (control instanceof HTMLInputElement && control.type === "file") return [];
+  if (control instanceof HTMLInputElement && (control.type === "checkbox" || control.type === "radio")) {
+    return Array.from(
+      form.querySelectorAll<HTMLInputElement>(`input[name="${CSS.escape(control.name)}"]`),
+    )
+      .filter((el) => el.checked)
+      .map((el) => el.value.trim())
+      .filter(Boolean);
+  }
+  return [control.value.trim()].filter(Boolean);
 };
 
 const validateField = (
   control: Control,
   rule: Rule | undefined,
   form: HTMLFormElement,
+  getValues?: () => Record<string, string[]>,
 ): boolean => {
   clearError(control);
   let value: string;
@@ -187,12 +230,24 @@ const validateField = (
   } else {
     value = control instanceof HTMLSelectElement ? control.value : control.value.trim();
   }
-  const message = validateValue(rule, value);
+  const ctx: RuleContext = {
+    values: getValues?.() ?? {},
+    selfValues: selfValuesFor(control, form),
+  };
+  const message = validateValue(rule, value, ctx);
   if (message) {
     setInvalid(control, message);
     return false;
   }
   return true;
+};
+
+/** Keep a `maxLength` character counter in sync with the control's input. */
+const updateCounter = (control: Control): void => {
+  const counter = control.closest<HTMLElement>(".rf-field")?.querySelector<HTMLElement>(".rf-counter");
+  const max = counter?.dataset.max;
+  if (!counter || max === undefined) return;
+  counter.textContent = `${String(control.value).length} / ${max}`;
 };
 
 /* ---- Status box ---- */
@@ -262,9 +317,10 @@ async function handleSubmit(
   // Fields inside hidden wrappers are out of scope — a hidden conditional
   // field can never block the form, and it never reaches the payload.
   const scoped = controls.filter((control) => !visibility.isHiddenControl(control));
+  const getValues = (): Record<string, string[]> => visibility.allValues();
 
   const invalidControls = scoped.filter(
-    (control) => !validateField(control, rules[control.name], form),
+    (control) => !validateField(control, rules[control.name], form, getValues),
   );
 
   if (invalidControls.length > 0) {
@@ -417,6 +473,7 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): () 
   const successMessage = spec?.status ?? status?.textContent ?? "";
 
   const visibility = createVisibilityEngine(form, fields);
+  const getValues = (): Record<string, string[]> => visibility.allValues();
 
   const isControl = (el: Element): el is Control =>
     el instanceof HTMLInputElement ||
@@ -503,7 +560,7 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): () 
     );
     if (currentStep < stepCount - 1) {
       event.preventDefault();
-      const invalid = stepControls.filter((control) => !validateField(control, rules[control.name], form));
+      const invalid = stepControls.filter((control) => !validateField(control, rules[control.name], form, getValues));
       if (invalid.length > 0) {
         invalid[0].focus();
         return;
@@ -545,11 +602,47 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): () 
   // hides the ones whose conditions don't hold yet.
   visibility.apply();
 
+  // Cross-field equality: which in-scope fields read each control's value as
+  // their `sameAs` target — re-checking a flagged dependent when the target
+  // changes (e.g. editing the password re-checks a visible "Confirm" error).
+  const sameAsDependents = new Map<string, string[]>();
+  for (const field of fields) {
+    if (field.sameAs && field.sameAs !== field.name) {
+      const list = sameAsDependents.get(field.sameAs) ?? [];
+      list.push(field.name);
+      sameAsDependents.set(field.sameAs, list);
+    }
+  }
+
   form.querySelectorAll<Control>("input, select, textarea").forEach((control) => {
     const fieldRules = rules[control.name];
     const onInput = (): void => {
       // Re-validate on change once a field has been flagged invalid.
-      if (control.hasAttribute("aria-invalid")) validateField(control, fieldRules, form);
+      if (control.hasAttribute("aria-invalid")) validateField(control, fieldRules, form, getValues);
+      // Shared-name groups (checkbox/radio): selection count is group-level,
+      // so re-check flagged siblings too when one member changes.
+      const group =
+        control instanceof HTMLInputElement &&
+        (control.type === "checkbox" || control.type === "radio")
+          ? form.querySelectorAll<Control>(`input[name="${CSS.escape(control.name)}"]`)
+          : null;
+      if (group) {
+        for (const sibling of Array.from(group)) {
+          if (sibling === control || !sibling.hasAttribute("aria-invalid")) continue;
+          validateField(sibling, rules[sibling.name], form, getValues);
+        }
+      }
+      updateCounter(control);
+      // A `sameAs` target changed — re-check flagged dependents, which only
+      // had their first error without a live peer to compare against.
+      const dependents = sameAsDependents.get(control.name);
+      if (dependents) {
+        for (const depName of dependents) {
+          const depControl = form.querySelector<Control>(`[name="${CSS.escape(depName)}"]`);
+          if (!depControl || !depControl.hasAttribute("aria-invalid")) continue;
+          validateField(depControl, rules[depName], form, getValues);
+        }
+      }
     };
     on(control, "input", onInput);
     on(control, "change", onInput);

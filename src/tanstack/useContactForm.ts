@@ -42,6 +42,7 @@ import {
   type FormFieldSpec,
   type FormSpec,
   type Rule,
+  type RuleContext,
   type ValidationProvider,
 } from "../core";
 import { getMailer, type MailerConfig, type MailerResult } from "../mailers";
@@ -58,8 +59,18 @@ export type FieldValue = string | boolean | string[] | File | FileList | null | 
 /** Field values as TanStack Form drives them. */
 export type FormValues = Record<string, FieldValue>;
 
+/**
+ * The extra props TanStack Form forwards to field validators in v1 — vendored
+ * shape, so the package never type-checks against TanStack itself (it is an
+ * optional peer). `values` is the full form state when the host supplies it.
+ */
+export interface ValidatorClientProps {
+  values?: FormValues;
+  formApi?: { state?: { values?: FormValues } };
+}
+
 /** A TanStack-compatible per-field validator: `(props) => message | undefined`. */
-export type FieldValidator = (props: { value: FieldValue }) => string | undefined;
+export type FieldValidator = (props: { value: FieldValue } & ValidatorClientProps) => string | undefined;
 
 /** Explicit endpoint overrides — take precedence over the form spec. */
 export interface TanStackBridgeOptions {
@@ -109,9 +120,36 @@ export function normalizeValue(field: FieldSpec, value: FieldValue): string {
   }
 }
 
-/** Run a core rule against one field's TanStack value. */
-export function validateFieldValue(rule: Rule | undefined, field: FieldSpec, value: FieldValue): string | undefined {
-  return validateValue(rule, normalizeValue(field, value)) ?? undefined;
+/** The RuleContext a per-field validator gets: sibling values + own entries. */
+const ruleContextFor = (field: FieldSpec, value: FieldValue, values?: FormValues): RuleContext => {
+  let selfValues: string[];
+  if (field.type === "file") {
+    selfValues = [];
+  } else if (Array.isArray(value)) {
+    // Checkbox/radio groups and multi-selects — every checked/selected option.
+    selfValues = value.map((v) => String(v).trim()).filter(Boolean);
+  } else if (field.type === "checkbox" || field.type === "radio") {
+    selfValues = value ? ["1"] : [];
+  } else {
+    selfValues = [String(value ?? "").trim()].filter(Boolean);
+  }
+  return { values: values ? valuesToLists(values) : {}, selfValues };
+};
+
+/**
+ * Run a core rule against one field's TanStack value. Pass the full form
+ * values (`values`) when the host can supply them (TanStack forwards
+ * `formApi.state.values` to validators) so cross-field rules like `sameAs`
+ * compare live siblings; without them such rules match only against the
+ * field's own entry.
+ */
+export function validateFieldValue(
+  rule: Rule | undefined,
+  field: FieldSpec,
+  value: FieldValue,
+  values?: FormValues,
+): string | undefined {
+  return validateValue(rule, normalizeValue(field, value), ruleContextFor(field, value, values)) ?? undefined;
 }
 
 /**
@@ -129,7 +167,13 @@ export function buildValidators(
   const validators: Record<string, FieldValidator> = {};
   for (const field of fields) {
     const rule = rules[field.name];
-    validators[field.name] = (props) => validateFieldValue(rule, field, props.value);
+    validators[field.name] = (props) => {
+      // TanStack v1 forwards the whole form state on formApi.state.values —
+      // cross-field rules (sameAs, minSelect/maxSelect against siblings) read
+      // live values through it.
+      const values = props.values ?? props.formApi?.state?.values;
+      return validateFieldValue(rule, field, props.value, values);
+    };
   }
   return validators;
 }

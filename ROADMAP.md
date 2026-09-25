@@ -1,0 +1,39 @@
+# Roadmap
+
+This roadmap describes intended sequencing. It does **not** determine whether
+a feature is currently implemented. See [FEATURES.md](FEATURES.md) and
+[project.state.json](project.state.json) for current status, and
+[PROJECT_STATUS.md](PROJECT_STATUS.md) for immediate next work.
+
+The items below are proposals derived from the README's stated follow-ups and
+the code's deprecation markers — reorder, rename or drop them freely.
+
+---
+
+## v0.4.0 — Nodemailer mail-delivery adapter
+
+The README's documented follow-up ("A first-party Nodemailer delivery adapter
+is planned"). Completes the serverless-worker story for the `json` mailer: the
+client posts the canonical payload to a worker; the adapter turns it into an
+email via Nodemailer. When it lands, flip `mailer-nodemailer` to
+`implemented` in FEATURES.md + project.state.json.
+
+## npm publishing
+
+The package is currently `private: true` and installed via immutable git tags.
+Ship a versioned build to the npm registry (drop `private`, publish with the
+existing `files: ["src"]` layout) so consumers can install `@clearstorm/
+contact-form` by version. Flip `release-npm-publish` when done.
+
+## Deprecation cleanup
+
+- Remove the legacy `copy.back` / `copy.next` label fallbacks (superseded by
+  `FormSpec.prev` / `FormSpec.next`).
+- Remove the `66` size alias once no spec or demo depends on it (keep `67`).
+
+## v1.0 stabilization
+
+- Freeze the `FormSpec` surface (types, serialisation, payload shapes) for a
+  1.x contract.
+- Final README / FEATURES.md / API-docs pass across all four bindings.
+- Consider a dedicated example for the Nodemailer worker once available.

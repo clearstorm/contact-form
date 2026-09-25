@@ -230,6 +230,8 @@ const fieldCases: [string, string][] = [
   ["field-textarea", renderField({ label: "Message", id: "m", name: "message", type: "textarea", rows: 4, maxlength: 100 })],
   ["field-group", renderField({ label: "Pick one", id: "p", name: "pick", type: "radio", options: ["A", "B"], required: true })],
   ["field-hidden", renderField({ label: "", id: "h", name: "hid", type: "hidden", value: "x" })],
+  ["field-counter", renderField({ label: "Promo code", id: "c", name: "code", type: "text", maxLength: 8, value: "ab", span: 6 })],
+  ["field-counter-textarea", renderField({ label: "Message", id: "m2", name: "message", type: "textarea", maxLength: 120, span: 8 })],
 ];
 
 const decorCases: [string, string][] = [

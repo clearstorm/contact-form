@@ -24,6 +24,10 @@ Status vocabulary: `implemented` · `partial` · `planned` · `deprecated`.
 | `parsetime` | Time normalisation | `parseTime` — 12h ("7:00 pm") and 24h ("19:30") input → 24-hour `HH:MM` for the email path | implemented |
 | `canonical-data` | Payload normalisation | `canonicalData` — trimmed values, multi-value fields comma-joined, file fields as filenames, honeypot never forwarded | implemented |
 | `validation-seam` | Pluggable `ValidationProvider` | `{ buildRules(fields, copy) }` seam; every binding validates through opaque `Rule` objects; default `vanillaValidation` | implemented |
+| `rules-pattern` | Regex `pattern` validation | Custom regex on string fields — enforced soft by the shared script (the form renders `novalidate`), fails open on a broken pattern; message via `field.message` → `copy.pattern` → default | implemented |
+| `rules-length` | Length bounds + live counter | `minLength` / `maxLength` soft bounds on text-like values; `maxLength` renders a live `N / max` character counter under the control; `minLength` overrides the textarea's 10-character default | implemented |
+| `rules-cross-match` | Cross-field equality | `sameAs` — the value must equal another field's (confirm-password style); the partner re-checks live when the target changes; optional fields match only while both sides are non-empty | implemented |
+| `rules-selection-bounds` | Selection bounds | `minSelect` / `maxSelect` on checkbox/radio groups and multi-selects; `minSelect > 0` implies required; group counting re-checks every flagged member when one option changes | implemented |
 | `button-specs` | Button specs | `submit` / `next` / `prev` as plain label or `{ label, variant }` (`primary` \| `secondary` \| `ghost`), default variants per role | implemented |
 | `grid-sizing` | 12-column field sizing | `size` percentage → nearest column span via `gridSpan` (`rf-span-1..12`); fields collapse below `48rem` | implemented |
 

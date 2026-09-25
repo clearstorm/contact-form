@@ -79,6 +79,12 @@ export interface FormCopy {
   textarea?: string;
   /** Checkbox/radio groups that must be selected. */
   checkbox?: string;
+  /** Regex `pattern` mismatch on string fields. */
+  pattern?: string;
+  /** `sameAs` cross-field mismatch (e.g. "Confirm password" ≠ password). */
+  sameAs?: string;
+  /** `minSelect` / `maxSelect` bounds on checkbox/radio groups and multi-selects. */
+  selection?: string;
   /** File fields that require an upload. */
   file?: string;
   /** Submit button label while the request is in flight. */
@@ -202,7 +208,34 @@ export interface FormFieldSpec {
   max?: number | string;
   step?: number | string;
   maxlength?: number;
+  /**
+   * Custom regex pattern for string fields — enforced as *soft* validation by
+   * the client (the form renders `novalidate`, so the shared script checks it
+   * and shows the field's message on mismatch). Also rendered as the native
+   * `pattern` attribute for assistive tech.
+   */
   pattern?: string;
+  /**
+   * Soft minimum length for text-like values (`text`, `email`, `tel`, `url`,
+   * `search`, `password`, `textarea`). Overrides the textarea's built-in
+   * 10-character default.
+   */
+  minLength?: number;
+  /** Soft maximum length — renders a live character counter on text-like inputs. */
+  maxLength?: number;
+  /**
+   * Another field's name this field's value must equal, e.g.
+   * `{ "name": "confirm_password", "sameAs": "password" }`. Re-validated
+   * whenever the other field changes.
+   */
+  sameAs?: string;
+  /**
+   * Minimum number of selected options before a checkbox/radio group or
+   * multi-select passes (a single checkbox: 0 or 1 by nature).
+   */
+  minSelect?: number;
+  /** Maximum number of selected options before it fails. */
+  maxSelect?: number;
   /**
    * Accept hint for `file` inputs (e.g. `"image/*,.pdf"`). No validation
    * implied — the picker hint only.
@@ -450,6 +483,20 @@ export interface FieldSpec {
   message?: string;
   min?: number | string;
   max?: number | string;
+  /** Regex pattern — soft validation on string fields. */
+  pattern?: string;
+  /** Soft minimum length for text-like values. */
+  minLength?: number;
+  /** Soft maximum length — renders a live character counter. */
+  maxLength?: number;
+  /** Another field whose value this must equal (cross-match). */
+  sameAs?: string;
+  /** Minimum selected options for groups / multi-selects. */
+  minSelect?: number;
+  /** Maximum selected options for groups / multi-selects. */
+  maxSelect?: number;
+  /** Multiple files / multi-select flag. */
+  multiple?: boolean;
   /**
    * Conditional fields: the normalized (always-array) showWhen rules —
    * conditions and/or `anyOf` / `noneOf` / `not` wrappers. Absent on
@@ -504,6 +551,13 @@ export function toFieldSpecs(fields: FormElement[]): FieldSpec[] {
       message: field.message,
       min: field.min,
       max: field.max,
+      pattern: field.pattern,
+      minLength: field.minLength,
+      maxLength: field.maxLength,
+      sameAs: field.sameAs,
+      minSelect: field.minSelect,
+      maxSelect: field.maxSelect,
+      multiple: field.multiple,
       ...(visibility && visibility.length > 0
         ? {
             visibility,
@@ -750,15 +804,36 @@ export function visibleNames(
 
 /* ---- Validation ---- */
 
+/**
+ * The context a rule gets besides the field's own value. Built by the DOM
+ * engine and the TanStack bridge; the vanilla rules mostly ignore it — the
+ * cross-field rules (`sameAs`, `minSelect`/`maxSelect`) and future adapters
+ * (file `maxSize`/MIME via `files`) are what read it.
+ */
+export interface RuleContext {
+  /**
+   * Trimmed, non-empty values of every in-scope control, keyed by field name.
+   * Checkbox/radio groups contribute only their checked option values.
+   */
+  values: Record<string, string[]>;
+  /**
+   * The field's own current values — every checked option of a checkbox/radio
+   * group, every selected option of a multi-select, else the single value.
+   */
+  selfValues: string[];
+  /** Attached files for `file` fields — name/size/type descriptors (no bytes). */
+  files?: { name: string; size: number; type: string }[];
+}
+
 export interface Rule {
   required?: boolean;
-  test: (value: string) => boolean;
+  test: (value: string, ctx?: RuleContext) => boolean;
   /**
    * The message to show on failure. A static string works everywhere; the
    * function form is for adapters (e.g. the optional Zod bridge) that want to
    * surface the exact error for the current value.
    */
-  message: string | ((value: string) => string);
+  message: string | ((value: string, ctx?: RuleContext) => string);
 }
 
 const NAME_RE = /^[\p{L}\s''-]{2,}$/u;
@@ -769,9 +844,39 @@ const NUMBER_RE = /^-?\d+(\.\d+)?$/;
 const COLOR_RE = /^#[0-9a-f]{6}$/i;
 
 /**
+ * Length bounds for text-like values (`minLength`/`maxLength`), no-ops when
+ * unset. The textarea's own 10-character default is applied in its case.
+ */
+const lengthOk = (field: FieldSpec, value: string): boolean => {
+  if (field.minLength !== undefined && value.length < field.minLength) return false;
+  if (field.maxLength !== undefined && value.length > field.maxLength) return false;
+  return true;
+};
+
+/**
+ * Custom regex pattern on string fields. An invalid pattern is a spec error —
+ * fail open, so a broken pattern never blocks valid input (the field's own
+ * type rule still validates). The pattern is tested client-side against the
+ * trimmed value exactly as the visitor typed it.
+ */
+const patternOk = (field: FieldSpec, value: string): boolean => {
+  if (!field.pattern) return true;
+  try {
+    return new RegExp(field.pattern).test(value);
+  } catch {
+    return true;
+  }
+};
+
+/** `sameAs`: the field's value must equal the target field's first value. */
+const matchesTarget = (target: string, value: string, ctx?: RuleContext): boolean =>
+  ctx?.values?.[target]?.[0] === value;
+
+/**
  * Build the per-field validation rules from a field spec. Required-ness comes
- * from the JSON spec; the format tests are shared code keyed by field type;
- * every message resolves `field.message` → `copy[key]` → default.
+ * from the JSON spec (plus `minSelect` on groups/multi-selects, which implies
+ * selecting at least one); the format tests are shared code keyed by field
+ * type; every message resolves `field.message` → `copy[key]` → default.
  */
 export function buildRules(fields: FieldSpec[], copy: FormCopy = {}): Record<string, Rule> {
   const rules: Record<string, Rule> = {};
@@ -779,10 +884,14 @@ export function buildRules(fields: FieldSpec[], copy: FormCopy = {}): Record<str
     field.message ?? copy[key] ?? fallback;
 
   for (const field of fields) {
-    const required = Boolean(field.required);
     const name = field.name;
     // Hidden fields receive no user input — never validate them.
     if (field.type === "hidden") continue;
+    // minSelect > 0 implies the group/multi-select must have a selection.
+    const required =
+      Boolean(field.required) ||
+      ((field.type === "checkbox" || field.type === "radio" || field.type === "select") &&
+        (field.minSelect ?? 0) > 0);
     if (name === "first_name" || name === "last_name") {
       rules[name] = {
         required,
@@ -801,21 +910,21 @@ export function buildRules(fields: FieldSpec[], copy: FormCopy = {}): Record<str
       case "email":
         rules[name] = {
           required,
-          test: (value) => EMAIL_RE.test(value),
+          test: (value) => EMAIL_RE.test(value) && lengthOk(field, value) && patternOk(field, value),
           message: messageFor(field, "email", "Enter a valid email address."),
         };
         break;
       case "tel":
         rules[name] = {
           required,
-          test: (value) => PHONE_RE.test(value),
+          test: (value) => PHONE_RE.test(value) && lengthOk(field, value) && patternOk(field, value),
           message: messageFor(field, "tel", "Enter a valid phone number."),
         };
         break;
       case "url":
         rules[name] = {
           required,
-          test: (value) => URL_RE.test(value),
+          test: (value) => URL_RE.test(value) && lengthOk(field, value) && patternOk(field, value),
           message: messageFor(field, "url", "Enter a valid URL."),
         };
         break;
@@ -856,26 +965,80 @@ export function buildRules(fields: FieldSpec[], copy: FormCopy = {}): Record<str
         break;
       case "checkbox":
       case "radio":
-        // The component aggregates selection state into "1" / "" for the rule.
+        // The component aggregates selection state into "1" / "" for the
+        // rule; with minSelect/maxSelect the rule counts every checked
+        // option of the group via the RuleContext instead.
+        if (field.minSelect !== undefined || field.maxSelect !== undefined) {
+          rules[name] = {
+            required,
+            test: (value, ctx) => {
+              const count = ctx?.selfValues?.length ?? (value === "1" ? 1 : 0);
+              if (field.minSelect !== undefined && count < field.minSelect) return false;
+              if (field.maxSelect !== undefined && count > field.maxSelect) return false;
+              return true;
+            },
+            message: messageFor(field, "selection", "Please select the right number of options."),
+          };
+        } else {
+          rules[name] = {
+            required,
+            test: (value) => value === "1",
+            message: messageFor(field, "checkbox", "Please select this option."),
+          };
+        }
+        break;
+      case "select":
         rules[name] = {
           required,
-          test: (value) => value === "1",
-          message: messageFor(field, "checkbox", "Please select this option."),
+          test: (value, ctx) => {
+            // Plain selects only need required-ness; bounds matter for
+            // multi-selects, where ctx.selfValues is every selected option.
+            if (field.minSelect === undefined && field.maxSelect === undefined) return true;
+            const count = ctx?.selfValues?.length ?? 0;
+            if (field.minSelect !== undefined && count < field.minSelect) return false;
+            if (field.maxSelect !== undefined && count > field.maxSelect) return false;
+            return true;
+          },
+          message: messageFor(field, "selection", "Please select the right number of options."),
         };
         break;
       case "textarea":
         rules[name] = {
           required,
-          test: (value) => value.length >= 10,
+          test: (value) =>
+            value.length >= (field.minLength ?? 10) &&
+            (field.maxLength === undefined || value.length <= field.maxLength) &&
+            patternOk(field, value),
           message: messageFor(field, "textarea", "Message must be at least 10 characters."),
         };
         break;
       default:
         rules[name] = {
           required,
-          test: () => true,
-          message: messageFor(field, "required", "Please fill this in."),
+          test: (value) => lengthOk(field, value) && patternOk(field, value),
+          // One message per field: a pattern mismatch and an empty required
+          // field resolve through the same string. Fields with a `pattern`
+          // resolve copy via the dedicated `pattern` key so consumers can
+          // phrase "wrong shape" without a per-field message.
+          message: messageFor(field, field.pattern ? "pattern" : "required", "Please fill this in."),
         };
+    }
+
+    // Cross-field equality: wrap whatever the type rule built. The base rule
+    // still runs (format/length), then the value must equal the target's. An
+    // empty confirm stays a pure required-check (you can't "match" a blank).
+    const base = rules[name];
+    if (base && field.sameAs && field.sameAs !== name) {
+      const target = field.sameAs;
+      rules[name] = {
+        ...base,
+        test: (value, ctx) => {
+          if (!base.test(value, ctx)) return false;
+          if (value === "") return true;
+          return matchesTarget(target, value, ctx);
+        },
+        message: messageFor(field, "sameAs", "These values must match."),
+      };
     }
   }
   return rules;
@@ -884,14 +1047,15 @@ export function buildRules(fields: FieldSpec[], copy: FormCopy = {}): Record<str
 /**
  * Validate one value against a rule. The value should already represent the
  * field's current state (checkbox/radio groups are collapsed to "1" / "" by
- * the component before calling this). Returns the message to show, or null
- * when the value passes.
+ * the component before calling this); `ctx` supplies the sibling values and
+ * the field's own entries that cross-field rules read. Returns the message to
+ * show, or null when the value passes.
  */
-export function validateValue(rule: Rule | undefined, value: string): string | null {
+export function validateValue(rule: Rule | undefined, value: string, ctx?: RuleContext): string | null {
   if (!rule) return null;
-  const message = typeof rule.message === "function" ? rule.message(value) : rule.message;
+  const message = typeof rule.message === "function" ? rule.message(value, ctx) : rule.message;
   if (rule.required && !value) return message;
-  if (value && !rule.test(value)) return message;
+  if (value && !rule.test(value, ctx)) return message;
   return null;
 }
 

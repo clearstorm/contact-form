@@ -278,21 +278,21 @@ delivery adapter for this package is planned.
 
 | Type | Renders as | Validation |
 | --- | --- | --- |
-| `text` | `<input type="text">` | required only (unless `pattern`) |
-| `email` | `<input type="email">` | email format |
-| `tel` | `<input type="tel">` | phone format (7–15 digits/`+-() `) |
-| `url` | `<input type="url">` | scheme-ful URL (`https://…`) |
-| `password` | `<input type="password">` | required only |
-| `search` | `<input type="search">` | required only |
+| `text` | `<input type="text">` | required only (unless `pattern` / `minLength` / `maxLength`) |
+| `email` | `<input type="email">` | email format (+ optional pattern/length bounds) |
+| `tel` | `<input type="tel">` | phone format (7–15 digits/`+-() `) (+ optional pattern/length bounds) |
+| `url` | `<input type="url">` | scheme-ful URL (`https://…`) (+ optional pattern/length bounds) |
+| `password` | `<input type="password">` | required only (+ optional pattern/length bounds) |
+| `search` | `<input type="search">` | required only (+ optional pattern/length bounds) |
 | `number` | `<input type="number">` | numeric + `min`/`max` bounds |
 | `date` | `<input type="date">` | required only |
 | `time` | `<input type="time">` | required only |
 | `datetime-local` | `<input type="datetime-local">` | required only |
 | `month` | `<input type="month">` | required only |
 | `week` | `<input type="week">` | required only |
-| `textarea` | `<textarea>` | min length 10 |
-| `select` | `<select>` — single, or multi with `multiple: true` (`rows` = visible height) | required only; multi needs at least one option chosen |
-| `checkbox` | single, or group (with `options`) | must be selected when required |
+| `textarea` | `<textarea>` | min length 10 (override via `minLength`, cap via `maxLength` + live counter) |
+| `select` | `<select>` — single, or multi with `multiple: true` (`rows` = visible height) | required only; multi needs at least one option chosen (`minSelect`/`maxSelect` bound multi-selects) |
+| `checkbox` | single, or group (with `options`) | must be selected when required (`minSelect`/`maxSelect` bound groups) |
 | `radio` | group (requires `options`) | must be selected when required |
 | `hidden` | `<input type="hidden">` | never validated |
 | `range` | `<input type="range">` | within 0–100 (override via `min`/`max`) |
@@ -304,6 +304,14 @@ delivery adapter for this package is planned.
 passthrough attributes — `placeholder`, `value`, `min`, `max`, `step`,
 `maxlength`, `pattern`, and for file/select `accept` and `multiple` — flow
 through to the rendered control.
+
+Beyond those attributes, four **validation keys** layer on top of any field's
+type rule (see [Custom validation rules](#custom-validation-rules)):
+`pattern` (regex — also rendered as the native attribute), `minLength` /
+`maxLength` (soft length bounds; `maxLength` draws a live character counter),
+`sameAs` (cross-field equality — confirm-password style) and `minSelect` /
+`maxSelect` (checked/selected counts on checkbox/radio groups and
+multi-selects).
 
 **`options` on a non-picker input** (e.g. `text`, `email`, `search`, `number`,
 … — anything that isn't `select`, checkbox/radio, `textarea` or `hidden`)
@@ -590,6 +598,9 @@ built-in default**. Put project-specific copy in the form spec:
 | `range` | range out-of-bounds | `Choose a value within the range.` |
 | `color` | colour format | `Enter a valid colour.` |
 | `textarea` | min length | `Message must be at least 10 characters.` |
+| `pattern` | regex mismatch on text-like fields (falls back to the `required` message for required-empty; format types keep their own key) | `Please fill this in.` |
+| `sameAs` | cross-field equality mismatch | `These values must match.` |
+| `selection` | `minSelect` / `maxSelect` bounds | `Please select the right number of options.` |
 | `checkbox` | checkbox/radio required | `Please select this option.` |
 | `file` | file required | `Please attach a file.` |
 | `sending` | submit button while in flight | `Sending…` |
@@ -720,6 +731,25 @@ shared code keyed by field type (`email`, `tel`, `url`, `number`/`range`
 bounds, `color`, `textarea` min length 10, names ≥ 2 letters, checkbox/radio
 selection). Errors render inline and clear on input; the honeypot field
 absorbs bots (pretend-success, nothing sent).
+
+### Custom validation rules
+
+Beyond the type's own rule, a field spec can layer on four constraints. They
+work through the same `Rule` objects as everything else — so the DOM engine,
+the React adapter and the TanStack bridge all enforce them identically:
+
+| Spec key | Meaning | Notes |
+| --- | --- | --- |
+| `pattern` | Regex the value must match (soft validation) | Also rendered as the native `pattern` attribute. The form renders `novalidate`, so **the shared script** checks it and shows the field's message on mismatch. An invalid pattern is a spec error — it's ignored (fails open), never blocking input. |
+| `minLength` / `maxLength` | Soft length bounds for text-like values (`text`, `email`, `tel`, `url`, `search`, `password`, `textarea`) | `minLength` overrides the textarea's built-in 10-char minimum. `maxLength` draws a **live character counter** under the control (`0 / 140`) that tracks typing; it's validation-only — set the native `maxlength` attribute too if you also want a hard cap. |
+| `sameAs` | The value must equal another field's value (confirm-password style) | `"sameAs": "password"`. The partner field is re-checked live whenever the target changes, so a visible "Passwords don't match" clears as you fix the original. Optional fields only match when both sides are non-empty. |
+| `minSelect` / `maxSelect` | Allowed checked/selected count on checkbox/radio groups and multi-selects | `minSelect > 0` implies required (must pick at least one). Errors are counted against the whole group, and changing any option re-checks every flagged member. |
+
+Any of these can be combined — e.g. a VAT field with `pattern`, an email with
+`maxLength`, or a "Confirm password" input with `sameAs` plus `required: true`.
+Messages resolve as everywhere else: `field.message` → `copy[key]` → default
+(see the copy table below for the new `pattern`, `sameAs` and `selection`
+keys).
 
 ### Validation is pluggable
 

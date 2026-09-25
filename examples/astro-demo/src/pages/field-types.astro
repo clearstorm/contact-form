@@ -6,6 +6,7 @@ import { getForm } from "../lib/forms";
 
 const allFields = getForm(fieldTypesSpec, "All 20 field types");
 const structure = getForm(fieldTypesSpec, "Structural field types");
+const validationExtras = getForm(fieldTypesSpec, "Validation extras");
 
 const structureRows: Array<[string, string, string]> = [
   ["heading", '{ "type": "heading", "text": "…", "line": false }', "a full-width <code>&lt;h3&gt;</code> title; its rule is on by default (left → line on the right, right → line on the left, center → both sides), <code>line: false</code> renders text only"],
@@ -15,12 +16,13 @@ const structureRows: Array<[string, string, string]> = [
 ];
 ---
 <DemoLayout title="Field types demo">
-  <p class="demo-kicker">every input type · structural types</p>
+  <p class="demo-kicker">every input type · structural types · validation extras</p>
   <h1>Field types</h1>
   <p class="lead">
-    Two named forms in one spec file (<code>examples/specs/field-types.json</code>):
-    the full 20-type kitchen sink and the structural field types — every element
-    a form can render, from a text input to a section break.
+    Three named forms in one spec file (<code>examples/specs/field-types.json</code>):
+    the full 20-type kitchen sink, the structural field types and a validation-extras
+    form — every element a form can render, from a text input to a section break,
+    plus the custom validation rules that layer on top of any field.
   </p>
 
   <h2>All 20 field types</h2>
@@ -104,4 +106,36 @@ const structureRows: Array<[string, string, string]> = [
     Note the invisible spacer at the end of the structure form, which controls
     the gap before the submit row.
   </p>
+
+  <h2>Validation extras</h2>
+  <p class="lead">
+    Four validation rules layer on top of any field's type rule — same
+    <code>Rule</code> objects through every binding (Astro shell, React
+    adapter, vanilla <code>renderForm</code>, TanStack bridge). The form below
+    exercises all of them: a <code>pattern</code> (regex) on a required VAT
+    field with a per-field message, <code>minLength</code> /
+    <code>maxLength</code> soft bounds (the <code>maxLength</code> fields render
+    a live “N / max” character counter under the control), a
+    <code>sameAs</code> confirm-password pair (the error clears live when you
+    fix the original), and <code>minSelect</code> / <code>maxSelect</code>
+    bounds on a checkbox group and a multi-select. The form-level
+    <code>copy</code> bag overrides the <code>sameAs</code> and
+    <code>selection</code> messages.
+  </p>
+
+  <div class="demo-card">
+    <FormDemo form={validationExtras} />
+  </div>
+
+  <table class="demo-table">
+    <thead>
+      <tr><th>Rule</th><th>JSON</th><th>What it does</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>pattern</code></td><td><code>{ "{ \"pattern\": \"^[A-Z]{2}\\\\d{9}$\", \"message\": \"…\" }" }</code></td><td>regex enforced by the shared script (the form renders <code>novalidate</code>); mismatch shows the field's message. A broken pattern fails open — it never blocks input</td></tr>
+      <tr><td><code>minLength</code> / <code>maxLength</code></td><td><code>{ "{ \"minLength\": 4, \"maxLength\": 8 }" }</code></td><td>soft length bounds for text-like values; <code>maxLength</code> additionally draws a live <code>0 / 8</code> counter under the control. <code>minLength</code> overrides the textarea's 10-char default</td></tr>
+      <tr><td><code>sameAs</code></td><td><code>{ "{ \"sameAs\": \"account_password\" }" }</code></td><td>the value must equal another field's — confirm-password style; the pair is re-checked live whenever the target changes</td></tr>
+      <tr><td><code>minSelect</code> / <code>maxSelect</code></td><td><code>{ "{ \"minSelect\": 2, \"maxSelect\": 3 }" }</code></td><td>allowed checked/selected count on checkbox/radio groups and multi-selects; <code>minSelect &gt; 0</code> implies required</td></tr>
+    </tbody>
+  </table>
 </DemoLayout>

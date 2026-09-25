@@ -10,10 +10,12 @@ import {
   buildInitialValues,
   buildValidators,
   normalizeValue,
+  validateFieldValue,
   valuesToFormData,
   visibleFieldNames,
 } from "../src/tanstack/useContactForm";
-import { canonicalData, toFieldSpecs, vanillaValidation, type FormSpec } from "../src/core";
+import { buildRules, canonicalData, toFieldSpecs, vanillaValidation, type FormSpec } from "../src/core";
+import type { FormValues } from "../src/tanstack/useContactForm";
 
 let failures = 0;
 const check = (label: string, cond: boolean, extra = "") => {
@@ -237,6 +239,58 @@ check(
   "bridge: numeric visibility",
   visibleFieldNames(logicFields, { plan: ["A"], team_size: ["80"] }).has("quote") &&
     !visibleFieldNames(logicFields, { plan: ["A"], team_size: ["10"] }).has("quote"),
+);
+
+/* ---- validation rule expansion: sameAs + selection bounds through the bridge ---- */
+
+const ruleFields = toFieldSpecs([
+  { type: "password", name: "password", label: "Password", required: true },
+  { type: "password", name: "confirm", label: "Confirm password", sameAs: "password", required: true },
+  {
+    type: "checkbox",
+    name: "topics",
+    label: "Topics",
+    options: ["News", "Events", "Offers"],
+    minSelect: 2,
+    maxSelect: 3,
+  },
+]);
+const ruleValidators = buildValidators(ruleFields);
+const sameValues: FormValues = { password: "hunter2", confirm: "hunter2", topics: ["News", "Events"] };
+
+check(
+  "bridge: sameAs passes when the validator reads sibling values off formApi",
+  ruleValidators.confirm({ value: "hunter2", formApi: { state: { values: sameValues } } }) === undefined,
+);
+check(
+  "bridge: sameAs mismatch reported",
+  ruleValidators.confirm({ value: "nope", formApi: { state: { values: sameValues } } }) === "These values must match.",
+);
+check(
+  "bridge: sameAs cannot match without live sibling state",
+  ruleValidators.confirm({ value: "hunter2" }) === "These values must match.",
+);
+check(
+  "bridge: minSelect satisfied by a group array",
+  ruleValidators.topics({ value: ["News", "Events"] }) === undefined,
+);
+check(
+  "bridge: minSelect under the floor",
+  ruleValidators.topics({ value: ["News"] }) === "Please select the right number of options.",
+);
+check(
+  "bridge: maxSelect over the ceiling",
+  ruleValidators.topics({ value: ["News", "Events", "Offers", "Careers"] }) === "Please select the right number of options.",
+);
+
+const ruleRules = buildRules(ruleFields);
+const confirmField = ruleFields.find((f) => f.name === "confirm")!;
+const topicsField = ruleFields.find((f) => f.name === "topics")!;
+check(
+  "bridge: validateFieldValue forwards sibling values",
+  validateFieldValue(ruleRules.confirm, confirmField, "hunter2", sameValues) === undefined &&
+    validateFieldValue(ruleRules.confirm, confirmField, "nope", sameValues) === "These values must match." &&
+    validateFieldValue(ruleRules.topics, topicsField, ["News", "Events"]) === undefined,
 );
 
 console.log(failures === 0 ? "TANSTACK ALL PASS" : `TANSTACK ${failures} FAILURES`);

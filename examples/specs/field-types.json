@@ -364,5 +364,113 @@
         "min": "2rem"
       }
     ]
+  },
+  "Validation extras": {
+    "name": "validation-extras",
+    "submit": "Send",
+    "status": "Thanks — every custom rule behaved as declared.",
+    "mailer": "json",
+    "endpoint": "http://localhost:8787/submit",
+    "copy": {
+      "sending": "Sending…",
+      "sameAs": "The two passwords must match.",
+      "selection": "Pick the right number of options (see the notes above).",
+      "submitError": "Sending failed (HTTP {status}) — is the echo server running (npm run demo:api)?"
+    },
+    "fields": [
+      {
+        "type": "text",
+        "id": "vat",
+        "name": "vat",
+        "label": "VAT number (pattern)",
+        "required": true,
+        "size": 50,
+        "placeholder": "GB123456789",
+        "pattern": "^[A-Z]{2}\\d{9}$",
+        "message": "VAT numbers look like GB123456789."
+      },
+      {
+        "type": "text",
+        "id": "promo_code",
+        "name": "promo_code",
+        "label": "Promo code (minLength + maxLength counter)",
+        "required": true,
+        "size": 50,
+        "placeholder": "4–8 characters",
+        "minLength": 4,
+        "maxLength": 8
+      },
+      {
+        "type": "email",
+        "id": "billing_email",
+        "name": "billing_email",
+        "label": "Billing email (maxLength on a format type)",
+        "required": true,
+        "size": 50,
+        "maxLength": 40
+      },
+      {
+        "type": "password",
+        "id": "account_password",
+        "name": "account_password",
+        "label": "Password (minLength)",
+        "required": true,
+        "size": 50,
+        "autocomplete": "new-password",
+        "minLength": 8
+      },
+      {
+        "type": "password",
+        "id": "confirm_password",
+        "name": "confirm_password",
+        "label": "Confirm password (sameAs)",
+        "required": true,
+        "size": 50,
+        "autocomplete": "new-password",
+        "sameAs": "account_password"
+      },
+      {
+        "type": "textarea",
+        "id": "short_message",
+        "name": "short_message",
+        "label": "Short message (minLength 20, maxLength 140)",
+        "required": true,
+        "size": 100,
+        "rows": 4,
+        "placeholder": "Keep it to 140 characters…",
+        "minLength": 20,
+        "maxLength": 140
+      },
+      {
+        "type": "checkbox",
+        "id": "channels",
+        "name": "channels",
+        "label": "Contact channels (minSelect 2, maxSelect 3)",
+        "required": true,
+        "size": 100,
+        "options": [
+          "Email",
+          "Phone",
+          "Post",
+          "SMS"
+        ]
+      },
+      {
+        "type": "select",
+        "id": "skills",
+        "name": "skills",
+        "label": "Skills (multi-select, minSelect 2)",
+        "required": true,
+        "size": 100,
+        "options": [
+          "HTML",
+          "CSS",
+          "TypeScript",
+          "React"
+        ],
+        "multiple": true,
+        "rows": 3
+      }
+    ]
   }
 }

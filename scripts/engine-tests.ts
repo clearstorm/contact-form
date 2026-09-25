@@ -264,6 +264,98 @@ check(
   JSON.stringify(logicPayload),
 );
 
+/* ---- 2c. validation rule expansion: pattern / length / sameAs / selection bounds ---- */
+
+const ruleSpec = jsonSpec(
+  [
+    {
+      type: "text",
+      id: "vat",
+      name: "vat",
+      label: "VAT number",
+      required: true,
+      pattern: "^[A-Z]{2}\\d{9}$",
+      message: "VAT must look like GB123456789.",
+    },
+    {
+      type: "text",
+      id: "code",
+      name: "code",
+      label: "Promo code",
+      required: true,
+      minLength: 4,
+      maxLength: 8,
+    },
+    { type: "password", id: "password", name: "password", label: "Password", required: true },
+    {
+      type: "password",
+      id: "confirm",
+      name: "confirm",
+      label: "Confirm password",
+      required: true,
+      sameAs: "password",
+    },
+    {
+      type: "checkbox",
+      id: "topics",
+      name: "topics",
+      label: "Topics (pick 2)",
+      required: true,
+      options: ["News", "Events", "Offers"],
+      minSelect: 2,
+    },
+  ],
+  { name: "engine-rules" },
+);
+
+form = mount(renderFormShell({ form: ruleSpec }));
+attachForm(form);
+
+const topicBoxes = () => Array.from(form.querySelectorAll<HTMLInputElement>('[name="topics"]'));
+
+// maxLength renders a live character counter that tracks typing.
+const counter = () => find(form, ".rf-counter") as HTMLElement;
+check("maxLength renders a character counter", counter().dataset.max === "8" && counter().textContent === "0 / 8");
+input(form, "code").value = "abcd";
+fire(input(form, "code"), "input");
+check("counter tracks typing", counter().textContent === "4 / 8", `got=${counter().textContent}`);
+check("exactly one counter — only the maxLength field renders it", form.querySelectorAll(".rf-counter").length === 1);
+
+// pattern: every field valid except vat → submit flags vat with its message.
+input(form, "vat").value = "BAD";
+input(form, "password").value = "s3cret";
+input(form, "confirm").value = "s3cret";
+topicBoxes()[0].checked = true;
+topicBoxes()[1].checked = true;
+submit(form);
+check("pattern mismatch blocks submit", await until(() => errorCount(form) === 1), `errors=${errorCount(form)}`);
+check(
+  "pattern message is the field's own",
+  find(form, ".rf-field-error")!.textContent === "VAT must look like GB123456789.",
+);
+
+// sameAs: mismatch flags confirm on submit; editing the target clears it live.
+input(form, "vat").value = "GB123456789";
+input(form, "confirm").value = "different";
+submit(form);
+check("sameAs mismatch flags confirm", await until(() => errorCount(form) === 1 && input(form, "confirm").hasAttribute("aria-invalid")));
+input(form, "password").value = "different";
+fire(input(form, "password"), "input");
+check("editing the target re-checks the flagged sameAs field", !input(form, "confirm").hasAttribute("aria-invalid"));
+
+// minSelect: one option flagged, second selection clears the whole group.
+topicBoxes()[1].checked = false;
+fire(topicBoxes()[0], "change");
+submit(form);
+check("minSelect under the floor", await until(() => input(form, "topics").hasAttribute("aria-invalid")));
+topicBoxes()[1].checked = true;
+fire(topicBoxes()[1], "change");
+check("second selection clears the group error", !input(form, "topics").hasAttribute("aria-invalid"));
+
+// everything fixed → submit succeeds.
+submit(form);
+check("rule-expansion form submits", await until(() => !find(form, ".rf-status")!.hidden));
+
 /* ---- 3. wizard: step scoping, Next validation, final submit ---- */
 
 const wizSpec = jsonSpec(

@@ -205,5 +205,39 @@ check(
     payload.get("first_name") === "Jane",
 );
 
+/* ---- conditional logic expansion: wrappers + numeric ops through the bridge ---- */
+
+const logicFields = toFieldSpecs([
+  { type: "select", name: "plan", label: "Plan", options: ["A", "B", "C"] },
+  {
+    type: "text",
+    name: "proc_code",
+    label: "Code",
+    showWhen: {
+      anyOf: [
+        { field: "plan", operator: "equals", value: "B" },
+        { field: "plan", operator: "equals", value: "C" },
+      ],
+    },
+  },
+  { type: "number", name: "team_size", label: "Team size" },
+  {
+    type: "text",
+    name: "quote",
+    label: "Quote",
+    showWhen: { field: "team_size", operator: "greaterThan", value: 50 },
+  },
+]);
+check(
+  "bridge: anyOf visibility honours OR",
+  visibleFieldNames(logicFields, { plan: ["C"], team_size: ["10"] }).has("proc_code") &&
+    !visibleFieldNames(logicFields, { plan: ["A"], team_size: ["10"] }).has("proc_code"),
+);
+check(
+  "bridge: numeric visibility",
+  visibleFieldNames(logicFields, { plan: ["A"], team_size: ["80"] }).has("quote") &&
+    !visibleFieldNames(logicFields, { plan: ["A"], team_size: ["10"] }).has("quote"),
+);
+
 console.log(failures === 0 ? "TANSTACK ALL PASS" : `TANSTACK ${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);

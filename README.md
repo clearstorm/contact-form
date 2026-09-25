@@ -462,11 +462,22 @@ script — no markup changes, no extra JS:
 }
 ```
 
-An **array of conditions means AND** (every one must hold). Operators:
-`equals` / `notEquals` (text, select, radio), `in` / `notIn` (value is/isn't in
-a list), `includes` (a checkbox group contains the value; an array means "all
-of these"), `filled` / `empty`. Unknown operators never match — the field stays
-hidden.
+An **array of conditions means AND** (every one must hold). For OR/NOR
+semantics wrap conditions in `anyOf` / `noneOf`, and negate any single rule
+with `not` — all three nest freely. Operators:
+
+- `equals` / `notEquals` — exact match (text, select, radio)
+- `in` / `notIn` — the value is/isn't in a list
+- `includes` / `containsAll` — a checkbox group contains *every* listed value
+- `containsAny` — a checkbox group contains *at least one* listed value
+- `greaterThan` / `greaterThanOrEqual` / `lessThan` / `lessThanOrEqual` —
+  numeric comparison (`value` as a number); non-numeric values (ISO dates,
+  times) compare lexicographically
+- `startsWith` / `endsWith` — string prefix/suffix match
+- `regex` — the value matches a regular expression (evaluated client-side)
+- `filled` / `empty` — the controlling field has / has no trimmed value
+
+Unknown operators never match — the field stays hidden.
 
 Behaviour:
 
@@ -487,20 +498,35 @@ Behaviour:
 "showWhen": { "field": "service", "operator": "notEquals", "value": "Other" }
 "showWhen": { "field": "plan",    "operator": "in",       "value": ["Pro", "Team"] }
 "showWhen": { "field": "plan",    "operator": "notIn",    "value": ["Trial"] }
-"showWhen": { "field": "topics",  "operator": "includes", "value": "News" }        // checkbox group
-"showWhen": { "field": "rush",    "operator": "filled" }                            // single checkbox
-"showWhen": { "field": "notes",   "operator": "empty" }
+"showWhen": { "field": "topics",  "operator": "includes", "value": "News" }        // checkbox group — "all of these"
+"showWhen": { "field": "topics",  "operator": "containsAll", "value": ["News", "Offers"] }
+"showWhen": { "field": "topics",  "operator": "containsAny", "value": ["News", "Offers"] } // at least one
+"showWhen": { "field": "team_size", "operator": "greaterThan", "value": 50 }      // numeric
+"showWhen": { "field": "date",   "operator": "greaterThanOrEqual", "value": "2026-10-01" } // ISO dates compare lexicographically
+"showWhen": { "field": "email",  "operator": "startsWith", "value": "jane@" }
+"showWhen": { "field": "email",  "operator": "endsWith",   "value": ".edu" }
+"showWhen": { "field": "vat",    "operator": "regex",      "value": "^[A-Z]{2}\\d{9}$" }
+"showWhen": { "field": "rush",   "operator": "filled" }                            // single checkbox
+"showWhen": { "field": "notes",  "operator": "empty" }
 "showWhen": [ // AND
   { "field": "region", "operator": "equals", "value": "US" },
   { "field": "plan",   "operator": "notEquals", "value": "Trial" }
 ]
+"showWhen": { "anyOf": [ // OR — one branch must hold
+  { "field": "plan", "operator": "equals", "value": "Enterprise" },
+  { "field": "plan", "operator": "equals", "value": "Custom" }
+] }
+"showWhen": { "noneOf": [ { "field": "plan", "operator": "equals", "value": "Free" } ] } // NOR
+"showWhen": { "not": { "field": "opt_out", "operator": "filled" } }                 // negation
 ```
 
-> Run every operator live: the demo's `/conditional` page renders all three
+> Run every operator live: the demo's `/conditional` page renders all four
 > named forms in
 > [`examples/specs/conditional.json`](examples/specs/conditional.json) — an
 > operator-reference form with one self-documenting reveal per operator,
-> alongside a realistic enquiry and an AND example.
+> alongside a realistic enquiry, an AND example and a "Logical combinations"
+> form exercising `anyOf`, `not`, numeric comparisons, `endsWith` and
+> `containsAll`.
 
 ---
 

@@ -194,6 +194,76 @@ await until(() => !find(form, ".rf-status")!.hidden);
 const payloadAfterHide = calls[calls.length - 1].data;
 check("payload only carries what the visitor saw", !("other_service" in payloadAfterHide), JSON.stringify(payloadAfterHide));
 
+/* ---- 2b. conditional logic expansion: anyOf wrappers + numeric operators ---- */
+
+const logicSpec = jsonSpec(
+  [
+    { type: "select", id: "plan", name: "plan", label: "Plan", options: ["Starter", "Enterprise", "Custom"] },
+    {
+      type: "text",
+      id: "procurement_code",
+      name: "procurement_code",
+      label: "Procurement code",
+      required: true,
+      // anyOf: shown when plan is Enterprise OR Custom.
+      showWhen: {
+        anyOf: [
+          { field: "plan", operator: "equals", value: "Enterprise" },
+          { field: "plan", operator: "equals", value: "Custom" },
+        ],
+      },
+    },
+    { type: "number", id: "team_size", name: "team_size", label: "Team size" },
+    {
+      type: "text",
+      id: "custom_quote",
+      name: "custom_quote",
+      label: "Custom quote details",
+      required: true,
+      showWhen: { field: "team_size", operator: "greaterThan", value: 50 },
+    },
+  ],
+  { name: "engine-logic" },
+);
+
+form = mount(renderFormShell({ form: logicSpec }));
+attachForm(form);
+const procWrap = () => input(form, "procurement_code").closest(".rf-field") as HTMLElement;
+const quoteWrap = () => input(form, "custom_quote").closest(".rf-field") as HTMLElement;
+
+// select defaults to its first option ("Starter") → no anyOf branch holds
+check("anyOf hidden while plan is Starter", procWrap().hidden === true);
+input(form, "plan").value = "Custom";
+fire(input(form, "plan"), "change");
+check("anyOf reveals when either branch holds", procWrap().hidden === false);
+input(form, "plan").value = "Starter";
+fire(input(form, "plan"), "change");
+check("anyOf re-hides when no branch holds", procWrap().hidden === true);
+
+// numeric operator reacts to typed input
+input(form, "team_size").value = "20";
+fire(input(form, "team_size"), "input");
+check("greaterThan hidden under the threshold", quoteWrap().hidden === true);
+input(form, "team_size").value = "80";
+fire(input(form, "team_size"), "input");
+check("greaterThan reveals over the threshold", quoteWrap().hidden === false);
+
+// reveal both, fill, submit → nested-reveal fields travel
+input(form, "plan").value = "Custom";
+fire(input(form, "plan"), "change");
+input(form, "procurement_code").value = "ENT-42";
+fire(input(form, "procurement_code"), "input");
+input(form, "custom_quote").value = "needs a custom SLA";
+fire(input(form, "custom_quote"), "input");
+submit(form);
+check("logic submit succeeds", await until(() => !find(form, ".rf-status")!.hidden));
+const logicPayload = calls[calls.length - 1].data;
+check(
+  "nested-reveal fields reach the payload",
+  logicPayload.procurement_code === "ENT-42" && logicPayload.custom_quote === "needs a custom SLA",
+  JSON.stringify(logicPayload),
+);
+
 /* ---- 3. wizard: step scoping, Next validation, final submit ---- */
 
 const wizSpec = jsonSpec(

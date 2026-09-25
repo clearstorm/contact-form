@@ -113,8 +113,15 @@ export interface FormCopy {
  *   exactly this value (text, select, radio).
  * - `in` / `notIn` — the controlling field's current value(s) overlap / don't
  *   overlap the given list.
- * - `includes` — a checkbox group includes the given value(s); an array means
- *   "all of these".
+ * - `includes` / `containsAll` (identical) — a checkbox group contains every
+ *   listed value ("all of these"); `containsAny` — it contains at least one of
+ *   the listed values.
+ * - `greaterThan` / `greaterThanOrEqual` / `lessThan` / `lessThanOrEqual` —
+ *   numeric comparison against the given number (non-numeric ISO values —
+ *   dates/times — compare lexicographically).
+ * - `startsWith` / `endsWith` — the controlling value starts/ends with the
+ *   given string; `regex` — it matches the given regular expression (tested
+ *   client-side only).
  * - `filled` / `empty` — the controlling field has / has no trimmed non-empty
  *   value.
  *
@@ -128,6 +135,15 @@ export type VisibilityOperator =
   | "in"
   | "notIn"
   | "includes"
+  | "containsAny"
+  | "containsAll"
+  | "greaterThan"
+  | "greaterThanOrEqual"
+  | "lessThan"
+  | "lessThanOrEqual"
+  | "startsWith"
+  | "endsWith"
+  | "regex"
   | "filled"
   | "empty";
 
@@ -135,12 +151,31 @@ export interface VisibilityCondition {
   /** Name of the controlling field whose value drives this condition. */
   field: string;
   operator: VisibilityOperator;
-  /** Required by `equals`/`notEquals`/`in`/`notIn`/`includes`; ignored by `filled`/`empty`. */
-  value?: string | string[];
+  /**
+   * Required by `equals`/`notEquals`/`in`/`notIn`/`includes`/`containsAny`/
+   * `containsAll`/`startsWith`/`endsWith`/`regex` (a number for the numeric
+   * comparison operators); ignored by `filled`/`empty`.
+   */
+  value?: string | number | Array<string | number>;
 }
 
-/** Single condition, or an array of conditions joined with AND. */
-export type VisibilityRule = VisibilityCondition | VisibilityCondition[];
+/**
+ * A single condition, or a logical wrapper combining conditions:
+ * `anyOf` (OR — one inner rule must hold), `noneOf` (NOR — none must hold) or
+ * `not` (negation of the inner rule). Wrappers nest freely — an `anyOf` can
+ * contain `noneOf`s, `not`s and AND arrays.
+ */
+export type VisibilityConditionLike =
+  | VisibilityCondition
+  | { anyOf: VisibilityConditionLike[] }
+  | { noneOf: VisibilityConditionLike[] }
+  | { not: VisibilityConditionLike };
+
+/**
+ * A field's `showWhen`: a single condition/wrapper, or an array of them joined
+ * with AND (the pre-1.x array-is-AND semantics are unchanged).
+ */
+export type VisibilityRule = VisibilityConditionLike | VisibilityConditionLike[];
 
 export interface FormFieldSpec {
   type?: FieldType;
@@ -416,15 +451,42 @@ export interface FieldSpec {
   min?: number | string;
   max?: number | string;
   /**
-   * Conditional fields: the normalized (always-array) showWhen conditions.
-   * Absent on unconditional fields.
+   * Conditional fields: the normalized (always-array) showWhen rules —
+   * conditions and/or `anyOf` / `noneOf` / `not` wrappers. Absent on
+   * unconditional fields.
    */
-  visibility?: VisibilityCondition[];
+  visibility?: VisibilityConditionLike[];
   /**
-   * Names of the fields whose values the visibility conditions read — the
+   * Names of the fields whose values the visibility rules read — the
    * client listens to these to re-evaluate. Absent on unconditional fields.
    */
   dependsOn?: string[];
+}
+
+/**
+ * The names of every controlling field a rule set reads — recursing through
+ * `anyOf` / `noneOf` / `not` wrappers. The client listens to exactly these to
+ * re-evaluate a conditional field (serialised as `dependsOn`).
+ */
+export function visibilityFields(rules: VisibilityConditionLike[]): string[] {
+  const out: string[] = [];
+  const walk = (rule: VisibilityConditionLike): void => {
+    if ("anyOf" in rule) {
+      rule.anyOf.forEach(walk);
+      return;
+    }
+    if ("noneOf" in rule) {
+      rule.noneOf.forEach(walk);
+      return;
+    }
+    if ("not" in rule) {
+      walk(rule.not);
+      return;
+    }
+    out.push(rule.field);
+  };
+  rules.forEach(walk);
+  return [...new Set(out)];
 }
 
 /** The client-side field spec (validation + mailers) for a form's fields. */
@@ -445,7 +507,7 @@ export function toFieldSpecs(fields: FormElement[]): FieldSpec[] {
       ...(visibility && visibility.length > 0
         ? {
             visibility,
-            dependsOn: [...new Set(visibility.map((c) => c.field))],
+            dependsOn: visibilityFields(visibility),
           }
         : {}),
     };
@@ -537,51 +599,132 @@ export function toSteps(elements: FormElement[]): FormLayout {
 
 /* ---- Conditional visibility evaluation ---- */
 
-/** Normalise a condition's `value` into a list of option strings (for `in`/`in`-family operators). */
-const valueList = (value: string | string[] | undefined): string[] => {
+/** Normalise a rule's `value` into a list of option strings (for value-family operators). */
+const valueList = (value: string | number | Array<string | number> | undefined): string[] => {
   if (value === undefined) return [];
   return Array.isArray(value) ? value.map(String) : [String(value)];
 };
 
+/** Compare a controlling value against the target string. Numeric values compare numerically; non-numeric ISO dates/times compare lexicographically. */
+const compareValues = (
+  operator: "greaterThan" | "greaterThanOrEqual" | "lessThan" | "lessThanOrEqual",
+  a: string,
+  b: string,
+): boolean => {
+  const na = Number(a);
+  const nb = Number(b);
+  if (!Number.isNaN(na) && !Number.isNaN(nb)) {
+    switch (operator) {
+      case "greaterThan": return na > nb;
+      case "greaterThanOrEqual": return na >= nb;
+      case "lessThan": return na < nb;
+      default: return na <= nb;
+    }
+  }
+  switch (operator) {
+    case "greaterThan": return a > b;
+    case "greaterThanOrEqual": return a >= b;
+    case "lessThan": return a < b;
+    default: return a <= b;
+  }
+};
+
 /**
- * Evaluate a field's showWhen conditions against the caller-supplied current
+ * Evaluate one leaf condition against the caller-supplied current values
+ * (`values[name]` = trimmed, non-empty values of the controls named `name`;
+ * checkbox/radio groups contribute only their checked values). Comparison and
+ * string-pattern operators match when *at least one* present value satisfies
+ * them; unknown operators and conditions with no usable value never match — the
+ * field stays hidden.
+ */
+const evaluateCondition = (
+  condition: VisibilityCondition,
+  values: Record<string, string[]>,
+): boolean => {
+  const field = values[condition.field] ?? [];
+  const list = valueList(condition.value);
+  switch (condition.operator) {
+    case "equals":
+      if (list.length !== 1 || field.length !== 1 || field[0] !== list[0]) return false;
+      break;
+    case "notEquals":
+      if (list.length === 1 && field.length === 1 && field[0] === list[0]) return false;
+      break;
+    case "in":
+      if (list.length === 0 || !field.some((v) => list.includes(v))) return false;
+      break;
+    case "notIn":
+      if (list.length !== 0 && field.some((v) => list.includes(v))) return false;
+      break;
+    case "includes":
+    case "containsAll":
+      if (list.length === 0 || !list.every((v) => field.includes(v))) return false;
+      break;
+    case "containsAny":
+      if (list.length === 0 || !field.some((v) => list.includes(v))) return false;
+      break;
+    case "greaterThan":
+    case "greaterThanOrEqual":
+    case "lessThan":
+    case "lessThanOrEqual": {
+      const operator = condition.operator; // narrowed by the switch — closures lose it
+      if (list.length === 0 || !field.some((v) => compareValues(operator, v, list[0]))) {
+        return false;
+      }
+      break;
+    }
+    case "startsWith":
+      if (list.length === 0 || !field.some((v) => v.startsWith(list[0]))) return false;
+      break;
+    case "endsWith":
+      if (list.length === 0 || !field.some((v) => v.endsWith(list[0]))) return false;
+      break;
+    case "regex":
+      if (list.length === 0) return false;
+      try {
+        if (!field.some((v) => new RegExp(list[0]).test(v))) return false;
+      } catch {
+        return false; // invalid regex — fail safe to hidden
+      }
+      break;
+    case "filled":
+      if (field.length === 0) return false;
+      break;
+    case "empty":
+      if (field.length !== 0) return false;
+      break;
+    default:
+      return false; // unknown operator — fail safe to hidden
+  }
+  return true;
+};
+
+/** Evaluate one rule (a condition or an `anyOf` / `noneOf` / `not` wrapper). */
+const evaluateRule = (
+  rule: VisibilityConditionLike,
+  values: Record<string, string[]>,
+): boolean => {
+  if ("anyOf" in rule) return rule.anyOf.some((inner) => evaluateRule(inner, values));
+  if ("noneOf" in rule) return !rule.noneOf.some((inner) => evaluateRule(inner, values));
+  if ("not" in rule) return !evaluateRule(rule.not, values);
+  return evaluateCondition(rule, values);
+};
+
+/**
+ * Evaluate a field's showWhen rules against the caller-supplied current
  * values (`values[name]` = trimmed, non-empty values of the controls named
  * `name`; checkbox/radio groups contribute only their checked values). An
- * array of conditions requires every one to hold (AND). Unknown operators and
- * conditions with no usable value never match — the field stays hidden.
+ * array of rules requires every one to hold (AND); `anyOf` requires at least
+ * one (OR), `noneOf` requires none (NOR) and `not` negates the inner rule.
+ * Unknown operators and rules with no usable value never match — the field
+ * stays hidden.
  */
 export function evaluateVisibility(
-  conditions: VisibilityCondition[],
+  rules: VisibilityConditionLike[],
   values: Record<string, string[]>,
 ): boolean {
-  for (const condition of conditions) {
-    const field = values[condition.field] ?? [];
-    const list = valueList(condition.value);
-    switch (condition.operator) {
-      case "equals":
-        if (list.length !== 1 || field.length !== 1 || field[0] !== list[0]) return false;
-        break;
-      case "notEquals":
-        if (list.length === 1 && field.length === 1 && field[0] === list[0]) return false;
-        break;
-      case "in":
-        if (list.length === 0 || !field.some((v) => list.includes(v))) return false;
-        break;
-      case "notIn":
-        if (list.length !== 0 && field.some((v) => list.includes(v))) return false;
-        break;
-      case "includes":
-        if (list.length === 0 || !list.every((v) => field.includes(v))) return false;
-        break;
-      case "filled":
-        if (field.length === 0) return false;
-        break;
-      case "empty":
-        if (field.length !== 0) return false;
-        break;
-      default:
-        return false; // unknown operator — fail safe to hidden
-    }
+  for (const rule of rules) {
+    if (!evaluateRule(rule, values)) return false;
   }
   return true;
 }

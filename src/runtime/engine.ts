@@ -26,6 +26,7 @@ import {
   toSteps,
   validateValue,
   vanillaValidation,
+  visibilityFields,
   visibleNames,
   type ButtonVariant,
   type FieldSpec,
@@ -33,7 +34,7 @@ import {
   type FormSpec,
   type Rule,
   type ValidationProvider,
-  type VisibilityCondition,
+  type VisibilityConditionLike,
 } from "../core";
 import { getMailer, type MailerConfig } from "../mailers";
 
@@ -93,12 +94,14 @@ const createVisibilityEngine = (
   form: HTMLFormElement,
   fields: FieldSpec[],
 ): VisibilityEngine => {
-  const visibilityByField = new Map<string, VisibilityCondition[]>();
+  const visibilityByField = new Map<string, VisibilityConditionLike[]>();
   const controllerNames = new Set<string>();
   for (const field of fields) {
     if (field.visibility?.length) {
       visibilityByField.set(field.name, field.visibility);
-      for (const condition of field.visibility) controllerNames.add(condition.field);
+      // Recursive through anyOf/noneOf/not wrappers — every controlling field
+      // gets an input/change listener, whatever its depth.
+      for (const name of visibilityFields(field.visibility)) controllerNames.add(name);
     }
   }
 

@@ -198,6 +198,76 @@ check("payload drops hidden conditional field", !("other_service" in Object.from
 const condRules = buildRules(toFieldSpecs([{ type: "email", name: "alt_email", label: "Alt email", required: true, showWhen: { field: "plain", operator: "filled" } }]));
 check("conditional field still builds rules", "alt_email" in condRules && condRules.alt_email.required === true);
 
+// --- 2.7b. Conditional logic expansion: numeric/string/multi-value operators + wrappers ---
+const cmp = (op, value) => evaluateVisibility([{ field: "n", operator: op, value }], { n: ["42"] });
+check("greaterThan matches", cmp("greaterThan", 41));
+check("greaterThan misses equal", !cmp("greaterThan", 42));
+check("greaterThanOrEqual matches equal", cmp("greaterThanOrEqual", 42));
+check("lessThan matches", cmp("lessThan", 43));
+check("lessThanOrEqual matches equal", cmp("lessThanOrEqual", 42));
+check("numeric target as string", cmp("greaterThan", "41"));
+check("empty controlling value never matches", !evaluateVisibility([{ field: "n", operator: "greaterThan", value: 50 }], { n: [] }));
+check("non-numeric ISO dates compare lexicographically", evaluateVisibility([{ field: "d", operator: "greaterThan", value: "2026-09-25" }], { d: ["2026-09-30"] }));
+check("ISO date under - not greater", !evaluateVisibility([{ field: "d", operator: "greaterThan", value: "2026-09-25" }], { d: ["2026-09-01"] }));
+
+check("startsWith matches", evaluateVisibility([{ field: "e", operator: "startsWith", value: "jane@" }], { e: ["jane@uni.edu"] }));
+check("startsWith misses", !evaluateVisibility([{ field: "e", operator: "startsWith", value: "bob@" }], { e: ["jane@uni.edu"] }));
+check("endsWith matches", evaluateVisibility([{ field: "e", operator: "endsWith", value: ".edu" }], { e: ["jane@uni.edu"] }));
+check("endsWith misses", !evaluateVisibility([{ field: "e", operator: "endsWith", value: ".co.uk" }], { e: ["jane@uni.edu"] }));
+check("regex matches", evaluateVisibility([{ field: "vat", operator: "regex", value: "^[A-Z]{2}\\d{9}$" }], { vat: ["GB123456789"] }));
+check("regex misses", !evaluateVisibility([{ field: "vat", operator: "regex", value: "^[A-Z]{2}\\d{9}$" }], { vat: ["123"] }));
+check("invalid regex fails safe to hidden", !evaluateVisibility([{ field: "x", operator: "regex", value: "(" }], { x: ["y"] }));
+
+const grp = (op, value) => evaluateVisibility([{ field: "svcs", operator: op, value }], { svcs: ["On-premise", "Backup"] });
+check("containsAll holds when every listed option present", grp("containsAll", ["On-premise", "Backup"]));
+check("containsAll misses a partial match", !grp("containsAll", ["On-premise", "Hardware"]));
+check("containsAny holds with one option present", grp("containsAny", ["Hardware", "On-premise"]));
+check("containsAny misses when none present", !grp("containsAny", ["Hardware", "Cloud"]));
+check("includes stays the all-of alias", grp("includes", ["On-premise", "Backup"]) && !grp("includes", ["On-premise", "Hardware"]));
+
+check("anyOf holds when a branch matches", evaluateVisibility([{ anyOf: [{ field: "plan", operator: "equals", value: "Enterprise" }, { field: "plan", operator: "equals", value: "Custom" }] }], { plan: ["Custom"] }));
+check("anyOf misses when no branch matches", !evaluateVisibility([{ anyOf: [{ field: "plan", operator: "equals", value: "Enterprise" }, { field: "plan", operator: "equals", value: "Custom" }] }], { plan: ["Free"] }));
+check("noneOf holds when nothing matches", evaluateVisibility([{ noneOf: [{ field: "plan", operator: "equals", value: "Free" }] }], { plan: ["Pro"] }));
+check("noneOf misses when something matches", !evaluateVisibility([{ noneOf: [{ field: "plan", operator: "equals", value: "Free" }] }], { plan: ["Free"] }));
+check("not negates a condition", evaluateVisibility([{ not: { field: "role", operator: "equals", value: "admin" } }], { role: ["user"] }));
+check("not flips a true condition to hidden", !evaluateVisibility([{ not: { field: "role", operator: "equals", value: "admin" } }], { role: ["admin"] }));
+check("not of an anyOf wrapper", evaluateVisibility([{ not: { anyOf: [{ field: "p", operator: "equals", value: "A" }, { field: "p", operator: "equals", value: "B" }] } }], { p: ["C"] }));
+check("anyOf containing a not wrapper", evaluateVisibility([{ anyOf: [{ field: "p", operator: "equals", value: "A" }, { not: { field: "p", operator: "equals", value: "B" } }] }], { p: ["C"] }));
+check("AND array with a wrapper element", evaluateVisibility([{ field: "n", operator: "greaterThan", value: 10 }, { anyOf: [{ field: "p", operator: "equals", value: "A" }, { field: "p", operator: "equals", value: "B" }] }], { n: ["20"], p: ["B"] }));
+check("AND array with a wrapper element (first fails)", !evaluateVisibility([{ field: "n", operator: "greaterThan", value: 10 }, { anyOf: [{ field: "p", operator: "equals", value: "A" }, { field: "p", operator: "equals", value: "B" }] }], { n: ["5"], p: ["B"] }));
+
+// Wrappers serialise into data-rules and expand dependsOn recursively.
+const wrapRaw = [
+  { type: "text", name: "sku", label: "SKU", showWhen: { anyOf: [{ field: "plan", operator: "equals", value: "Enterprise" }, { field: "region", operator: "equals", value: "EU" }] } },
+  { type: "text", name: "locked_note", label: "Note", showWhen: { not: { field: "active", operator: "filled" } } },
+];
+const wrapFields = toFieldSpecs(wrapRaw);
+const wrapByName = (n) => wrapFields.find((f) => f.name === n);
+check(
+  "anyOf serialised through toFieldSpecs",
+  JSON.stringify(wrapByName("sku").visibility) ===
+    JSON.stringify([{ anyOf: [{ field: "plan", operator: "equals", value: "Enterprise" }, { field: "region", operator: "equals", value: "EU" }] }]),
+);
+check("anyOf dependsOn collects every controller", JSON.stringify(wrapByName("sku").dependsOn) === JSON.stringify(["plan", "region"]));
+check("not wrapper dependsOn recurses", JSON.stringify(wrapByName("locked_note").dependsOn) === JSON.stringify(["active"]));
+const wrapRound = parseFieldSpec(serializeRules(wrapFields));
+check(
+  "data-rules round-trip keeps anyOf",
+  JSON.stringify(wrapRound.find((f) => f.name === "sku").visibility) === JSON.stringify(wrapByName("sku").visibility),
+);
+check(
+  "data-rules round-trip keeps not",
+  JSON.stringify(wrapRound.find((f) => f.name === "locked_note").visibility) === JSON.stringify([{ not: { field: "active", operator: "filled" } }]),
+);
+
+const wrapVisible = visibleNames(wrapFields, { plan: ["Free"], region: ["EU"], active: [] });
+check("visibleNames honours anyOf", wrapVisible.has("sku"));
+const wrapHidden = visibleNames(wrapFields, { plan: ["Free"], region: ["US"], active: [] });
+check("visibleNames hides when no anyOf branch holds", !wrapHidden.has("sku"));
+check("visibleNames honours not", wrapHidden.has("locked_note"));
+const wrapNotHidden = visibleNames(wrapFields, { plan: [], region: [], active: ["yes"] });
+check("visibleNames hides a not-filled field", !wrapNotHidden.has("locked_note"));
+
 // --- 2.8. Structural elements (heading / description / divider / section) ---
 const structRaw = [
   { type: "text", id: "full_name", name: "full_name", label: "Name", required: true },

@@ -367,5 +367,142 @@
         ]
       }
     ]
+  },
+  "Logical combinations": {
+    "name": "logic",
+    "submit": "Send",
+    "status": "Thanks — every logical combination behaved as declared.",
+    "mailer": "json",
+    "endpoint": "http://localhost:8787/submit",
+    "copy": {
+      "sending": "Sending…",
+      "submitError": "Sending failed (HTTP {status}) — is the echo server running (npm run demo:api)?"
+    },
+    "fields": [
+      {
+        "type": "select",
+        "id": "plan",
+        "name": "plan",
+        "label": "Plan",
+        "required": true,
+        "size": 50,
+        "options": [
+          "Starter",
+          "Enterprise",
+          "Custom"
+        ],
+        "message": "Choose a plan."
+      },
+      {
+        "type": "text",
+        "id": "procurement_code",
+        "name": "procurement_code",
+        "label": "anyOf — shown when Plan is “Enterprise” or “Custom”",
+        "size": 50,
+        "placeholder": "e.g. ENT-42",
+        "showWhen": {
+          "anyOf": [
+            {
+              "field": "plan",
+              "operator": "equals",
+              "value": "Enterprise"
+            },
+            {
+              "field": "plan",
+              "operator": "equals",
+              "value": "Custom"
+            }
+          ]
+        }
+      },
+      {
+        "type": "number",
+        "id": "team_size",
+        "name": "team_size",
+        "label": "Team size",
+        "optional": true,
+        "size": 50,
+        "placeholder": "0"
+      },
+      {
+        "type": "text",
+        "id": "custom_quote",
+        "name": "custom_quote",
+        "label": "greaterThan — shown when Team size > 50",
+        "size": 50,
+        "showWhen": {
+          "field": "team_size",
+          "operator": "greaterThan",
+          "value": 50
+        }
+      },
+      {
+        "type": "email",
+        "id": "visitor_email",
+        "name": "visitor_email",
+        "label": "Email address",
+        "required": true,
+        "size": 50
+      },
+      {
+        "type": "text",
+        "id": "student_discount",
+        "name": "student_discount",
+        "label": "endsWith — shown when the email ends in “.edu”",
+        "size": 50,
+        "showWhen": {
+          "field": "visitor_email",
+          "operator": "endsWith",
+          "value": ".edu"
+        }
+      },
+      {
+        "type": "checkbox",
+        "id": "services",
+        "name": "services",
+        "label": "Services (checkbox group)",
+        "size": 100,
+        "options": [
+          "On-premise",
+          "Hardware Support",
+          "Training"
+        ]
+      },
+      {
+        "type": "text",
+        "id": "hardware_specs",
+        "name": "hardware_specs",
+        "label": "containsAll — shown when On-premise AND Hardware Support are ticked",
+        "size": 100,
+        "showWhen": {
+          "field": "services",
+          "operator": "containsAll",
+          "value": [
+            "On-premise",
+            "Hardware Support"
+          ]
+        }
+      },
+      {
+        "type": "checkbox",
+        "id": "dont_call",
+        "name": "dont_call",
+        "label": "Opt out of the callback",
+        "size": 50
+      },
+      {
+        "type": "text",
+        "id": "callback_note",
+        "name": "callback_note",
+        "label": "not — visible while “Opt out” is unticked",
+        "size": 50,
+        "showWhen": {
+          "not": {
+            "field": "dont_call",
+            "operator": "filled"
+          }
+        }
+      }
+    ]
   }
 }

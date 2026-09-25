@@ -15,7 +15,7 @@ next item instead of duplicating it.
   vanilla · TanStack). Immutable tags: `v0.1.0`, `v0.2.0`, `v0.3.0`.
 - **Branch:** `dev` (ahead of `main`), working tree clean.
 - **Most recent work (HEAD):**
-  - Validation rule expansion (`rules-*`) — `pattern` (regex), `minLength` /
+  - Validation rule expansion (`1ea47bc`) — `pattern` (regex), `minLength` /
     `maxLength` soft bounds (with a live `N / max` character counter),
     `sameAs` cross-field equality and `minSelect` / `maxSelect` selection
     bounds; a `RuleContext` seam (`values`, `selfValues`) threads sibling

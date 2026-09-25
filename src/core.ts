@@ -87,6 +87,12 @@ export interface FormCopy {
   selection?: string;
   /** File fields that require an upload. */
   file?: string;
+  /** A file exceeds `maxSize` — `{max}` renders the human-readable limit. */
+  fileSize?: string;
+  /** A file's MIME type isn't in `allowedTypes`. */
+  fileType?: string;
+  /** The number of attached files is outside `minFiles`/`maxFiles` — `{min}`/`{max}` placeholders. */
+  fileCount?: string;
   /** Submit button label while the request is in flight. */
   sending?: string;
   /**
@@ -246,6 +252,24 @@ export interface FormFieldSpec {
    * multi-select (`rows` controls its visible height).
    */
   multiple?: boolean;
+  /**
+   * Per-file maximum size for `file` inputs. A plain number is bytes; a string
+   * accepts size units (`"512KB"`, `"5MB"`). Any attached file larger than this
+   * fails the field. Unparseable values fail open, the same way an invalid
+   * `pattern` does.
+   */
+  maxSize?: number | string;
+  /**
+   * MIME allow-list for attached files — exact types (`"application/pdf"`) or
+   * globs (`"image/*"`). This is the *enforcement* list; `accept` stays the
+   * picker hint only. A file with an empty/unknown MIME type fails when a list
+   * is configured.
+   */
+  allowedTypes?: string[];
+  /** Minimum number of attached files (a `multiple` file input). `> 0` implies required. */
+  minFiles?: number;
+  /** Maximum number of attached files (a `multiple` file input). */
+  maxFiles?: number;
 }
 
 /* ---- Structural elements (heading, description, divider, section) ---- */
@@ -497,6 +521,14 @@ export interface FieldSpec {
   maxSelect?: number;
   /** Multiple files / multi-select flag. */
   multiple?: boolean;
+  /** Per-file maximum size (bytes or a `"5MB"`-style units string). */
+  maxSize?: number | string;
+  /** MIME allow-list for attached files — exact types or `image/*` globs. */
+  allowedTypes?: string[];
+  /** Minimum attached files (`multiple` file inputs). */
+  minFiles?: number;
+  /** Maximum attached files (`multiple` file inputs). */
+  maxFiles?: number;
   /**
    * Conditional fields: the normalized (always-array) showWhen rules —
    * conditions and/or `anyOf` / `noneOf` / `not` wrappers. Absent on
@@ -558,6 +590,10 @@ export function toFieldSpecs(fields: FormElement[]): FieldSpec[] {
       minSelect: field.minSelect,
       maxSelect: field.maxSelect,
       multiple: field.multiple,
+      maxSize: field.maxSize,
+      allowedTypes: field.allowedTypes,
+      minFiles: field.minFiles,
+      maxFiles: field.maxFiles,
       ...(visibility && visibility.length > 0
         ? {
             visibility,
@@ -806,9 +842,11 @@ export function visibleNames(
 
 /**
  * The context a rule gets besides the field's own value. Built by the DOM
- * engine and the TanStack bridge; the vanilla rules mostly ignore it — the
- * cross-field rules (`sameAs`, `minSelect`/`maxSelect`) and future adapters
- * (file `maxSize`/MIME via `files`) are what read it.
+ * engine (the TanStack bridge builds it too, minus `files`, which has no
+ * FileList in API-land — file bounds idle there); the vanilla rules mostly
+ * ignore it — the cross-field rules (`sameAs`, `minSelect`/`maxSelect`) and
+ * the file bounds (`maxSize`/`allowedTypes`/`minFiles`/`maxFiles` via `files`)
+ * are what read it.
  */
 export interface RuleContext {
   /**
@@ -873,6 +911,52 @@ const matchesTarget = (target: string, value: string, ctx?: RuleContext): boolea
   ctx?.values?.[target]?.[0] === value;
 
 /**
+ * Size-units parsing for `maxSize`: a plain number is bytes, a string accepts
+ * `"512KB"` / `"5MB"` style units. Unparseable strings return undefined — the
+ * rule then fails open, the same way an invalid `pattern` does.
+ */
+const parseMaxSize = (max?: number | string): number | undefined => {
+  if (max === undefined) return undefined;
+  if (typeof max === "number") return max;
+  const match = /^(\d+(?:\.\d+)?)\s*(b|kb|mb|gb)$/i.exec(max.trim());
+  if (!match) return undefined;
+  const units: Record<string, number> = { b: 0, kb: 1, mb: 2, gb: 3 };
+  return Math.round(Number(match[1]) * 1024 ** units[match[2].toLowerCase()]);
+};
+
+/** Render byte counts human-readably for the `{max}` token — "512KB", "2MB". */
+const formatSize = (bytes: number): string => {
+  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1).replace(/\.0$/, "")}GB`;
+  if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(1).replace(/\.0$/, "")}MB`;
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1).replace(/\.0$/, "")}KB`;
+  return `${bytes}B`;
+};
+
+/** True when a file's MIME type matches the allow-list (exact or `image/*`). */
+const matchesAllowed = (allowed: string[], type: string): boolean =>
+  allowed.some((entry) => entry === type || (entry.endsWith("/*") && type.startsWith(entry.slice(0, -1))));
+
+/** Replace `{key}` placeholders in a visitor-facing string. */
+const tokens = (text: string, values: Record<string, string | number>): string =>
+  Object.entries(values).reduce((acc, [key, value]) => acc.replaceAll(`{${key}}`, String(value)), text);
+
+/**
+ * The attached files satisfy the field's file bounds (`maxSize` /
+ * `allowedTypes` / `minFiles` / `maxFiles`). An empty selection is the
+ * required check's business — file bounds only judge files that exist.
+ */
+const filesOk = (field: FieldSpec, ctx?: RuleContext): boolean => {
+  const files = ctx?.files;
+  if (!files || files.length === 0) return true;
+  const max = parseMaxSize(field.maxSize);
+  if (max !== undefined && files.some((file) => file.size > max)) return false;
+  if (field.allowedTypes?.length && files.some((file) => !matchesAllowed(field.allowedTypes!, file.type))) return false;
+  if (field.minFiles !== undefined && files.length < field.minFiles) return false;
+  if (field.maxFiles !== undefined && files.length > field.maxFiles) return false;
+  return true;
+};
+
+/**
  * Build the per-field validation rules from a field spec. Required-ness comes
  * from the JSON spec (plus `minSelect` on groups/multi-selects, which implies
  * selecting at least one); the format tests are shared code keyed by field
@@ -883,15 +967,51 @@ export function buildRules(fields: FieldSpec[], copy: FormCopy = {}): Record<str
   const messageFor = (field: FieldSpec, key: keyof FormCopy, fallback: string): string =>
     field.message ?? copy[key] ?? fallback;
 
+  /**
+   * Resolve the message for a file failure — which bound broke decides which
+   * copy key wins (fileSize / fileType / fileCount), so a single per-field
+   * `message` override covers every case for that field.
+   */
+  const fileMessageFor = (field: FieldSpec): ((value: string, ctx?: RuleContext) => string) => {
+    return (value, ctx) => {
+      const files = ctx?.files;
+      if (files && files.length > 0) {
+        const max = parseMaxSize(field.maxSize);
+        if (max !== undefined && files.some((file) => file.size > max)) {
+          const raw = copy.fileSize ?? `File is too large (max ${formatSize(max)}).`;
+          return field.message ?? tokens(raw, { max: formatSize(max) });
+        }
+        if (field.allowedTypes?.length && files.some((file) => !matchesAllowed(field.allowedTypes!, file.type))) {
+          return messageFor(field, "fileType", "This file type isn't allowed.");
+        }
+        const min = field.minFiles;
+        const maximum = field.maxFiles;
+        if ((min !== undefined && files.length < min) || (maximum !== undefined && files.length > maximum)) {
+          const defaultText =
+            min !== undefined && maximum !== undefined
+              ? "Attach between {min} and {max} files."
+              : min !== undefined
+                ? "Attach at least {min} files."
+                : "Attach at most {max} files.";
+          const raw = copy.fileCount ?? defaultText;
+          return field.message ?? tokens(raw, { min: min ?? 0, max: maximum ?? 0 });
+        }
+      }
+      return messageFor(field, "file", "Please attach a file.");
+    };
+  };
+
   for (const field of fields) {
     const name = field.name;
     // Hidden fields receive no user input — never validate them.
     if (field.type === "hidden") continue;
-    // minSelect > 0 implies the group/multi-select must have a selection.
+    // minSelect > 0 implies the group/multi-select must have a selection;
+    // minFiles > 0 implies a file field must have at least one attachment.
     const required =
       Boolean(field.required) ||
       ((field.type === "checkbox" || field.type === "radio" || field.type === "select") &&
-        (field.minSelect ?? 0) > 0);
+        (field.minSelect ?? 0) > 0) ||
+      (field.type === "file" && (field.minFiles ?? 0) > 0);
     if (name === "first_name" || name === "last_name") {
       rules[name] = {
         required,
@@ -956,11 +1076,13 @@ export function buildRules(fields: FieldSpec[], copy: FormCopy = {}): Record<str
         };
         break;
       case "file":
-        // The component aggregates file-selection into "1" / "" for the rule.
+        // The component aggregates file-selection into "1" / "" for the
+        // rule; the actual files ride in ctx.files so the size/type/count
+        // bounds (maxSize / allowedTypes / minFiles / maxFiles) can run.
         rules[name] = {
           required,
-          test: (value) => value === "1",
-          message: messageFor(field, "file", "Please attach a file."),
+          test: (value, ctx) => value === "1" && filesOk(field, ctx),
+          message: fileMessageFor(field),
         };
         break;
       case "checkbox":

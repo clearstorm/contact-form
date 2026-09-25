@@ -233,6 +233,12 @@ const validateField = (
   const ctx: RuleContext = {
     values: getValues?.() ?? {},
     selfValues: selfValuesFor(control, form),
+    // File bounds (maxSize / allowedTypes / minFiles / maxFiles) read the
+    // attached files' descriptors — never the bytes, so no payload copies.
+    files:
+      control instanceof HTMLInputElement && control.type === "file" && control.files
+        ? Array.from(control.files).map((file) => ({ name: file.name, size: file.size, type: file.type }))
+        : undefined,
   };
   const message = validateValue(rule, value, ctx);
   if (message) {

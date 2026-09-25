@@ -457,11 +457,127 @@ check("file required passes once selected", validateValue(fileRules.cv, "1") ===
 check("file optional empty ok", validateValue(fileRules.files, "") === null);
 check(
   "file copy override",
-  buildRules(toFieldSpecs([{ type: "file", name: "cv2", label: "CV", required: true }]), { file: "Attach your CV." }).cv2.message === "Attach your CV.",
+  buildRules(toFieldSpecs([{ type: "file", name: "cv2", label: "CV", required: true }]), { file: "Attach your CV." }).cv2.message("") === "Attach your CV.",
 );
 check(
   "serialized spec carries file type",
   parseFieldSpec(serializeRules(fileFieldsFromSpec))[0].type === "file",
+);
+
+// --- 4c. file upload rules: maxSize / allowedTypes / minFiles / maxFiles ---
+const fileBoundCtx = (files) => ({ values: {}, selfValues: [], files });
+const png = { name: "a.png", size: 1024, type: "image/png" };
+const okText = () => [{ name: "a.txt", size: 512, type: "text/plain" }];
+
+check(
+  "maxSize byte number — over the limit flags",
+  validateValue(buildRules(toFieldSpecs([{ type: "file", name: "b1", label: "F", maxSize: 1024 }])).b1, "1", fileBoundCtx([{ ...png, size: 2048 }])) !== null,
+);
+check(
+  "maxSize byte number — at the limit passes",
+  validateValue(buildRules(toFieldSpecs([{ type: "file", name: "b2", label: "F", maxSize: 1024 }])).b2, "1", fileBoundCtx([png])) === null,
+);
+check(
+  "maxSize units string parsed ('2MB') over the limit",
+  validateValue(buildRules(toFieldSpecs([{ type: "file", name: "b3", label: "F", maxSize: "2MB" }])).b3, "1", fileBoundCtx([{ name: "big.bin", size: 3 * 1024 * 1024, type: "application/octet-stream" }])) !== null,
+);
+check(
+  "maxSize units string under the limit passes",
+  validateValue(buildRules(toFieldSpecs([{ type: "file", name: "b4", label: "F", maxSize: "512KB" }])).b4, "1", fileBoundCtx(okText())) === null,
+);
+check(
+  "unparseable maxSize fails open (spec error never blocks)",
+  validateValue(buildRules(toFieldSpecs([{ type: "file", name: "b5", label: "F", maxSize: "lots" }])).b5, "1", fileBoundCtx([{ name: "huge.bin", size: 2 ** 53, type: "text/plain" }])) === null,
+);
+
+check(
+  "allowedTypes rejects a disallowed MIME",
+  validateValue(buildRules(toFieldSpecs([{ type: "file", name: "b6", label: "F", allowedTypes: ["image/png", "application/pdf"] }])).b6, "1", fileBoundCtx([{ name: "x.exe", size: 100, type: "application/x-msdownload" }])) !== null,
+);
+check(
+  "allowedTypes passes an exact MIME",
+  validateValue(buildRules(toFieldSpecs([{ type: "file", name: "b7", label: "F", allowedTypes: ["image/png"] }])).b7, "1", fileBoundCtx([png])) === null,
+);
+check(
+  "allowedTypes glob matches (image/*)",
+  validateValue(buildRules(toFieldSpecs([{ type: "file", name: "b8", label: "F", allowedTypes: ["image/*"] }])).b8, "1", fileBoundCtx([{ name: "p.jpg", size: 100, type: "image/jpeg" }])) === null,
+);
+check(
+  "allowedTypes rejects an empty/unknown MIME",
+  validateValue(buildRules(toFieldSpecs([{ type: "file", name: "b9", label: "F", allowedTypes: ["image/*"] }])).b9, "1", fileBoundCtx([{ name: "no-type", size: 100, type: "" }])) !== null,
+);
+
+check(
+  "maxFiles over the ceiling flags",
+  validateValue(buildRules(toFieldSpecs([{ type: "file", name: "b10", label: "F", multiple: true, maxFiles: 2 }])).b10, "1", fileBoundCtx([png, okText(), { name: "c", size: 1, type: "text/plain" }])) !== null,
+);
+check(
+  "maxFiles at the ceiling passes",
+  validateValue(buildRules(toFieldSpecs([{ type: "file", name: "b11", label: "F", multiple: true, maxFiles: 2 }])).b11, "1", fileBoundCtx([png, okText()])) === null,
+);
+check(
+  "minFiles under the floor flags",
+  validateValue(buildRules(toFieldSpecs([{ type: "file", name: "b12", label: "F", multiple: true, minFiles: 2 }])).b12, "1", fileBoundCtx([png])) !== null,
+);
+check(
+  "minFiles satisfied",
+  validateValue(buildRules(toFieldSpecs([{ type: "file", name: "b13", label: "F", multiple: true, minFiles: 2 }])).b13, "1", fileBoundCtx([png, okText()])) === null,
+);
+check(
+  "minFiles > 0 implies required — empty selection fails",
+  validateValue(buildRules(toFieldSpecs([{ type: "file", name: "b14", label: "F", multiple: true, minFiles: 2 }])).b14, "") !== null,
+);
+check(
+  "file bounds idle without ctx.files (bridge path)",
+  validateValue(buildRules(toFieldSpecs([{ type: "file", name: "b15", label: "F", maxFiles: 1 }])).b15, "1") === null,
+);
+
+const sizeMsg = buildRules(toFieldSpecs([{ type: "file", name: "s", label: "S", maxSize: "1MB" }])).s.message;
+check(
+  "fileSize default message names the max",
+  sizeMsg("1", fileBoundCtx([{ name: "big", size: 2 * 1024 * 1024, type: "text/plain" }])).includes("1MB"),
+);
+check(
+  "fileSize copy override with {max} token",
+  buildRules(toFieldSpecs([{ type: "file", name: "s2", label: "S", maxSize: "1MB" }]), { fileSize: "Too big — max {max}." }).s2.message("1", fileBoundCtx([{ name: "big", size: 2 * 1024 * 1024, type: "text/plain" }])) === "Too big — max 1MB.",
+);
+check(
+  "fileType copy override",
+  buildRules(toFieldSpecs([{ type: "file", name: "t", label: "T", allowedTypes: ["image/*"] }]), { fileType: "Wrong kind of file." }).t.message("1", fileBoundCtx([{ name: "x", size: 1, type: "application/octet-stream" }])) === "Wrong kind of file.",
+);
+check(
+  "fileCount copy override with {min}/{max} tokens",
+  buildRules(toFieldSpecs([{ type: "file", name: "c", label: "C", minFiles: 2, maxFiles: 4 }]), { fileCount: "Pick {min} to {max} files." }).c.message("1", fileBoundCtx([png])) === "Pick 2 to 4 files.",
+);
+check(
+  "fileCount only-max default",
+  buildRules(toFieldSpecs([{ type: "file", name: "c2", label: "C", maxFiles: 2 }])).c2.message("1", fileBoundCtx([png, okText(), { name: "d", size: 1, type: "text/plain" }])) === "Attach at most 2 files.",
+);
+check(
+  "field-level message overrides every file bound",
+  buildRules(toFieldSpecs([{ type: "file", name: "m", label: "M", maxFiles: 1, message: "Pick one file." }])).m.message("1", fileBoundCtx([png, okText()])) === "Pick one file.",
+);
+
+const fRules = buildRules(toFieldSpecs([
+  { type: "file", name: "art", label: "Art", multiple: true, maxSize: "2MB", allowedTypes: ["image/png", "image/jpeg"], minFiles: 1, maxFiles: 3 },
+]));
+const fRound = parseFieldSpec(serializeRules(toFieldSpecs([
+  { type: "file", name: "art2", label: "Art", multiple: true, maxSize: "2MB", allowedTypes: ["image/png", "image/jpeg"], minFiles: 1, maxFiles: 3 },
+])));
+check(
+  "data-rules round-trips the file bounds",
+  fRound[0].maxSize === "2MB" &&
+    Array.isArray(fRound[0].allowedTypes) &&
+    fRound[0].allowedTypes.length === 2 &&
+    fRound[0].minFiles === 1 &&
+    fRound[0].maxFiles === 3,
+  JSON.stringify(fRound),
+);
+check(
+  "file rules enforce size + type + count together",
+  validateValue(fRules.art, "1", fileBoundCtx([{ name: "x.exe", size: 3 * 1024 * 1024, type: "application/x-msdownload" }])) !== null &&
+    validateValue(fRules.art, "1", fileBoundCtx([png, { name: "b.png", size: 1024, type: "image/png" }, { name: "c.jpg", size: 512, type: "image/jpeg" }])) === null &&
+    validateValue(fRules.art, "1", fileBoundCtx([png, png, png, png])) !== null,
 );
 
 // --- 2.13. Validation rule expansion: pattern / length / sameAs / selection bounds ---

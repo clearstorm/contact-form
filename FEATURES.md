@@ -28,6 +28,7 @@ Status vocabulary: `implemented` · `partial` · `planned` · `deprecated`.
 | `rules-length` | Length bounds + live counter | `minLength` / `maxLength` soft bounds on text-like values; `maxLength` renders a live `N / max` character counter under the control; `minLength` overrides the textarea's 10-character default | implemented |
 | `rules-cross-match` | Cross-field equality | `sameAs` — the value must equal another field's (confirm-password style); the partner re-checks live when the target changes; optional fields match only while both sides are non-empty | implemented |
 | `rules-selection-bounds` | Selection bounds | `minSelect` / `maxSelect` on checkbox/radio groups and multi-selects; `minSelect > 0` implies required; group counting re-checks every flagged member when one option changes | implemented |
+| `rules-file-bounds` | File upload bounds | `maxSize` (bytes or `"5MB"` units) and `allowedTypes` (MIME allow-list, `image/*` globs) per file, plus `minFiles` / `maxFiles` count bounds on `multiple` file inputs — all read `ctx.files`; `minFiles > 0` implies required | implemented |
 | `button-specs` | Button specs | `submit` / `next` / `prev` as plain label or `{ label, variant }` (`primary` \| `secondary` \| `ghost`), default variants per role | implemented |
 | `grid-sizing` | 12-column field sizing | `size` percentage → nearest column span via `gridSpan` (`rf-span-1..12`); fields collapse below `48rem` | implemented |
 

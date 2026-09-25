@@ -297,7 +297,7 @@ delivery adapter for this package is planned.
 | `hidden` | `<input type="hidden">` | never validated |
 | `range` | `<input type="range">` | within 0–100 (override via `min`/`max`) |
 | `color` | `<input type="color">` | `#rrggbb` hex |
-| `file` | `<input type="file">` (single, or `multiple` with an `accept` hint) | must have a file selected when required |
+| `file` | `<input type="file">` (single, or `multiple` with an `accept` hint) | must have a file selected when required; file bounds via `maxSize` / `allowedTypes` / `minFiles` / `maxFiles` |
 
 `select` needs `options: string[]`; checkbox/radio groups need `options` too
 (a checkbox without `options` is a single toggle next to its label). Input
@@ -305,24 +305,28 @@ passthrough attributes — `placeholder`, `value`, `min`, `max`, `step`,
 `maxlength`, `pattern`, and for file/select `accept` and `multiple` — flow
 through to the rendered control.
 
-Beyond those attributes, four **validation keys** layer on top of any field's
+Beyond those attributes, **validation keys** layer on top of any field's
 type rule (see [Custom validation rules](#custom-validation-rules)):
 `pattern` (regex — also rendered as the native attribute), `minLength` /
 `maxLength` (soft length bounds; `maxLength` draws a live character counter),
-`sameAs` (cross-field equality — confirm-password style) and `minSelect` /
+`sameAs` (cross-field equality — confirm-password style), `minSelect` /
 `maxSelect` (checked/selected counts on checkbox/radio groups and
-multi-selects).
+multi-selects) and — on `file` fields — `maxSize` / `allowedTypes` /
+`minFiles` / `maxFiles`.
 
 **`options` on a non-picker input** (e.g. `text`, `email`, `search`, `number`,
 … — anything that isn't `select`, checkbox/radio, `textarea` or `hidden`)
 renders a `<datalist>` of suggestions on the input. They steer the visitor
 without restricting the value — free text stays valid.
 
-**`file` fields** are validated when required, and the canonical payload
-carries the attached **filename(s)** (`"a.txt, b.txt"` for a `multiple` file
-input) — a JSON endpoint receives names, not bytes. The cf7 mailer re-attaches
-the real uploads from the multipart body, so the email path gets the actual
-files.
+**`file` fields** validate their attachments — per-file `maxSize` (bytes or
+`"5MB"`-style units), an `allowedTypes` MIME allow-list (`"image/*"` globs
+work), and `minFiles` / `maxFiles` count bounds on `multiple` inputs
+(`minFiles > 0` implies required). `accept` stays a **picker hint only** — the
+enforcement list is explicit. The canonical payload carries the attached
+**filename(s)** (`"a.txt, b.txt"` for a `multiple` file input) — a JSON
+endpoint receives names, not bytes. The cf7 mailer re-attaches the real
+uploads from the multipart body, so the email path gets the actual files.
 
 Every type can be required or optional. `required: false` (the default)
 never blocks submit; `optional: true` additionally renders a muted
@@ -603,6 +607,9 @@ built-in default**. Put project-specific copy in the form spec:
 | `selection` | `minSelect` / `maxSelect` bounds | `Please select the right number of options.` |
 | `checkbox` | checkbox/radio required | `Please select this option.` |
 | `file` | file required | `Please attach a file.` |
+| `fileSize` | a file exceeds `maxSize` (`{max}` = human-readable limit) | `File is too large (max 2MB).` |
+| `fileType` | a file's MIME type isn't in `allowedTypes` | `This file type isn't allowed.` |
+| `fileCount` | attached count outside `minFiles`/`maxFiles` (`{min}`/`{max}` placeholders) | `Attach between {min} and {max} files.` |
 | `sending` | submit button while in flight | `Sending…` |
 | `back` *(deprecated)* | wizard Previous button — use `form.prev` | `Back` |
 | `next` *(deprecated)* | wizard Next button — use `form.next` | `Next` |

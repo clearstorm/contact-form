@@ -356,6 +356,77 @@ check("second selection clears the group error", !input(form, "topics").hasAttri
 submit(form);
 check("rule-expansion form submits", await until(() => !find(form, ".rf-status")!.hidden));
 
+/* ---- 2d. file upload rules: maxSize / allowedTypes / count bounds ---- */
+
+const fileSpec = jsonSpec(
+  [
+    {
+      type: "file",
+      id: "attachments",
+      name: "attachments",
+      label: "Attachments",
+      multiple: true,
+      maxSize: "2MB",
+      allowedTypes: ["image/png", "image/jpeg"],
+      minFiles: 1,
+      maxFiles: 3,
+    },
+  ],
+  { name: "engine-file-rules" },
+);
+form = mount(renderFormShell({ form: fileSpec }));
+attachForm(form);
+
+// Real File objects (happy-dom) with the descriptor's size baked into the
+// content; the list gets an item() shim for FormData walks.
+const fileInput = () => input(form, "attachments");
+const setFiles = (...files: File[]) => {
+  const list = [...files] as unknown as FileList & { item(i: number): File | null };
+  list.item = (i: number) => list[i] ?? null;
+  Object.defineProperty(fileInput(), "files", { value: list, configurable: true });
+};
+const file = (name: string, type: string, size: number) => new File([new Uint8Array(size)], name, { type });
+
+submit(form);
+check("minFiles>0 empty selection fails required", await until(() => errorCount(form) === 1), `errors=${errorCount(form)}`);
+check(
+  "empty file message default",
+  find(form, ".rf-field-error")!.textContent === "Please attach a file.",
+);
+
+setFiles(file("a.png", "image/png", 1024), file("b.jpg", "image/jpeg", 512));
+submit(form);
+check("valid attachments submit", await until(() => !find(form, ".rf-status")!.hidden));
+
+setFiles(file("big.jpg", "image/jpeg", 3 * 1024 * 1024));
+submit(form);
+check("file over maxSize flags", await until(() => errorCount(form) === 1 && fileInput().hasAttribute("aria-invalid")));
+check(
+  "fileSize message names the limit",
+  find(form, ".rf-field-error")!.textContent === "File is too large (max 2MB).",
+);
+
+setFiles(file("a.png", "image/png", 1024), file("b.jpg", "image/jpeg", 512), file("c.png", "image/png", 256), file("d.jpg", "image/jpeg", 128));
+submit(form);
+check("file count over maxFiles flags", await until(() => errorCount(form) === 1));
+check(
+  "fileCount message uses the bounds",
+  find(form, ".rf-field-error")!.textContent === "Attach between 1 and 3 files.",
+);
+
+setFiles(file("malware.exe", "application/x-msdownload", 128));
+submit(form);
+check("file type outside allowedTypes flags", await until(() => errorCount(form) === 1));
+check(
+  "fileType message default",
+  find(form, ".rf-field-error")!.textContent === "This file type isn't allowed.",
+);
+
+// once flagged, a change to an allowed set clears the error live
+setFiles(file("ok.png", "image/png", 1024));
+fire(fileInput(), "change");
+check("allowed files clear the flagged field", !fileInput().hasAttribute("aria-invalid"));
+
 /* ---- 3. wizard: step scoping, Next validation, final submit ---- */
 
 const wizSpec = jsonSpec(

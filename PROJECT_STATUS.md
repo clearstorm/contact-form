@@ -15,6 +15,14 @@ next item instead of duplicating it.
   vanilla · TanStack). Immutable tags: `v0.1.0`, `v0.2.0`, `v0.3.0`.
 - **Branch:** `dev` (ahead of `main`), working tree clean.
 - **Most recent work (HEAD):**
+  - Repeaters — dynamic row groups (`f006672`) — `type: "repeater"` specs
+    holding any field types, visitor add/remove rows bounded by `minRows` /
+    `maxRows` (the add button disables at the ceiling, remove at the floor),
+    row-scoped validation (cross-field rules stay inside the row's own
+    values), and a canonical payload that groups each repeater's rows into
+    one structured JSON-array entry (empty rows dropped, or padded back to
+    `minRows`; files as filenames). The scalar-only TanStack bridge and Zod
+    adapter skip row groups (documented non-goal).
   - File upload bounds (`2c8bd54`) — `maxSize` (bytes or `"5MB"`-style units),
     `allowedTypes` MIME allow-list with `image/*` globs, and `minFiles` /
     `maxFiles` count bounds on file fields — all read `ctx.files`; a
@@ -43,7 +51,7 @@ next item instead of duplicating it.
 
 ## Feature summary
 
-- **36 implemented** / **2 planned** of 38 tracked features (see
+- **38 implemented** / **2 planned** of 40 tracked features (see
   FEATURES.md). Implemented means shipped, exercised by the test suite
   (`npm test`) and demonstrated in `examples/`.
 - The 2 planned features: the **Nodemailer mail-delivery adapter**

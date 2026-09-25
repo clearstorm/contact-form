@@ -36,7 +36,7 @@ const { renderFormShell } = await import("../src/runtime/markup");
 
 /* ---- fetch stub ---- */
 
-const calls: { url: string; data: Record<string, unknown> }[] = [];
+const calls: { url: string; data: Record<string, unknown>; method?: string; headers?: Record<string, string> }[] = [];
 globalThis.fetch = async (url: string | URL | Request, init: RequestInit = {}) => {
   const body = init.body;
   const data =
@@ -45,7 +45,7 @@ globalThis.fetch = async (url: string | URL | Request, init: RequestInit = {}) =
       : body instanceof Blob
         ? "<blob>"
         : body;
-  calls.push({ url: String(url), data });
+  calls.push({ url: String(url), data, method: init.method, headers: init.headers as Record<string, string> | undefined });
   if (String(url).includes("fail")) {
     return new NodeResponse(JSON.stringify({ error: "mail provider timeout" }), {
       status: 500,
@@ -1670,6 +1670,79 @@ submit(form);
 check("default autoSuccess collapses the replace form", await until(() => form.classList.contains("rf-form--success")));
 check("default autoSuccess shows the success box", await until(() => !(find(form, ".rf-status") as HTMLElement).hidden));
 check("default autoSuccess emits the message too", defEvents[0]?.message === "Thanks!");
+
+/* ---- M9: config-object mailers through the shell + engine ---- */
+
+// A `mailer` config object serialises onto the shell (provider in data-mailer,
+// extras in data-mailer-method / data-mailer-headers), and the engine honours
+// them on submit: the generic transport gets the custom method + headers.
+const customMailerSpec = {
+  name: "cfg-mailer",
+  submit: "Send",
+  status: "Thanks!",
+  mailer: { provider: "custom", endpoint: "https://cfg.test/api", method: "PUT", headers: { "x-demo": "1" } },
+  fields: [{ type: "text", id: "name", name: "name", label: "Name", required: true, size: 50 }],
+} as const;
+
+form = mount(renderFormShell({ form: customMailerSpec }));
+const customBefore = calls.length;
+attachForm(form);
+input(form, "name").value = "Jane";
+fire(input(form, "name"), "input");
+submit(form);
+check("config-object custom mailer reaches submit", await until(() => calls.length === customBefore + 1));
+check(
+  "config-object mailer honors method + headers",
+  calls[calls.length - 1].method === "PUT" &&
+    calls[calls.length - 1].headers?.["x-demo"] === "1" &&
+    calls[calls.length - 1].url === "https://cfg.test/api",
+  JSON.stringify(calls[calls.length - 1]),
+);
+check(
+  "shell carries data-mailer-method + data-mailer-headers",
+  form.dataset.mailerMethod === "PUT" && form.dataset.mailerHeaders?.includes("x-demo"),
+  form.getAttribute("data-mailer") ?? "no data-mailer",
+);
+
+// Proxy-only providers resolve through the same shell/engine path and post the
+// provider-shaped JSON envelope (no secret, default /api/contact endpoint).
+const proxySpec = {
+  name: "cfg-proxy",
+  submit: "Send",
+  status: "Thanks!",
+  mailer: { provider: "resend", to: "team@example.test", formId: "9" },
+  fields: [{ type: "text", id: "name", name: "name", label: "Name", required: true, size: 50 }],
+} as const;
+
+form = mount(renderFormShell({ form: proxySpec }));
+const proxyBefore = calls.length;
+attachForm(form);
+input(form, "name").value = "Jane";
+fire(input(form, "name"), "input");
+submit(form);
+check("proxy mailer posts to /api/contact", await until(() => calls.length === proxyBefore + 1 && calls[calls.length - 1].url === "/api/contact"));
+const proxyEnvelope = typeof calls[calls.length - 1].data === "string" ? JSON.parse(String(calls[calls.length - 1].data)) : null;
+check(
+  "proxy envelope carries provider + to + canonical payload",
+  proxyEnvelope?.provider === "resend" &&
+    proxyEnvelope?.to === "team@example.test" &&
+    proxyEnvelope?.formId === "9" &&
+    proxyEnvelope?.payload?.name === "Jane",
+  JSON.stringify(proxyEnvelope),
+);
+
+// A runtime `config` override wins over the shell's data-* attributes.
+form = mount(renderFormShell({ form: customMailerSpec }));
+const overrideBefore = calls.length;
+attachForm(form, { config: { endpoint: "https://override.test/go" } });
+input(form, "name").value = "Jane";
+fire(input(form, "name"), "input");
+submit(form);
+check(
+  "runtime config override beats the shell endpoint",
+  await until(() => calls.length === overrideBefore + 1 && calls[calls.length - 1].url === "https://override.test/go"),
+  calls[calls.length - 1]?.url,
+);
 
 console.log(failures === 0 ? "\nENGINE ALL PASS" : `\nENGINE ${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);

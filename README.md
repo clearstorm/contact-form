@@ -10,8 +10,11 @@ three decoupled pieces:
   normalisation and payload normalisation. No framework or DOM dependencies,
   so the same code can run in a browser bundle or a Node worker.
 - **Mailers** — transport adapters (`src/mailers/`): `cf7` (Contact Form 7,
-  the default) and `json` (generic POST to any endpoint you control).
-  A Nodemailer-based delivery adapter is planned as a follow-up release.
+  the default), the generic `custom`/`"json"` POST, the direct publics
+  (`wpforms`, `formspree`, `formkeep`, `getform`) and proxy-only builders
+  (`resend`, `postmark`, `sendgrid`) — driven by a per-form `mailer` spec
+  (shorthand or config object), with server-side proxy boilerplate in
+  [`docs/transport-proxies.md`](docs/transport-proxies.md).
 - **Runtime** — the shared client engine and markup builders for every
   binding (`src/runtime/`): namespaced `rf-*` markup and the DOM-driven client
   (`attachForm` / `initForms`), styled entirely with `--rf-*` CSS custom
@@ -27,7 +30,7 @@ per-field `message` overrides, with built-in defaults.
 Zero runtime dependencies. No Tailwind required.
 
 > **Want to see it working?** `examples/` holds a runnable **Astro site** (all
-> 20 field types — including file uploads — both mailers, CSS-only theming, a
+> 20 field types — including file uploads — a transport adapter per mailer you need, CSS-only theming, a
 > multi-form wizard, plus a vanilla-JS page mounting the same specs with
 > `renderForm`), a **Vite + React app** with the same seven routes as the Astro
 > demo (each rendering the uncontrolled `<ContactForm />`; `/vanilla` mounts
@@ -82,7 +85,7 @@ Works with Astro `^4 || ^5 || ^6 || ^7`.
     "name": "enquiry",          // identity: data-mail-form, form id, JS hooks
     "submit": "Send message",
     "status": "Thanks — we'll reply shortly.",
-    "mailer": "cf7",            // "cf7" (default) | "json"
+    "mailer": "cf7",            // "cf7" (default) | "custom"/"json" | "wpforms" | "formspree" | … | { provider, endpoint, formId, method, headers, formToken, to }
     "fields": [
       { "type": "text", "id": "first_name", "name": "first_name", "label": "First name", "required": true, "size": 50 },
       { "type": "email", "id": "email", "name": "email", "label": "Email address", "required": true, "size": 50 },
@@ -109,10 +112,12 @@ const { PUBLIC_API_URL, PUBLIC_CF7_FORM_ID } = import.meta.env; // your conventi
 ```
 
 **Config resolution (no env-var assumptions in the package):**
-`config` props → the form spec's own block (`cf7: { apiUrl, formId }`, or
-`endpoint` for `json`) → a build-time console warning that the form is missing
-its endpoint config. How the values reach the component — your env files, CI
-secrets, hard-coding, content JSON — is entirely the consumer's business.
+`config` props → the form spec's `mailer` config object (`endpoint`/`formId`/
+`method`/`headers`/`formToken`/`to`) → the legacy top-level blocks
+(`cf7: { apiUrl, formId }`, or `endpoint` for `json`) → a build-time console
+warning that the form is missing its endpoint config. How the values reach the
+component — your env files, CI secrets, hard-coding, content JSON — is
+entirely the consumer's business.
 
 ---
 
@@ -124,7 +129,7 @@ the same engine and markup builders via subpath exports:
 | Subpath | What you get |
 | --- | --- |
 | `@clearstorm/contact-form/core` | spec types + framework-less logic (rules, `toSteps`, `canonicalData`, …) |
-| `@clearstorm/contact-form/mailers` | `cf7` / `json` transport adapters |
+| `@clearstorm/contact-form/mailers` | transport adapters + `getMailer`/`mailerSpecName` + the `Mailer`/`MailerConfig` types |
 | `@clearstorm/contact-form/runtime` (alias `./vanilla`) | `renderForm`, `attachForm`/`initForms`, `createAnalytics`, markup builders |
 | `@clearstorm/contact-form/react` | `ContactForm` + `Field` React components (peer: `react`) |
 | `@clearstorm/contact-form/tanstack` | `useContactForm` bridge + `ContactFormField` (peers: `react`, `@tanstack/react-form`) |
@@ -331,7 +336,7 @@ their real bytes).
 
 ---
 
-## JSON transport (Formspree-style / your own endpoint)
+## Generic transport (`custom` / `json` — Formspree-style or your own endpoint)
 
 For endpoints that accept a plain `multipart/form-data` POST of the spec
 fields:
@@ -340,17 +345,71 @@ fields:
 {
   "form": {
     "name": "enquiry",
-    "mailer": "json",
+    "mailer": "custom",
     "endpoint": "https://your-worker.example.com/submit",
     // ...fields
   }
 }
 ```
 
+The legacy `"json"` shorthand is an alias of the same transport. A config
+object adds `method` and client-safe `headers`:
+
+```jsonc
+"mailer": {
+  "provider": "custom",
+  "endpoint": "https://your-worker.example.com/submit",
+  "method": "PUT",
+  "headers": { "x-channel": "website" }
+}
+```
+
 This is the path for **serverless mail-delivery workers** — e.g. a
 Cloudflare Worker / Netlify Function that receives the canonical payload and
-sends via `nodemailer` or your provider's API. A first-party Nodemailer
-delivery adapter for this package is planned.
+sends via your provider's API. For keyed providers that need a server-side
+secret, see [transport proxies](docs/transport-proxies.md).
+
+---
+
+## Direct public adapters
+
+`wpforms`, `formspree`, `formkeep` and `getform` talk straight to the
+provider's public endpoint with client-safe config only (no secret keys):
+
+```jsonc
+{
+  "name": "enquiry",
+  "mailer": {
+    "provider": "wpforms",
+    "endpoint": "https://your-site.example",  // WP site base (API route derived)
+    "formId": "42"
+  }
+}
+```
+
+| provider | what the client POSTs to |
+| --- | --- |
+| `wpforms` | `{endpoint}/wp-json/wpforms/v1/forms/{formId}/submit` |
+| `formspree` | `https://formspree.io/f/{formId}` (or explicit `endpoint`) |
+| `formkeep` | `https://formkeep.com/f/{formId}` (or explicit `endpoint`) |
+| `getform` | `{endpoint}` or `https://getform.io/f/{formId}` |
+
+A `formId` alone (or a bare `endpoint`) is enough for Formspree / FormKeep /
+Getform; WPForms needs the site base + form id. All of them accept the
+canonical payload; see the CF7 payload policy below for how extras fold into
+`message`.
+
+---
+
+## Provider-backed delivery via a transport proxy
+
+`resend`, `postmark` and `sendgrid` are **proxy-only**: the browser never
+holds a key. The client POSTs a small JSON envelope
+(`{ provider, formId, to, payload }`) to your `/api/contact` endpoint (default,
+same origin), and a worker forwards it with its environment key. Runnable
+Next.js + Astro boilerplate lives in
+[`docs/transport-proxies.md`](docs/transport-proxies.md) — including how the
+old Nodemailer/SMTP worker idea maps onto the same contract.
 
 ---
 
@@ -1088,9 +1147,14 @@ the vanilla rule, so the two compose instead of replacing each other.
 src/
 ├── core.ts                    # spec types, rules, parseTime, canonicalData (no deps)
 ├── mailers/
-│   ├── index.ts               # Mailer types + getMailer registry
+│   ├── index.ts               # Mailer types + getMailer/mailerSpecName registry
 │   ├── cf7.ts                 # CF7 REST transport + payload policy
-│   └── json.ts                # generic POST transport
+│   ├── json.ts                # generic custom/"json" transport (method/headers)
+│   ├── wpforms.ts             # direct WPForms REST adapter
+│   ├── formspree.ts           # direct Formspree adapter
+│   ├── formkeep.ts            # direct FormKeep adapter
+│   ├── getform.ts             # direct Getform adapter
+│   └── proxy.ts               # resend/postmark/sendgrid proxy-only builder
 ├── runtime/                   # framework-agnostic layer all bindings share
 │   ├── markup.ts              # rf-* markup builders (single source of truth)
 │   ├── engine.ts              # attachForm / initForms — DOM-driven client engine

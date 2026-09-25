@@ -20,7 +20,11 @@ export const jsonMailer: Mailer = {
     }
 
     const payload = canonicalData(data, fields);
-    const response = await fetch(endpoint, { method: "POST", body: payload });
+    const response = await fetch(endpoint, {
+      method: config.method ?? "POST",
+      headers: config.headers,
+      body: payload,
+    });
 
     if (response.ok) return { ok: true, message: "" };
 

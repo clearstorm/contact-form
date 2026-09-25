@@ -69,13 +69,41 @@ in [FEATURES.md](FEATURES.md) as implemented:
 
 ---
 
-## v0.4.0 — Nodemailer mail-delivery adapter
+## v0.4.0 — expanded mailer schema, transport resolution & proxy boilerplate (M9)
 
-The README's documented follow-up ("A first-party Nodemailer delivery adapter
-is planned"). Completes the serverless-worker story for the `json` mailer: the
-client posts the canonical payload to a worker; the adapter turns it into an
-email via Nodemailer. When it lands, flip `mailer-nodemailer` to
-`implemented` in FEATURES.md + project.state.json.
+The spec-driven mailer expansion: `mailer` becomes a `MailerSpec`
+(`MailerProvider` shorthand or a `MailerConfig` object — `endpoint`, `formId`,
+`method`, `headers`, public `formToken`), with new first-class adapters:
+direct publics (`wpforms`, `formspree`, `formkeep`, `getform`; `cf7` and the
+generic `custom`/`"json"` transport stay) and proxy-only payload builders
+(`resend`, `postmark`, `sendgrid`) that POST provider-shaped JSON to a
+consumer `/api/contact` endpoint — master keys / `serverToken` never leave the
+server. `docs/transport-proxies.md` ships runnable Next.js (App Router) +
+Astro proxy boilerplate (raw `fetch` + `Bearer` keys from environment), which
+also covers the old Nodemailer/SMTP delivery idea as a worker variant. When it
+lands, flip `mailer-config`, `mailer-direct-providers` and
+`mailer-proxy-docs` to `implemented` in FEATURES.md + project.state.json.
+(`mailer-nodemailer` stays planned — the package cannot ship a first-party
+Nodemailer SDK under the zero-runtime-dependency rule.)
+
+## M10 — structural additions: `callout` + `html`
+
+Decor-style, render-only elements: `type: "callout"` (`variant: "info" |
+"warning" | "success" | "danger"`, `--rf-callout-*` tokens) and `type: "html"`
+(verbatim pass-through; sanitization is the consumer's responsibility). Both
+go through the `markup.ts` builders + fixture snapshots and are dropped from
+the client spec like the other structural types. Flip `struct-callout` and
+`struct-html` when done.
+
+## M11 — declarative `FormSpec.analytics` block (hybrid with the seam)
+
+An optional `analytics` spec block (`provider: "dataLayer" | "customEvent" |
+"plausible" | "posthog"`, `eventName`, `trackSteps`, `trackFieldErrors`)
+auto-resolves into the existing `createAnalytics` seam when the spec is wired
+by `attachForm` / `renderForm` / `initForms`; an explicit analytics option on
+attach overrides the block. Adds the `rf:validation-error` bus event (the
+`trackFieldErrors` signal). Flip `analytics-block` and
+`validation-error-event` when done.
 
 ## npm publishing
 
@@ -89,4 +117,4 @@ contact-form` by version. Flip `release-npm-publish` when done.
 - Freeze the `FormSpec` surface (types, serialisation, payload shapes) for a
   1.x contract.
 - Final README / FEATURES.md / API-docs pass across all four bindings.
-- Consider a dedicated example for the Nodemailer worker once available.
+- Consider a dedicated proxy-worker example once the M9 boilerplate ships.

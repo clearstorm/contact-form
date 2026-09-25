@@ -75,7 +75,9 @@ interface Cf7Result {
 export const cf7Mailer: Mailer = {
   name: "cf7",
   async submit({ data, fields, config }): Promise<MailerResult> {
-    const { apiUrl, formId, copy } = config;
+    const apiUrl = (config.apiUrl ?? config.endpoint ?? "").replace(/\/$/, "");
+    const formId = config.formId;
+    const copy = config.copy;
     if (!apiUrl || !formId) {
       return {
         ok: false,

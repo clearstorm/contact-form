@@ -359,6 +359,54 @@ const autoSaveSpec: FormSpec = {
   ],
 };
 
+// M9: a `mailer` config object — the resolved provider rides `data-mailer`
+// and the client-safe extras (method / headers / formToken / to) serialise to
+// their own data-* attributes so the specless initForms path resolves them too.
+const mailerConfigSpec: FormSpec = {
+  name: "snapshot-mailer-config",
+  mailer: {
+    provider: "custom",
+    endpoint: "https://example.test/api",
+    method: "PUT",
+    headers: { "x-demo": "1", "x-trace": "abc" },
+    formToken: "pub_abc123",
+    to: "team@example.test",
+  },
+  submit: "Send",
+  status: "Thanks.",
+  fields: [
+    {
+      type: "text",
+      id: "name",
+      name: "name",
+      label: "Name",
+      required: true,
+      size: 50,
+    },
+  ],
+};
+
+// M9: a direct provider as a config object — the provider name rides
+// `data-mailer`, while `endpoint` + `formId` serialize through the shared
+// `data-endpoint` / `data-form-id` attributes (a shorthand can't carry a
+// form id, so this is the real-world shape).
+const mailerDirectSpec: FormSpec = {
+  name: "snapshot-mailer-wpforms",
+  mailer: { provider: "wpforms", endpoint: "https://wp.example.test", formId: "42" },
+  submit: "Send",
+  status: "Thanks.",
+  fields: [
+    {
+      type: "email",
+      id: "email",
+      name: "email",
+      label: "Email",
+      required: true,
+      size: 50,
+    },
+  ],
+};
+
 /* ---- standalone builder cases ---- */
 
 const fieldCases: [string, string][] = [
@@ -418,6 +466,8 @@ const snapshots: Snapshot[] = [
   { name: "shell-repeater", html: renderFormShell({ form: repeaterSpec }) },
   { name: "shell-conditional-steps", html: renderFormShell({ form: conditionalStepsSpec }) },
   { name: "shell-autosave", html: renderFormShell({ form: autoSaveSpec }) },
+  { name: "shell-mailer-config", html: renderFormShell({ form: mailerConfigSpec }) },
+  { name: "shell-mailer-wpforms", html: renderFormShell({ form: mailerDirectSpec }) },
   ...fieldCases.map(([name, html]) => ({ name, html })),
   ...decorCases.map(([name, html]) => ({ name, html })),
 ];

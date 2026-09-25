@@ -41,7 +41,7 @@ import {
   type ValidationProvider,
   type VisibilityConditionLike,
 } from "../core";
-import { getMailer, type MailerConfig } from "../mailers";
+import { getMailer, mailerSpecName, type MailerConfig } from "../mailers";
 import {
   applyDraft,
   applyValues,
@@ -465,6 +465,18 @@ const hideStatus = (status: Status): void => {
   status.hidden = true;
 };
 
+/** Parse the shell's serialised `data-mailer-headers` JSON (safe-parse). */
+const parseSerializedHeaders = (raw: string | undefined): Record<string, string> | undefined => {
+  if (!raw) return undefined;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (parsed && typeof parsed === "object") return parsed as Record<string, string>;
+  } catch {
+    /* malformed attribute — treat as absent */
+  }
+  return undefined;
+};
+
 async function handleSubmit(
   event: Event,
   fields: FieldSpec[],
@@ -487,6 +499,8 @@ async function handleSubmit(
   autoSuccess = true,
   /** Marks a submit attempt — unlocks "touched" live validation (see attach). */
   markSubmitAttempt?: () => void,
+  /** Runtime config overrides — win over the shell's `data-*` attributes. */
+  configOverride?: Partial<MailerConfig>,
 ): Promise<void> {
   const form = event.currentTarget;
   if (!(form instanceof HTMLFormElement)) return;
@@ -596,9 +610,15 @@ async function handleSubmit(
   emit("rf:submit-start", submitContext);
 
   const config: MailerConfig = {
-    endpoint: form.dataset.endpoint,
-    apiUrl: form.dataset.wpUrl,
-    formId: form.dataset.formId,
+    provider: (mailerName as MailerConfig["provider"]) ?? undefined,
+    // Runtime overrides win over the shell's serialised data-* attributes.
+    endpoint: configOverride?.endpoint ?? form.dataset.endpoint,
+    apiUrl: configOverride?.apiUrl ?? form.dataset.wpUrl,
+    formId: configOverride?.formId ?? form.dataset.formId,
+    method: configOverride?.method ?? (form.dataset.mailerMethod === "PUT" ? "PUT" : undefined),
+    headers: configOverride?.headers ?? parseSerializedHeaders(form.dataset.mailerHeaders),
+    formToken: configOverride?.formToken ?? form.dataset.formToken,
+    to: configOverride?.to ?? form.dataset.to,
     copy,
   };
 
@@ -648,7 +668,12 @@ export interface AttachOptions {
    * serialised spec off the form's attributes.
    */
   spec?: FormSpec;
-  /** Explicit config overrides — win over the form's data-* attributes. */
+  /**
+   * Explicit transport overrides — win over the shell's `data-*` attributes
+   * (endpoint trio + the mailer config extras: method / headers / formToken /
+   * to). Config-object mailers normally serialise onto the form at render, so
+   * this mostly matters for custom markup.
+   */
   config?: Partial<MailerConfig>;
   /**
    * Validation provider — swaps which rules run. Defaults to the package's
@@ -769,7 +794,7 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): Att
     }
   }
   const rules = (opts.validation ?? vanillaValidation).buildRules(fields, copy);
-  const mailerName = spec?.mailer ?? form.dataset.mailer ?? "cf7";
+  const mailerName = mailerSpecName(spec?.mailer) ?? form.dataset.mailer ?? "cf7";
   const status = form.querySelector<HTMLElement>(".rf-status");
   const successMessage = spec?.status ?? status?.textContent ?? "";
 
@@ -1110,7 +1135,7 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): Att
 
   on(form, "submit", (event) => {
     if (!isWizard) {
-      void handleSubmit(event, fields, rules, mailerName, successMessage, copy, visibilityForSubmit, undefined, validateControl, submitHooks, autoSuccess, markSubmitAttempt);
+      void handleSubmit(event, fields, rules, mailerName, successMessage, copy, visibilityForSubmit, undefined, validateControl, submitHooks, autoSuccess, markSubmitAttempt, opts.config);
       return;
     }
     // Wizard: the submit button advances to the next *visible* step; the last
@@ -1135,7 +1160,7 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): Att
       goTo(nextStep);
       return;
     }
-    void handleSubmit(event, fields, rules, mailerName, successMessage, copy, visibilityForSubmit, stepControls, validateControl, submitHooks, autoSuccess, markSubmitAttempt);
+    void handleSubmit(event, fields, rules, mailerName, successMessage, copy, visibilityForSubmit, stepControls, validateControl, submitHooks, autoSuccess, markSubmitAttempt, opts.config);
   });
 
   // Stepper: completed steps are clickable and jump back without validation

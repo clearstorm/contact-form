@@ -133,5 +133,50 @@
         "rows": 5
       }
     ]
+  },
+  "Resend proxy envelope": {
+    "name": "resend-proxy-demo",
+    "submit": "Send via proxy",
+    "status": "Envelope delivered — inspect the echo server's console.",
+    "statusMode": "replace",
+    "mailer": {
+      "provider": "resend",
+      "formId": "demo-form",
+      "to": "team@example.test",
+      "endpoint": "http://localhost:8787/api/contact"
+    },
+    "copy": {
+      "sending": "Sending envelope…",
+      "submitError": "Sending failed (HTTP {status}) — is the echo server running (npm run demo:api)?"
+    },
+    "fields": [
+      {
+        "type": "text",
+        "id": "first_name",
+        "name": "first_name",
+        "label": "First name",
+        "required": true,
+        "size": 50,
+        "autocomplete": "given-name"
+      },
+      {
+        "type": "email",
+        "id": "email",
+        "name": "email",
+        "label": "Email address",
+        "required": true,
+        "size": 50,
+        "autocomplete": "email"
+      },
+      {
+        "type": "textarea",
+        "id": "message",
+        "name": "message",
+        "label": "Message",
+        "required": true,
+        "size": 100,
+        "rows": 5
+      }
+    ]
   }
 }

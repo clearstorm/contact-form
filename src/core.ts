@@ -55,8 +55,61 @@ export function gridSpan(size?: number): number {
   return Math.min(12, Math.max(1, Math.round((size / 100) * 12)));
 }
 
-/** Transport adapters shipped with the form solution. */
-export type MailerName = "cf7" | "json";
+/**
+ * Transport providers shipped with the form solution. `"custom"` (and the
+ * legacy `"json"` shorthand) both land on the generic FormData/JSON transport:
+ * POSTs the canonical payload to any `endpoint`. The direct publics
+ * (`wpforms`, `formspree`, `formkeep`, `getform`) shape the request for that
+ * provider's public endpoint; `cf7` is the WordPress default. The proxy-only
+ * providers (`resend`, `postmark`, `sendgrid`) never hold a key client-side —
+ * they POST provider-shaped JSON to the consumer's `/api/contact` endpoint
+ * (see `docs/transport-proxies.md`).
+ */
+export type MailerProvider =
+  | "cf7"
+  | "wpforms"
+  | "formspree"
+  | "formkeep"
+  | "getform"
+  | "resend"
+  | "postmark"
+  | "sendgrid"
+  | "custom";
+
+/**
+ * Client-safe transport config. Master API keys / server tokens are typed out
+ * of this surface on purpose: anything the browser holds is public, so secrets
+ * belong in the consumer's proxy environment instead. `formToken` is the
+ * exception — a *public* form-access token (Formspree-style) only.
+ */
+export interface MailerConfig {
+  provider: MailerProvider;
+  /**
+   * Target URL. For `wpforms` / `cf7` this is the site base (the API route is
+   * derived); for the generic `custom` transport and the proxies it is the
+   * full endpoint (`/api/contact` for a proxy worker).
+   */
+  endpoint?: string;
+  /**
+   * Provider form reference: a CF7/WPForms form id, a Formspree/FormKeep form
+   * slug, a Getform endpoint id, or the id a proxy worker should forward.
+   */
+  formId?: string;
+  /** HTTP method for the generic transport (defaults to "POST"). */
+  method?: "POST" | "PUT";
+  /** Extra request headers (client-safe only — never Authorization / Cookie). */
+  headers?: Record<string, string>;
+  /** Public form-access token (Formspree-style). Master keys never belong here. */
+  formToken?: string;
+  /** Optional recipient hint forwarded to a proxy mail-delivery worker. */
+  to?: string;
+}
+
+/**
+ * The `mailer` spec key: a provider shorthand, the legacy `"json"` alias, or a
+ * `MailerConfig` object carrying the provider plus its client-safe settings.
+ */
+export type MailerSpec = MailerProvider | "json" | MailerConfig;
 
 /**
  * Visitor-facing copy for a form. Every key is optional — when absent the
@@ -580,12 +633,17 @@ export interface FormSpec {
    */
   statusMode?: "inline" | "replace";
   /**
-   * Transport adapter used on submit (defaults to "cf7"). "json" posts the
-   * canonical payload to `endpoint` — use it for Formspree-style endpoints,
-   * your own API, or a serverless mail-delivery worker.
+   * Transport adapter used on submit (defaults to "cf7"). A `MailerSpec` is a
+   * provider shorthand (`"cf7"`, `"json"`, `"custom"`, `"wpforms"`,
+   * `"formspree"`, `"formkeep"`, `"getform"` — direct — or `"resend"` /
+   * `"postmark"` / `"sendgrid"` — proxy-only) or a `MailerConfig` object:
+   * `{ provider, endpoint, formId, method, headers, formToken, to }`.
+   * Provider-shaped requests need no secrets client-side; master API keys
+   * live in a consumer proxy (`docs/transport-proxies.md`).
    */
-  mailer?: MailerName;
-  /** Where the form data is sent — required by the "json" mailer. */
+  mailer?: MailerSpec;
+  /** Where the form data is sent — required by the generic transport
+   *  (`"json"` / `"custom"`) and the direct publics. */
   endpoint?: string;
   /** CF7-specific endpoint config (alternative to passing props at render). */
   cf7?: { apiUrl?: string; formId?: string };
@@ -1506,4 +1564,19 @@ export function canonicalData(data: FormData, fields: FieldSpec[]): FormData {
     payload.set(field.name, values.length > 1 ? values.join(", ") : (values[0] ?? ""));
   }
   return payload;
+}
+
+/**
+ * The canonical payload as a plain JSON object (`canonicalData`'s entries,
+ * one key per spec field). Proxy-only transport adapters use this instead of
+ * FormData — the consumer's `/api/contact` worker reads JSON, never a
+ * multipart body, and no files travel this path (they become their
+ * filenames, exactly like the generic payload).
+ */
+export function canonicalObject(data: FormData, fields: FieldSpec[]): Record<string, unknown> {
+  const canonical: Record<string, unknown> = {};
+  for (const [key, value] of canonicalData(data, fields).entries()) {
+    canonical[key] = value;
+  }
+  return canonical;
 }

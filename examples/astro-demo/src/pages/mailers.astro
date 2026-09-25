@@ -6,6 +6,7 @@ import { getForm } from "../lib/forms";
 
 const cf7 = getForm(mailersSpec, "Contact — CF7 mailer");
 const json = getForm(mailersSpec, "JSON mailer echo");
+const proxy = getForm(mailersSpec, "Resend proxy envelope");
 
 // Endpoint config is the consumer's business — the component never reads env.
 // The demo reads the same PUBLIC_* convention as the reference site.
@@ -27,17 +28,35 @@ const payloadPreview = `POST /submit  (multipart/form-data)
   # honeypot field (name="website") is dropped by canonicalData()`;
 const responsePreview = `200 OK  application/json
   { "ok": true, "message": "Payload received by the demo echo server." }`;
+
+// The proxy-only mailers (resend / postmark / sendgrid) swap multipart for a
+// small JSON envelope the consumer's /api/contact worker turns into email —
+// no API key ever lives in the browser.
+const envelopePreview = `POST /api/contact  (application/json)
+  {
+    "provider": "resend",
+    "formId": "demo-form",
+    "to": "team@example.test",
+    "payload": {
+      "first_name": "Jane",
+      "email": "jane@example.com",
+      "message": "Hello from the demo"
+    }
+  }
+  # server-side: forward with Bearer \`RESEND_API_KEY\` (see docs/transport-proxies.md)`;
 ---
 <DemoLayout title="Mailers demo">
-  <p class="demo-kicker">cf7 · json transports</p>
+  <p class="demo-kicker">cf7 · json · config-object mailers</p>
   <h1>Mailers</h1>
   <p class="lead">
-    <code>@clearstorm/contact-form</code> ships two transports today — the
-    default <code>cf7</code> (WordPress Contact Form 7 REST feedback endpoint)
-    and the generic <code>json</code> (POST the canonical payload to any
-    endpoint). A Nodemailer-based delivery adapter is planned as a follow-up
-    release. Both forms below live in one spec file —
-    <code>examples/specs/mailers.json</code>, a map of named forms.
+    <code>@clearstorm/contact-form</code> ships a transport per provider — the
+    default <code>cf7</code> (WordPress REST feedback), the generic
+    <code>custom</code>/<code>json</code>, direct publics <code>wpforms</code> /
+    <code>formspree</code> / <code>formkeep</code> / <code>getform</code>, and
+    the proxy-only <code>resend</code> / <code>postmark</code> /
+    <code>sendgrid</code> (server-side boilerplate in
+    <code>docs/transport-proxies.md</code>). The forms below live in one spec
+    file — <code>examples/specs/mailers.json</code>, a map of named forms.
   </p>
 
   <h2><code>cf7</code> — WordPress Contact Form 7</h2>
@@ -92,7 +111,21 @@ const responsePreview = `200 OK  application/json
     <FormDemo form={json} />
   </div>
 
+  <h2><code>resend</code> — proxy envelope (no secrets client-side)</h2>
+  <p class="lead">
+    <code>resend</code> / <code>postmark</code> / <code>sendgrid</code> never
+    see an API key in the browser: the client posts a small JSON envelope to
+    your <code>/api/contact</code> endpoint, and a worker forwards it (the
+    echo server prints the envelope below). Runnable Next.js + Astro
+    boilerplate: <code>docs/transport-proxies.md</code>.
+  </p>
+
+  <div class="demo-card">
+    <FormDemo form={proxy} />
+  </div>
+
   <h2>What travels over the wire</h2>
   <pre>{payloadPreview}</pre>
   <pre>{responsePreview}</pre>
+  <pre>{envelopePreview}</pre>
 </DemoLayout>

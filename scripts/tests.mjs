@@ -6,6 +6,10 @@ import {
 } from "../src/mailers/cf7.ts";
 import { jsonMailer } from "../src/mailers/json.ts";
 import {
+  getMailer,
+  mailerSpecName,
+} from "../src/mailers/index.ts";
+import {
   buildRules,
   buttonLabel,
   buttonVariant,
@@ -889,6 +893,120 @@ const cf7NoCfg = await cf7Mailer.submit({ data: raw, fields, config: { copy: { c
 check("cf7 mailer honours copy.configError", cf7NoCfg.ok === false && cf7NoCfg.message === "CF7 not configured.", JSON.stringify(cf7NoCfg));
 
 server.close();
+
+// --- 6. M9: mailer registry + MailerSpec name resolution ---
+check("mailerSpecName: shorthand passthrough", mailerSpecName("wpforms") === "wpforms");
+check("mailerSpecName: legacy json shorthand stays", mailerSpecName("json") === "json");
+check(
+  "mailerSpecName: config object → provider",
+  mailerSpecName({ provider: "resend", formId: "x" }) === "resend",
+);
+check("mailerSpecName: undefined stays undefined", mailerSpecName(undefined) === undefined);
+check("getMailer: custom aliases the generic transport", getMailer("custom").name === "json");
+check("getMailer: unknown falls back to cf7", getMailer("nope").name === "cf7");
+check(
+  "getMailer: every provider resolves a submitter",
+  ["cf7", "json", "custom", "wpforms", "formspree", "formkeep", "getform", "resend", "postmark", "sendgrid"]
+    .every((name) => typeof getMailer(name).submit === "function"),
+);
+
+// --- 7. M9: proxy + direct adapter URL/body shaping (fetch stub) ---
+const fetched = [];
+globalThis.fetch = async (url, init = {}) => {
+  fetched.push({ url: String(url), method: init.method, headers: init.headers, body: init.body });
+  if (String(url).includes("boom")) {
+    return new Response(JSON.stringify({ error: "provider exploded" }), {
+      status: 500,
+      headers: { "content-type": "application/json" },
+    });
+  }
+  if (String(url).includes("404")) {
+    return new Response("not found", { status: 404 });
+  }
+  return new Response("{}", { status: 200, headers: { "content-type": "application/json" } });
+};
+
+const proxyResult = await getMailer("resend").submit({
+  data: raw,
+  fields,
+  config: { endpoint: "https://api.example.test/contact", to: "team@example.test", formId: "30" },
+});
+check("resend proxy → ok on 2xx", proxyResult.ok === true, JSON.stringify(proxyResult));
+const proxyBody = JSON.parse(String(fetched[fetched.length - 1].body));
+check("resend proxy posts provider-shaped JSON", proxyBody.provider === "resend", JSON.stringify(proxyBody));
+check(
+  "resend proxy forwards formId + to",
+  proxyBody.formId === "30" && proxyBody.to === "team@example.test",
+  JSON.stringify(proxyBody),
+);
+check(
+  "resend proxy payload is the canonical object",
+  proxyBody.payload.first_name === "Jane" && proxyBody.payload.email === "jane@example.com",
+  JSON.stringify(proxyBody.payload),
+);
+
+await getMailer("postmark").submit({ data: raw, fields, config: {} });
+check("proxy defaults to /api/contact", fetched[fetched.length - 1].url === "/api/contact");
+
+const proxyErr = await getMailer("sendgrid").submit({
+  data: raw,
+  fields,
+  config: { endpoint: "https://boom.test/nope" },
+});
+check(
+  "proxy failure surfaces the provider error body",
+  proxyErr.ok === false && proxyErr.message === "provider exploded",
+  JSON.stringify(proxyErr),
+);
+
+await getMailer("custom").submit({
+  data: raw,
+  fields,
+  config: { endpoint: "https://api.test/custom", method: "PUT", headers: { "x-demo": "1" } },
+});
+const customCall = fetched[fetched.length - 1];
+check("custom transport honors PUT", customCall.method === "PUT", customCall.method);
+check(
+  "custom transport honors headers",
+  customCall.headers && customCall.headers["x-demo"] === "1",
+  JSON.stringify(customCall.headers),
+);
+
+const wp = await getMailer("wpforms").submit({
+  data: raw,
+  fields,
+  config: { endpoint: "https://wp.test", formId: "7" },
+});
+check("wpforms 2xx → ok", wp.ok === true, JSON.stringify(wp));
+const wpCall = fetched[fetched.length - 1];
+check(
+  "wpforms posts to the REST submit route",
+  wpCall.url === "https://wp.test/wp-json/wpforms/v1/forms/7/submit",
+  wpCall.url,
+);
+const wpBody = wpCall.body instanceof FormData ? Object.fromEntries(wpCall.body.entries()) : {};
+check("wpforms carries form_id + page_url", wpBody.form_id === "7" && typeof wpBody.page_url === "string", JSON.stringify(wpBody));
+
+await getMailer("formspree").submit({ data: raw, fields, config: { formId: "abcd" } });
+const fsCall = fetched[fetched.length - 1];
+check("formspree derives its endpoint from formId", fsCall.url === "https://formspree.io/f/abcd", fsCall.url);
+const fsAccept = fsCall.headers && (fsCall.headers.Accept ?? fsCall.headers.accept);
+check("formspree sends Accept: application/json", fsAccept === "application/json", JSON.stringify(fsCall.headers));
+
+await getMailer("formkeep").submit({ data: raw, fields, config: { formId: "k123" } });
+check("formkeep derives its endpoint", fetched[fetched.length - 1].url === "https://formkeep.com/f/k123");
+await getMailer("getform").submit({ data: raw, fields, config: { endpoint: "https://explicit.test/g" } });
+check("getform explicit endpoint wins", fetched[fetched.length - 1].url === "https://explicit.test/g");
+await getMailer("getform").submit({ data: raw, fields, config: { formId: "g9" } });
+check("getform derives from formId", fetched[fetched.length - 1].url === "https://getform.io/f/g9");
+
+// missing-config errors per provider
+const wpNoCfg = await getMailer("wpforms").submit({ data: raw, fields, config: {} });
+check("wpforms missing config → configError", wpNoCfg.ok === false && /config/i.test(wpNoCfg.message), JSON.stringify(wpNoCfg));
+const fsNoCfg = await getMailer("formspree").submit({ data: raw, fields, config: {} });
+check("formspree missing formId → configError", fsNoCfg.ok === false && /form id/i.test(fsNoCfg.message), JSON.stringify(fsNoCfg));
+const proxyNoCfg = await getMailer("resend").submit({ data: raw, fields, config: { endpoint: "https://missing.test/404" } });
+check("proxy 404 → configError mentions the proxy", proxyNoCfg.ok === false && /api\/contact/i.test(proxyNoCfg.message), JSON.stringify(proxyNoCfg));
 
 console.log(failures === 0 ? "\nALL PASS" : `\n${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);

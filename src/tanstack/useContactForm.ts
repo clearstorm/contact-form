@@ -45,7 +45,7 @@ import {
   type RuleContext,
   type ValidationProvider,
 } from "../core";
-import { getMailer, type MailerConfig, type MailerResult } from "../mailers";
+import { getMailer, mailerSpecName, type MailerConfig, type MailerResult } from "../mailers";
 
 /* ---- value shapes ---- */
 
@@ -323,14 +323,19 @@ export function useContactForm(form: FormSpec, options: TanStackBridgeOptions = 
     () => buildInitialValues(fieldSpecs.filter((field) => scalarNames.has(field.name))),
     [fieldSpecs, scalarNames],
   );
+  const mailerSpec = typeof form.mailer === "object" ? form.mailer : undefined;
   const mailerConfig: MailerConfig = useMemo(
     () => ({
-      endpoint: options.config?.endpoint ?? form.endpoint,
-      apiUrl: options.config?.apiUrl ?? form.cf7?.apiUrl,
-      formId: options.config?.cf7FormId ?? form.cf7?.formId,
+      endpoint: options.config?.endpoint ?? mailerSpec?.endpoint ?? form.endpoint,
+      apiUrl: options.config?.apiUrl ?? (mailerSpec?.provider === "cf7" ? mailerSpec.endpoint : undefined) ?? form.cf7?.apiUrl,
+      formId: options.config?.cf7FormId ?? mailerSpec?.formId ?? form.cf7?.formId,
+      method: mailerSpec?.method,
+      headers: mailerSpec?.headers,
+      formToken: mailerSpec?.formToken,
+      to: mailerSpec?.to,
       copy,
     }),
-    [options.config, form.endpoint, form.cf7?.apiUrl, form.cf7?.formId, copy],
+    [options.config, form.endpoint, form.mailer, form.cf7?.apiUrl, form.cf7?.formId, copy],
   );
 
   const isVisible = useMemo(
@@ -374,7 +379,7 @@ export function useContactForm(form: FormSpec, options: TanStackBridgeOptions = 
       const data = valuesToFormData(values, scalarFields);
       let result: MailerResult;
       try {
-        result = await getMailer(form.mailer).submit({ data, fields: mailerFields, config: mailerConfig });
+        result = await getMailer(mailerSpecName(form.mailer)).submit({ data, fields: mailerFields, config: mailerConfig });
       } catch (error) {
         // Keep the bridge's throwing contract (callers may still catch), but
         // announce the failure on the bus and run `afterSubmit` regardless.

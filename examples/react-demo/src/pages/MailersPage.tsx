@@ -6,7 +6,8 @@ import { getForm, type NamedForms } from "../lib/forms";
 
 const cf7 = getForm(mailersSpec as NamedForms, "Contact — CF7 mailer");
 const json = getForm(mailersSpec as NamedForms, "JSON mailer echo");
-const pageShellTitle = "cf7 · json transports";
+const proxy = getForm(mailersSpec as NamedForms, "Resend proxy envelope");
+const pageShellTitle = "cf7 · json · config-object mailers";
 
 // Same form data, re-keyed with its own `name` slug so the second rendering
 // on this page never collides ids with the demo above it. A custom success
@@ -48,15 +49,33 @@ const payloadPreview = `POST /submit  (multipart/form-data)
 const responsePreview = `200 OK  application/json
   { "ok": true, "message": "Payload received by the demo echo server." }`;
 
+// The proxy-only mailers (resend / postmark / sendgrid) swap multipart for a
+// small JSON envelope the consumer's /api/contact worker turns into email —
+// no API key ever lives in the browser.
+const envelopePreview = `POST /api/contact  (application/json)
+  {
+    "provider": "resend",
+    "formId": "demo-form",
+    "to": "team@example.test",
+    "payload": {
+      "first_name": "Jane",
+      "email": "jane@example.com",
+      "message": "Hello from the demo"
+    }
+  }
+  # server-side: forward with Bearer \`RESEND_API_KEY\` (see docs/transport-proxies.md)`;
+
 export function MailersPage() {
   return (
     <PageShell title={pageShellTitle}>
       <h1>Mailers</h1>
       <p className="lead">
-        <code>@clearstorm/contact-form</code> ships two transports today — the default{" "}
-        <code>cf7</code> (WordPress Contact Form 7 REST feedback endpoint) and the
-        generic <code>json</code> (POST the canonical payload to any endpoint). Both
-        forms below live in one spec file — <code>examples/specs/mailers.json</code>,
+        <code>@clearstorm/contact-form</code> ships a transport per provider — the
+        default <code>cf7</code> (WordPress REST feedback), the generic{" "}
+        <code>custom</code>/<code>json</code>, direct publics <code>wpforms</code> /{" "}
+        <code>formspree</code> / <code>formkeep</code> / <code>getform</code>, and the
+        proxy-only <code>resend</code> / <code>postmark</code> / <code>sendgrid</code>.
+        The forms below live in one spec file — <code>examples/specs/mailers.json</code>,
         a map of named forms.
       </p>
 
@@ -123,6 +142,42 @@ export function MailersPage() {
       </div>
 
       <h2>
+        <code>{`{ provider: "custom", … }`}</code> — a config-object mailer
+      </h2>
+      <p className="lead">
+        A <code>mailer</code> config object serialises onto the shell as{" "}
+        <code>data-mailer</code> plus <code>data-mailer-method</code> /{" "}
+        <code>data-mailer-headers</code> / <code>data-form-token</code> /{" "}
+        <code>data-to</code>, so the specless <code>initForms</code> path resolves the
+        same provider. The generic <code>custom</code> transport honours
+        <code>method</code> / <code>headers</code>; the direct publics and proxies all
+        take their settings from the same shape (see the envelope demo below).
+      </p>
+      <div className="demo-card">
+        <pre style={{ margin: 0, overflow: "auto" }}>{`"mailer": {
+  "provider": "custom",
+  "endpoint": "https://your-worker.example.com/submit",
+  "method": "PUT",
+  "headers": { "x-channel": "website" }
+}`}</pre>
+      </div>
+
+      <h2>
+        <code>resend</code> — proxy envelope (no secrets client-side)
+      </h2>
+      <p className="lead">
+        <code>resend</code> / <code>postmark</code> / <code>sendgrid</code> never see
+        an API key in the browser: the client posts a small JSON envelope to your{" "}
+        <code>/api/contact</code> endpoint, and a worker forwards it (the envelope is
+        what the echo server prints below). Runnable Next.js + Astro boilerplate:
+        <code> docs/transport-proxies.md</code>.
+      </p>
+
+      <div className="demo-card">
+        <FormDemonstration form={proxy} />
+      </div>
+
+      <h2>
         <code>renderStatus</code> — a custom success screen
       </h2>
       <p className="lead">
@@ -141,6 +196,10 @@ export function MailersPage() {
       <h2>What travels over the wire</h2>
       <pre>{payloadPreview}</pre>
       <pre>{responsePreview}</pre>
+      <p className="lead" style={{ marginBlock: "0.6rem 0.2rem" }}>
+        The proxy-only mailers replace that multipart body with the JSON envelope:
+      </p>
+      <pre>{envelopePreview}</pre>
     </PageShell>
   );
 }

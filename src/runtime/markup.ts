@@ -27,10 +27,10 @@ import {
   type FormElement,
   type FormFieldSpec,
   type FormSpec,
-  type MailerName,
   type RepeaterSpec,
   type StepHeaderSpec,
 } from "../core";
+import { mailerSpecName } from "../mailers";
 
 /* ---- HTML helpers ---- */
 
@@ -350,20 +350,43 @@ export interface ShellOptions {
 /** Warn once per shell render when the form is missing its endpoint config. */
 export function warnMissingConfig(
   formName: string,
-  mailerName: MailerName,
-  wpUrl?: string,
-  cf7FormId?: string,
-  formEndpoint?: string,
+  mailerName: string,
+  config: { endpoint?: string; apiUrl?: string; formId?: string },
 ): void {
-  if (
-    (mailerName === "cf7" && (!wpUrl || !cf7FormId)) ||
-    (mailerName === "json" && !formEndpoint)
-  ) {
+  const { endpoint, apiUrl, formId } = config;
+  const missing: string[] = [];
+  switch (mailerName) {
+    case "cf7":
+      if (!apiUrl || !formId) {
+        missing.push("config.apiUrl + config.cf7FormId (or cf7.apiUrl / cf7.formId in the form spec)");
+      }
+      break;
+    case "wpforms":
+      if (!endpoint || !formId) missing.push("an `endpoint` (your WordPress site) and a `formId`");
+      break;
+    case "formspree":
+      if (!formId) missing.push("a `formId` (your Formspree form slug)");
+      break;
+    case "formkeep":
+    case "getform":
+      if (!endpoint && !formId) missing.push("an `endpoint` or a `formId`");
+      break;
+    case "json":
+    case "custom":
+      if (!endpoint) missing.push("an `endpoint` (Formspree-style or your API)");
+      break;
+    case "resend":
+    case "postmark":
+    case "sendgrid":
+      if (!endpoint) missing.push("an `endpoint` for your /api/contact proxy worker");
+      break;
+    default:
+      break; // unknown provider — the engine falls back to cf7 (and warns below)
+  }
+  if (missing.length > 0) {
     console.warn(
       `[ContactForm] "${formName}" (mailer: ${mailerName}) is missing its endpoint config — ` +
-        (mailerName === "cf7"
-          ? "pass config.apiUrl / config.cf7FormId, or set cf7.apiUrl / cf7.formId in the form spec."
-          : "add an `endpoint` to the form spec, or pass config.endpoint."),
+        `add ${missing.join(" and ")}.`,
     );
   }
 }
@@ -378,7 +401,8 @@ export function warnMissingConfig(
 export function renderFormShell({ form, config = {}, prefill }: ShellOptions): string {
   const formName = form.name;
   const formId = `${form.name}-form`;
-  const mailerName: MailerName = form.mailer ?? "cf7";
+  const mailerSpec = typeof form.mailer === "object" ? form.mailer : undefined;
+  const mailerName = mailerSpecName(form.mailer) ?? "cf7";
   const statusMode = form.statusMode ?? "inline";
 
   // JSON is the source of truth for which fields are required and how extra
@@ -430,10 +454,27 @@ export function renderFormShell({ form, config = {}, prefill }: ShellOptions): s
   });
   const stepperMods = stepperModifiers(stepper);
 
-  // Endpoint config — explicit props win, else the form spec's own block.
-  const wpUrl = config.apiUrl ?? form.cf7?.apiUrl;
-  const cf7FormId = config.cf7FormId ?? form.cf7?.formId;
-  const formEndpoint = config.endpoint ?? form.endpoint;
+  // Endpoint config — explicit props win, then the mailer config object, then
+  // the form spec's own legacy blocks. For a `cf7` config object its
+  // `endpoint` is the WordPress site base (mapped onto `data-wp-url`); every
+  // other provider's `endpoint` (and the generic formId) serialises directly.
+  const wpUrl =
+    config.apiUrl ??
+    (mailerSpec?.provider === "cf7" ? mailerSpec.endpoint : undefined) ??
+    form.cf7?.apiUrl;
+  const formIdAttr = config.cf7FormId ?? mailerSpec?.formId ?? form.cf7?.formId;
+  const formEndpoint = config.endpoint ?? mailerSpec?.endpoint ?? form.endpoint;
+
+  // Client-safe transport extras from a `MailerConfig` object — serialised so
+  // the specless `initForms` path resolves config-object mailers too. Method /
+  // headers / token / recipient only ever come from the spec (props config
+  // stays the legacy endpoint trio).
+  const mailerMethod = mailerSpec?.method;
+  const mailerHeaders = mailerSpec?.headers
+    ? JSON.stringify(mailerSpec.headers)
+    : undefined;
+  const formToken = mailerSpec?.formToken;
+  const mailerTo = mailerSpec?.to;
 
   // Opt-in draft persistence (`autoSave`): `true` scopes the draft to the form
   // name; a string names the exact localStorage key. Absent → no data-autosave.
@@ -454,7 +495,11 @@ export function renderFormShell({ form, config = {}, prefill }: ShellOptions): s
         ? form.validateOn.join(" ")
         : form.validateOn;
 
-  warnMissingConfig(formName, mailerName, wpUrl, cf7FormId, formEndpoint);
+  warnMissingConfig(formName, mailerName, {
+    endpoint: formEndpoint,
+    apiUrl: wpUrl,
+    formId: formIdAttr,
+  });
 
   /* ---- form open tag ---- */
 
@@ -462,7 +507,10 @@ export function renderFormShell({ form, config = {}, prefill }: ShellOptions): s
     `<form id="${esc(formId)}" class="rf-form" data-mail-form="${esc(formName)}" data-mailer="${esc(mailerName)}"` +
     `${attr("data-status-mode", statusMode === "inline" ? undefined : statusMode)}` +
     `${attr("data-prefill", prefill)}${attr("data-endpoint", formEndpoint)}` +
-    `${attr("data-wp-url", wpUrl)}${attr("data-form-id", cf7FormId)}${attr("data-autosave", autoSaveKey)}${attr("data-validate-on", validateOn)}` +
+    `${attr("data-wp-url", wpUrl)}${attr("data-form-id", formIdAttr)}` +
+    `${attr("data-mailer-method", mailerMethod)}${attr("data-mailer-headers", mailerHeaders)}` +
+    `${attr("data-form-token", formToken)}${attr("data-to", mailerTo)}` +
+    `${attr("data-autosave", autoSaveKey)}${attr("data-validate-on", validateOn)}` +
     ` data-rules="${esc(serializeRules(fieldConfig))}"` +
     `${attr("data-copy", form.copy ? JSON.stringify(form.copy) : undefined)}` +
     `${attr("data-steps", isWizard

@@ -16,6 +16,24 @@ next item instead of duplicating it.
   vanilla · TanStack). Immutable tags: `v0.1.0`, `v0.2.0`, `v0.3.0`.
 - **Branch:** `dev` (ahead of `main`), working tree clean.
 - **Most recent work (HEAD):**
+  - Validation timing + custom success screens (`d563dfa`) —
+    `FormSpec.validateOn: "submit" | "blur" | "change" | "touched" |
+    Array<…>` selects *when* pristine controls live-validate before submit
+    (serialised as `data-validate-on`, overridable at attach — options
+    win — and always through the same `ValidationProvider` rules, only the
+    timing changes). `"touched"` is the don't-nag mode: a field validates
+    the first time it loses focus, a submit attempt unlocks live
+    validation for every in-scope field, and both reset on
+    `rf:submit-success`; hidden conditional fields and skipped panes never
+    live-validate, wizard Next is unchanged. `autoSuccess: false`
+    suppresses only the success presentation (no box, no
+    `rf-form--success` collapse) while the error box, the reset and
+    `rf:submit-success` — now `{ name, id, message }` — stay
+    engine-driven; the React `renderStatus` prop renders a custom success
+    screen in place of the form with `{ message, name, id, form, reset }`
+    (`reset()` re-mounts a fresh form). The Flagship wizard opts into
+    `"validateOn": "touched"`; the react-demo `/mailers` page demonstrates
+    `renderStatus`.
   - Conditional wizard steps + draft autosave & prefill (`601152a`) —
     `step` markers accept `showWhen`: a pane whose conditions don't hold is
     skipped (hidden + `inert`, struck-through `rf-step--skipped` chip, out of
@@ -87,7 +105,7 @@ next item instead of duplicating it.
 
 ## Feature summary
 
-- **44 implemented** / **2 planned** of 46 tracked features (see
+- **46 implemented** / **2 planned** of 48 tracked features (see
   FEATURES.md). Implemented means shipped, exercised by the test suite
   (`npm test`) and demonstrated in `examples/`.
 - The 2 planned features: the **Nodemailer mail-delivery adapter**

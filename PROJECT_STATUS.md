@@ -15,6 +15,16 @@ next item instead of duplicating it.
   vanilla · TanStack). Immutable tags: `v0.1.0`, `v0.2.0`, `v0.3.0`.
 - **Branch:** `dev` (ahead of `main`), working tree clean.
 - **Most recent work (HEAD):**
+  - Analytics seam + deprecation cleanup (`aa130a6`) —
+    `createAnalytics({ adapter })`: a zero-dependency seam over the `rf:*`
+    bus whose `attach(form)` forwards every event (plus its detail — form
+    identity, step transitions, row counts, submit outcomes) to a
+    consumer-supplied tracker via native `addEventListener` and returns a
+    detach — no fabricated events, no new `data-*` hooks. Also removed the
+    legacy `copy.back` / `copy.next` label fallbacks (`form.prev` /
+    `form.next` are the only way to label wizard buttons) and the `66` size
+    alias (keep `67`); `shell-single.html`'s `data-copy` drops the removed
+    keys (regenerated, diff reviewed).
   - Wizard hooks + the `rf:*` event bus (`5107a64`) — `attachForm` /
     `renderForm` now return `{ on(event, handler), detach() }`: the
     namespaced `rf:*` event bus (`rf:fields-change`, `rf:row-add` /
@@ -63,7 +73,7 @@ next item instead of duplicating it.
 
 ## Feature summary
 
-- **40 implemented** / **2 planned** of 42 tracked features (see
+- **41 implemented** / **2 planned** of 43 tracked features (see
   FEATURES.md). Implemented means shipped, exercised by the test suite
   (`npm test`) and demonstrated in `examples/`.
 - The 2 planned features: the **Nodemailer mail-delivery adapter**
@@ -79,10 +89,7 @@ next item instead of duplicating it.
 
 ## Immediate next work
 
-The next milestone on [ROADMAP.md](ROADMAP.md): **M6 — analytics +
-deprecation cleanup** — a zero-dependency `createAnalytics({ adapter })`
-seam subscribed to the M5 `rf:*` bus, then removing the legacy `copy.back` /
-`copy.next` label fallbacks and the `66` size alias (keep `67`). After that
-the roadmap's separate release track is the Nodemailer-based mail-delivery
-adapter (v0.4.0 target) — the serverless worker half of the `json` mailer
-path.
+The top item on [ROADMAP.md](ROADMAP.md): the **Nodemailer-based
+mail-delivery adapter** (v0.4.0 target) — the serverless worker half of the
+`json` mailer path, completing the browser → worker → email story. See the
+roadmap for sequencing and dependencies.

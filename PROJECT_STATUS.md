@@ -16,6 +16,20 @@ next item instead of duplicating it.
   vanilla · TanStack). Immutable tags: `v0.1.0`, `v0.2.0`, `v0.3.0`.
 - **Branch:** `dev` (ahead of `main`), working tree clean.
 - **Most recent work (HEAD):**
+  - Structural `callout` + `html` elements (`2a9eeee`) — two new render-only
+    `FormElement`s routed through the shared `renderDecor`/`renderElement`
+    builders (no engine change; both carry no `name`, so they never
+    serialise into `data-rules`, never validate, never reach the payload).
+    `callout` (`text` + `variant: info|warning|success|danger`) renders
+    `<div class="rf-callout rf-callout--{variant}" role="note">` with
+    escaped text and `--rf-callout-*` theme tokens per variant; `html`
+    wraps its string verbatim in `<div class="rf-html rf-span-12">` — the
+    package's one documented carve-out from escape-everywhere, with
+    sanitization explicitly the consumer's responsibility. Fixtures pin
+    both (`struct-callout*`, `struct-html*`, `shell-struct`); the README +
+    examples document the carve-out, and the demos exercise a callout on
+    `/field-types` and a consent `details`/`summary` `html` block +
+    `success` callout in the wizard's last pane.
   - Expanded mailer schema + transport resolution + proxy docs (`02c4e16`) —
     `mailer` becomes a `MailerSpec` (provider shorthand or a `MailerConfig`
     object: `provider` / `endpoint` / `formId` / `method` / `headers` /
@@ -125,7 +139,7 @@ next item instead of duplicating it.
 
 ## Feature summary
 
-- **49 implemented** / **2 planned** of 51 tracked features (see
+- **51 implemented** / **2 planned** of 53 tracked features (see
   FEATURES.md). Implemented means shipped, exercised by the test suite
   (`npm test`) and demonstrated in `examples/`.
 - The 2 planned features: the **Nodemailer mail-delivery adapter**
@@ -143,7 +157,7 @@ next item instead of duplicating it.
 
 ## Immediate next work
 
-The top item on [ROADMAP.md](ROADMAP.md): **M10 — structural additions
-(`callout` + `html`)** next, then **M11 — the declarative `FormSpec.analytics`
-block** (auto-resolved into the `createAnalytics` seam). See the roadmap for
-sequencing and dependencies.
+The top item on [ROADMAP.md](ROADMAP.md): **M11 — the declarative
+`FormSpec.analytics` block** (auto-resolved into the `createAnalytics` seam,
+plus the new `rf:validation-error` bus event). See the roadmap for sequencing
+and dependencies.

@@ -10,11 +10,25 @@ next item instead of duplicating it.
 
 - **Latest release:** `v0.3.0` — file uploads, multi-selects and datalist
   suggestions, 12-column field sizing, structural field types, multi-step
-  wizard (`step` markers + `stepper` chrome), `showWhen` conditionals,
-  `statusMode: "replace"`, framework-independent bindings (Astro · React ·
+  wizard (`step` markers + `stepper` chrome), conditional wizard steps,
+  `showWhen` conditionals, localStorage `autoSave` drafts, `statusMode:
+  "replace"`, framework-independent bindings (Astro · React ·
   vanilla · TanStack). Immutable tags: `v0.1.0`, `v0.2.0`, `v0.3.0`.
 - **Branch:** `dev` (ahead of `main`), working tree clean.
 - **Most recent work (HEAD):**
+  - Conditional wizard steps + draft autosave & prefill (`601152a`) —
+    `step` markers accept `showWhen`: a pane whose conditions don't hold is
+    skipped (hidden + `inert`, struck-through `rf-step--skipped` chip, out of
+    validation, the payload and cross-field chains) while authored step
+    indices never change — Next/Back/jumps and `rf:step-change`'s `total`
+    follow a computed *visible* sequence, a step that collapses underfoot
+    reflows, and re-revealing a later step flips the final button back to a
+    submit. `autoSave` (boolean or explicit key) drafts the current step,
+    repeater row counts and every visible value to localStorage on a ~400ms
+    debounce, restores on attach (explicit `values` win) and clears on
+    `rf:submit-success`; the runtime `values` option prefills controls at
+    attach in every binding. The Flagship wizard example demonstrates all of
+    it with a conditional "Company" pane.
   - Analytics seam + deprecation cleanup (`aa130a6`) —
     `createAnalytics({ adapter })`: a zero-dependency seam over the `rf:*`
     bus whose `attach(form)` forwards every event (plus its detail — form
@@ -73,7 +87,7 @@ next item instead of duplicating it.
 
 ## Feature summary
 
-- **41 implemented** / **2 planned** of 43 tracked features (see
+- **44 implemented** / **2 planned** of 46 tracked features (see
   FEATURES.md). Implemented means shipped, exercised by the test suite
   (`npm test`) and demonstrated in `examples/`.
 - The 2 planned features: the **Nodemailer mail-delivery adapter**

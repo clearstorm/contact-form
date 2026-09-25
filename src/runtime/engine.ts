@@ -37,6 +37,7 @@ import {
   type HookName,
   type Rule,
   type RuleContext,
+  type ValidateOn,
   type ValidationProvider,
   type VisibilityConditionLike,
 } from "../core";
@@ -53,6 +54,27 @@ import {
 type Control = HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
 type Status = HTMLElement | null;
 type Handler = (event: Event) => void;
+
+/* ---- Live validation timing (`validateOn`) ---- */
+
+/** The proactive validation events `FormSpec.validateOn` can select. */
+export type LiveValidateMode = "blur" | "change" | "touched";
+
+/**
+ * Normalise a `validateOn` value (spec key, runtime override or the space-
+ * joined `data-validate-on` attribute) into the set of live modes to run.
+ * `"submit"` / absence means the empty set — submit-only validation.
+ */
+const normalizeValidateOn = (raw: ValidateOn | string | undefined): Set<LiveValidateMode> =>
+  new Set(
+    (
+      raw === undefined
+        ? []
+        : Array.isArray(raw)
+          ? raw
+          : raw.split(/\s+/).filter(Boolean)
+    ).filter((mode): mode is LiveValidateMode => mode !== "submit"),
+  );
 
 /* ---- Events (the `rf:*` bus) + lifecycle hooks ---- */
 
@@ -456,6 +478,15 @@ async function handleSubmit(
   validateControl?: (control: Control) => boolean,
   /** Resolved submit lifecycle hooks (see `attachForm`). */
   hooks?: { beforeSubmit?: SubmitHook; afterSubmit?: AfterSubmitHook },
+  /**
+   * `false` — the consumer owns the success presentation: the engine never
+   * shows the success status box and never collapses a `statusMode:
+   * "replace"` form on success (the error box, the reset and the
+   * `rf:submit-success` event stay engine-driven). Defaults to `true`.
+   */
+  autoSuccess = true,
+  /** Marks a submit attempt — unlocks "touched" live validation (see attach). */
+  markSubmitAttempt?: () => void,
 ): Promise<void> {
   const form = event.currentTarget;
   if (!(form instanceof HTMLFormElement)) return;
@@ -470,9 +501,11 @@ async function handleSubmit(
   // Honeypot: a filled hidden field means a bot — pretend success, send nothing.
   const honeypot = form.querySelector<HTMLInputElement>("[data-honeypot]");
   if (honeypot && honeypot.value.trim() !== "") {
-    showSuccess(status, successMessage);
+    if (autoSuccess) {
+      showSuccess(status, successMessage);
+      if (form.dataset.statusMode === "replace") form.classList.add("rf-form--success");
+    }
     form.reset();
-    if (form.dataset.statusMode === "replace") form.classList.add("rf-form--success");
     return;
   }
 
@@ -492,6 +525,10 @@ async function handleSubmit(
   // Fields inside hidden wrappers are out of scope — a hidden conditional
   // field can never block the form, and it never reaches the payload.
   const scoped = controls.filter((control) => !visibility.isHiddenControl(control));
+
+  // A submit attempt unlocks "touched" live validation for every in-scope
+  // field (see attachForm's `validateOn` mode) — even a failed attempt.
+  markSubmitAttempt?.();
 
   const validate = validateControl ?? ((control: Control) => validateField(control, rules[control.name], form, () => visibility.allValues()));
 
@@ -578,15 +615,15 @@ async function handleSubmit(
     });
     if (result.ok) {
       ok = true;
-      showSuccess(status, successMessage);
+      if (autoSuccess) {
+        // replace mode — the success box takes the form's place entirely.
+        if (form.dataset.statusMode === "replace") form.classList.add("rf-form--success");
+        showSuccess(status, successMessage);
+      }
       form.reset();
       controls.forEach((control) => clearError(control));
       clearRepeaterErrors(form);
-      // replace mode — the success box takes the form's place entirely.
-      if (form.dataset.statusMode === "replace") {
-        form.classList.add("rf-form--success");
-      }
-      emit("rf:submit-success", { name: formName, id: formId });
+      emit("rf:submit-success", { name: formName, id: formId, message: successMessage });
     } else {
       message = result.message || genericError;
       showError(status, message);
@@ -634,6 +671,20 @@ export interface AttachOptions {
    * this is a runtime-only option.
    */
   values?: Record<string, string | string[]>;
+  /**
+   * Override the form's `validateOn` timing at attach time (wins over the
+   * spec key and the shell's `data-validate-on`). Not serialised.
+   */
+  validateOn?: ValidateOn;
+  /**
+   * `false` — the consumer owns the *success* presentation: the engine never
+   * shows the success status box and never adds `rf-form--success` on
+   * success (field-level errors, the reset, the error box and the
+   * `rf:submit-success` event all stay engine-driven). Pair with an
+   * `rf:submit-success` listener — or the React `renderStatus` prop — to
+   * swap in your own success UI. Defaults to `true`.
+   */
+  autoSuccess?: boolean;
 }
 
 interface StepsMeta {
@@ -724,6 +775,27 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): Att
 
   const visibility = createVisibilityEngine(form, fields);
   const getValues = (): Record<string, string[]> => visibility.allValues();
+
+  /* ---- Live validation timing (`validateOn`) ----
+     Resolution order: runtime override → spec key → the shell's serialised
+     `data-validate-on`. Modes select which events proactively validate a
+     *pristine* control; the submit path and the error-driven re-validation of
+     already-flagged controls always run. In "touched" mode a field is only
+     validated live once it has been left at least once (its first blur) or a
+     submit attempt has been made. */
+  const autoSuccess = opts.autoSuccess !== false;
+  const validateOn = normalizeValidateOn(opts.validateOn ?? spec?.validateOn ?? form.dataset.validateOn);
+  const touchedNames = new Set<string>();
+  let submittedOnce = false;
+  const markSubmitAttempt = (): void => {
+    submittedOnce = true;
+  };
+  const shouldLiveValidate = (control: Control, kind: LiveValidateMode): boolean => {
+    if (visibility.isHiddenControl(control)) return false;
+    if (kind === "blur" && validateOn.has("blur")) return true;
+    if (kind === "change" && validateOn.has("change")) return true;
+    return validateOn.has("touched") && (submittedOnce || touchedNames.has(control.name));
+  };
 
   /* ---- The `rf:*` event bus + lifecycle hooks ---- */
 
@@ -1038,7 +1110,7 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): Att
 
   on(form, "submit", (event) => {
     if (!isWizard) {
-      void handleSubmit(event, fields, rules, mailerName, successMessage, copy, visibilityForSubmit, undefined, validateControl, submitHooks);
+      void handleSubmit(event, fields, rules, mailerName, successMessage, copy, visibilityForSubmit, undefined, validateControl, submitHooks, autoSuccess, markSubmitAttempt);
       return;
     }
     // Wizard: the submit button advances to the next *visible* step; the last
@@ -1063,7 +1135,7 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): Att
       goTo(nextStep);
       return;
     }
-    void handleSubmit(event, fields, rules, mailerName, successMessage, copy, visibilityForSubmit, stepControls, validateControl, submitHooks);
+    void handleSubmit(event, fields, rules, mailerName, successMessage, copy, visibilityForSubmit, stepControls, validateControl, submitHooks, autoSuccess, markSubmitAttempt);
   });
 
   // Stepper: completed steps are clickable and jump back without validation
@@ -1133,8 +1205,14 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): Att
   // repeater row when it lives in one.
   const wireControl = (control: Control): void => {
     const onInput = (): void => {
-      // Re-validate on change once a field has been flagged invalid.
-      if (control.hasAttribute("aria-invalid")) validateControl(control);
+      // Live validation: `validateOn` may demand a pristine field be checked
+      // on everyday typing ("change" mode, or "touched" once the field is
+      // live); the submit path always re-validates already-flagged controls.
+      if (shouldLiveValidate(control, "change")) {
+        validateControl(control);
+      } else if (control.hasAttribute("aria-invalid")) {
+        validateControl(control);
+      }
       // Shared-name groups (checkbox/radio): selection count is group-level,
       // so re-check flagged siblings too when one member changes.
       const row = control.closest<HTMLElement>("[data-repeater-row]");
@@ -1163,8 +1241,15 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): Att
         }
       }
     };
+    const onBlur = (): void => {
+      // "touched": leaving a field at least once makes it live-validated
+      // from then on ("blur" mode validates the blurred control directly).
+      touchedNames.add(control.name);
+      if (shouldLiveValidate(control, "blur")) validateControl(control);
+    };
     on(control, "input", onInput);
     on(control, "change", onInput);
+    on(control, "blur", onBlur);
   };
 
   form.querySelectorAll<Control>("input, select, textarea").forEach((control) => wireControl(control));
@@ -1280,6 +1365,11 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): Att
   on(form, "rf:submit-success", () => {
     if (saveTimer) clearTimeout(saveTimer);
     draft?.clear();
+    // Fresh form = submit-only again: drop the "touched" memory and the
+    // submit-attempt unlock so the next visit gets vanilla "don't nag"
+    // behaviour under `validateOn: "touched"`.
+    touchedNames.clear();
+    submittedOnce = false;
   });
 
   return {

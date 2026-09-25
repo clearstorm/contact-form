@@ -163,6 +163,7 @@ const wizardSpec: FormSpec = {
   submit: "Submit",
   status: "Submitted.",
   endpoint: "https://example.test/send",
+  validateOn: "touched",
   stepper: {
     nav: { variant: "right", line: "under" },
     header: { show: true, align: "left" },
@@ -564,6 +565,24 @@ if (RECORD) {
   check(
     "autoSave: false renders no data-autosave",
     !renderFormShell({ form: { ...autoSaveSpec, autoSave: false } }).includes("data-autosave"),
+  );
+
+  /* ---- validateOn (M8): data-validate-on serialisation ---- */
+  const wizardShellW = snapshots.find((s) => s.name === "shell-wizard")!.html;
+  check(
+    "validateOn: a string mode renders on the shell",
+    wizardShellW.includes(' data-validate-on="touched"'),
+  );
+  check(
+    "validateOn: an array renders space-joined",
+    renderFormShell({ form: { ...singleSpec, validateOn: ["blur", "change"] } }).includes(
+      ' data-validate-on="blur change"',
+    ),
+  );
+  check(
+    "validateOn: absent (submit-only) serialises nothing",
+    !shell.includes("data-validate-on") &&
+      !renderFormShell({ form: { ...singleSpec, validateOn: "submit" } }).includes("data-validate-on"),
   );
 }
 

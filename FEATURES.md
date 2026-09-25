@@ -72,6 +72,7 @@ Status vocabulary: `implemented` · `partial` · `planned` · `deprecated`.
 | --- | --- | --- | --- |
 | `validation-vanilla` | Built-in vanilla rules | Regex rules keyed by field type (`email`, `tel`, `url`, `number`/`range` bounds, `color`, `textarea` ≥ 10 chars, names ≥ 2 letters, checkbox/radio/file selection) | implemented |
 | `validation-zod` | Optional Zod adapter | `zodValidation(schema)` — schema drives required-ness, format and per-value messages; consumed structurally so zod v3 and v4 both work; `zod` is an optional peer | implemented |
+| `validation-timing` | Validation timing (`validateOn`) | `validateOn: "submit" \| "blur" \| "change" \| "touched" \| Array<...>` on the spec — *when* pristine controls live-validate before submit (blur / change / touched — no nagging until a field is first left or a submit attempt happens). Runs through the same `ValidationProvider` seam (only *when* rules run, never which/how), serialised as `data-validate-on`, overridable at attach through `renderForm` / `attachForm` / the React `validateOn` prop (options win over the spec); hidden conditional fields and skipped panes never live-validate; success resets the touched/unlock state; wizard "Next" step validation is unchanged | implemented |
 
 ## UX & theming
 
@@ -79,6 +80,7 @@ Status vocabulary: `implemented` · `partial` · `planned` · `deprecated`.
 | --- | --- | --- | --- |
 | `ux-copy` | Consumer-driven copy | `FormCopy` keys + per-field `message`; resolution `field.message` → `copy[key]` → built-in default; `{status}` token in `submitError` | implemented |
 | `ux-status-mode` | Success state | `statusMode: "inline"` (default; box under submit, cleared form stays) or `"replace"` (form collapses to the success box); `role="status"` announced | implemented |
+| `status-renderer` | Custom success screen | `autoSuccess: false` on `renderForm` / `attachForm` options (and React props) suppresses *only* the success presentation — no success box, no `rf-form--success` collapse — while the error box, the reset, the lifecycle and `rf:submit-success` (now `{ name, id, message }`) stay engine-driven; the React `renderStatus` prop renders a custom success screen in place of the form with `{ message, name, id, form, reset }`, and `reset()` re-mounts the form as a fresh engine-wired instance (submit errors keep the default box) | implemented |
 | `ux-honeypot` | Honeypot anti-bot field | Hidden field absorbs bots — pretend success, nothing sent | implemented |
 | `ux-theming-tokens` | `--rf-*` theming tokens | Color, label and spacing token sets; compact light defaults, re-themes by overriding variables; native controls via `--rf-color-scheme` | implemented |
 | `ux-prefill` | Opt-in `prefill="datetime"` | Pre-fills `date` / `time` inputs with today's local date and near-now time | implemented |

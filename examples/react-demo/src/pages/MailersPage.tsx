@@ -1,11 +1,29 @@
 import { PageShell } from "../components/PageShell";
 import { FormDemonstration } from "../components/FormDemonstration";
+import { ContactForm, type SubmitStatusContext } from "@clearstorm/contact-form/react";
 import mailersSpec from "../../../specs/mailers.json";
 import { getForm, type NamedForms } from "../lib/forms";
 
 const cf7 = getForm(mailersSpec as NamedForms, "Contact — CF7 mailer");
 const json = getForm(mailersSpec as NamedForms, "JSON mailer echo");
 const pageShellTitle = "cf7 · json transports";
+
+// Same form data, re-keyed with its own `name` slug so the second rendering
+// on this page never collides ids with the demo above it. A custom success
+// screen (`renderStatus`) takes over the whole card on submit.
+const customSuccess = { ...json, name: "json-success-custom" };
+const customSuccessStatus = (ctx: SubmitStatusContext) => (
+  <div className="demo-success-screen">
+    <h4 className="demo-success-title">✓ {ctx.message}</h4>
+    <p className="demo-success-meta">
+      <code>{ctx.name}</code> · <code>id={ctx.id}</code> · the echo server logged
+      the canonical payload.
+    </p>
+    <button type="button" className="rf-submit rf-submit--secondary" onClick={ctx.reset}>
+      Fill it in again
+    </button>
+  </div>
+);
 
 // Endpoint config is the consumer's business — the engine never reads env. The
 // demo reads the Vite convention (VITE_*) for the same PUBLIC_* story the
@@ -102,6 +120,22 @@ export function MailersPage() {
 
       <div className="demo-card">
         <FormDemonstration form={json} />
+      </div>
+
+      <h2>
+        <code>renderStatus</code> — a custom success screen
+      </h2>
+      <p className="lead">
+        The same JSON echo form, re-keyed as <code>json-success-custom</code> and
+        given a <code>renderStatus</code> prop. On success the whole card swaps to
+        your component (here driven straight from the spec JSON, theme tokens and
+        the <code>reset</code> callback); the engine keeps everything up to — but
+        not including — the success presentation. Submit it and the default
+        success box never appears.
+      </p>
+
+      <div className="demo-card">
+        <ContactForm form={customSuccess} renderStatus={customSuccessStatus} />
       </div>
 
       <h2>What travels over the wire</h2>

@@ -444,6 +444,16 @@ export function renderFormShell({ form, config = {}, prefill }: ShellOptions): s
         ? form.autoSave.trim()
         : undefined;
 
+  // Live validation timing (`validateOn`): `"blur"` / `"change"` / `"touched"`
+  // or an array (space-joined). The default (`undefined` / `"submit"`)
+  // serialises nothing — the engine then validates on submit only.
+  const validateOn =
+    form.validateOn === undefined || form.validateOn === "submit"
+      ? undefined
+      : Array.isArray(form.validateOn)
+        ? form.validateOn.join(" ")
+        : form.validateOn;
+
   warnMissingConfig(formName, mailerName, wpUrl, cf7FormId, formEndpoint);
 
   /* ---- form open tag ---- */
@@ -452,7 +462,7 @@ export function renderFormShell({ form, config = {}, prefill }: ShellOptions): s
     `<form id="${esc(formId)}" class="rf-form" data-mail-form="${esc(formName)}" data-mailer="${esc(mailerName)}"` +
     `${attr("data-status-mode", statusMode === "inline" ? undefined : statusMode)}` +
     `${attr("data-prefill", prefill)}${attr("data-endpoint", formEndpoint)}` +
-    `${attr("data-wp-url", wpUrl)}${attr("data-form-id", cf7FormId)}${attr("data-autosave", autoSaveKey)}` +
+    `${attr("data-wp-url", wpUrl)}${attr("data-form-id", cf7FormId)}${attr("data-autosave", autoSaveKey)}${attr("data-validate-on", validateOn)}` +
     ` data-rules="${esc(serializeRules(fieldConfig))}"` +
     `${attr("data-copy", form.copy ? JSON.stringify(form.copy) : undefined)}` +
     `${attr("data-steps", isWizard

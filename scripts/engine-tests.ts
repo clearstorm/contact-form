@@ -1455,5 +1455,221 @@ check(
 );
 localStorage.removeItem(autoRepKey);
 
+/* ---- 13. M8: `validateOn` — blur / change / touched live validation ---- */
+
+// 13a. "blur": the mode serialises as data-validate-on, and a *pristine* field
+// is validated the moment it loses focus (submit-only validation no longer
+// gates it).
+const blurSpec = jsonSpec(
+  [
+    { type: "text", id: "b_name", name: "b_name", label: "Name", required: true },
+    { type: "email", id: "b_email", name: "b_email", label: "Email", required: true },
+    { type: "text", id: "b_opt", name: "b_opt", label: "Optional", optional: true },
+  ],
+  { name: "engine-m8-blur", validateOn: "blur" },
+);
+
+form = mount(renderFormShell({ form: blurSpec }));
+attachForm(form);
+check("blur spec serialises data-validate-on", form.getAttribute("data-validate-on") === "blur");
+fire(input(form, "b_name"), "blur");
+check("blur flags a pristine required field", errorCount(form) === 1 && input(form, "b_name").hasAttribute("aria-invalid"));
+input(form, "b_name").value = "Jane";
+fire(input(form, "b_name"), "input");
+check("the blurred field's error clears on input", errorCount(form) === 0);
+fire(input(form, "b_email"), "blur");
+check("blur flags another pristine required field", errorCount(form) === 1 && input(form, "b_email").hasAttribute("aria-invalid"));
+fire(input(form, "b_opt"), "blur");
+check("blur never flags an optional empty field", errorCount(form) === 1);
+
+// 13b. "change": everyday typing validates a pristine field (and clears live).
+const changeSpec = jsonSpec(
+  [{ type: "text", id: "c_code", name: "c_code", label: "Code", pattern: "[0-9]{4}", message: "Four digits" }],
+  { name: "engine-m8-change", validateOn: "change" },
+);
+form = mount(renderFormShell({ form: changeSpec }));
+attachForm(form);
+input(form, "c_code").value = "12";
+fire(input(form, "c_code"), "input");
+check("change validates a pristine field as it types", input(form, "c_code").hasAttribute("aria-invalid"));
+input(form, "c_code").value = "1234";
+fire(input(form, "c_code"), "input");
+check("change live-clears once the field is valid", !input(form, "c_code").hasAttribute("aria-invalid") && errorCount(form) === 0);
+
+// 13c. "touched": nothing validates until a field is left (its first blur) or
+// a submit attempt happens; once a field is live it re-validates as usual.
+const touchedSpec = jsonSpec(
+  [
+    { type: "text", id: "t_name", name: "t_name", label: "Name", required: true },
+    { type: "text", id: "t_code", name: "t_code", label: "Code", required: true, minLength: 4 },
+  ],
+  { name: "engine-m8-touched", validateOn: "touched" },
+);
+
+form = mount(renderFormShell({ form: touchedSpec }));
+attachForm(form);
+input(form, "t_code").value = "ab";
+fire(input(form, "t_code"), "input");
+check("touched: a pristine change is ignored before any interaction", !input(form, "t_code").hasAttribute("aria-invalid") && errorCount(form) === 0);
+fire(input(form, "t_name"), "blur");
+check("touched: leaving an empty required field flags it on that blur", errorCount(form) === 1 && input(form, "t_name").hasAttribute("aria-invalid"));
+check("touched: unrelated untouched fields stay unflagged", !input(form, "t_code").hasAttribute("aria-invalid"));
+fire(input(form, "t_code"), "blur");
+check("touched: the blurred field validates on its own blur", input(form, "t_code").hasAttribute("aria-invalid"));
+input(form, "t_code").value = "abcd";
+fire(input(form, "t_code"), "input");
+check("touched: a touched field live-clears on input", !input(form, "t_code").hasAttribute("aria-invalid"));
+
+// A submit attempt (even a failed one) unlocks live validation for every
+// in-scope field.
+form = mount(renderFormShell({ form: touchedSpec }));
+attachForm(form);
+submit(form);
+check("touched: submit still fully validates", errorCount(form) === 2);
+input(form, "t_code").value = "abcd";
+fire(input(form, "t_code"), "input");
+check("touched: post-attempt live-clear works too", !input(form, "t_code").hasAttribute("aria-invalid"));
+input(form, "t_code").value = "ab";
+fire(input(form, "t_code"), "change");
+check("touched: after a submit attempt a field validates live", input(form, "t_code").hasAttribute("aria-invalid"));
+
+// Success resets the touched state and the submit-attempt unlock.
+form = mount(renderFormShell({ form: touchedSpec }));
+attachForm(form);
+input(form, "t_name").value = "Jane";
+fire(input(form, "t_name"), "input");
+input(form, "t_code").value = "abcd";
+fire(input(form, "t_code"), "input");
+submit(form);
+check("touched: a valid submit succeeds", await until(() => !(find(form, ".rf-status") as HTMLElement).hidden));
+input(form, "t_code").value = "ab";
+fire(input(form, "t_code"), "change");
+check("touched: live validation resets after a successful submit", !input(form, "t_code").hasAttribute("aria-invalid") && errorCount(form) === 0);
+
+// 13d. arrays combine modes; a runtime override wins over the spec; the
+// specless initForms path reads the serialised hook.
+const unionSpec = jsonSpec(
+  [{ type: "text", id: "u_code", name: "u_code", label: "Code", minLength: 4 }],
+  { name: "engine-m8-union", validateOn: ["blur", "change"] },
+);
+form = mount(renderFormShell({ form: unionSpec }));
+check("array validateOn serialises space-joined", form.getAttribute("data-validate-on") === "blur change");
+attachForm(form);
+input(form, "u_code").value = "ab";
+fire(input(form, "u_code"), "input");
+check("union change leg validates pristine typing", input(form, "u_code").hasAttribute("aria-invalid"));
+input(form, "u_code").value = "abcd";
+fire(input(form, "u_code"), "input");
+check("union live-clears valid typing", !input(form, "u_code").hasAttribute("aria-invalid"));
+
+form = mount(renderFormShell({ form: blurSpec })); // spec says "blur"
+attachForm(form, { validateOn: "change" });
+check("data-validate-on still reflects the spec when overridden", form.getAttribute("data-validate-on") === "blur");
+fire(input(form, "b_email"), "blur");
+check("runtime override disables the spec's blur leg", !input(form, "b_email").hasAttribute("aria-invalid"));
+input(form, "b_name").value = "";
+fire(input(form, "b_name"), "input");
+check("runtime override change leg flags a now-empty required", input(form, "b_name").hasAttribute("aria-invalid"));
+
+document.body.innerHTML = '<div id="root"></div>';
+root()!.innerHTML = renderFormShell({ form: blurSpec });
+initForms();
+form = root()!.querySelector<HTMLFormElement>("form[data-mail-form]")!;
+fire(input(form, "b_name"), "blur");
+check("specless initForms honours data-validate-on", input(form, "b_name").hasAttribute("aria-invalid"));
+
+// 13e. scope guards: hidden conditional fields are never live-validated,
+// radio groups validate group-level on a member blur, repeater clones wire
+// the same live mode.
+const scopeSpec = jsonSpec(
+  [
+    { type: "radio", id: "s_pick", name: "s_pick", label: "Pick", required: true, options: ["A", "B"] },
+    {
+      type: "text",
+      id: "s_hid",
+      name: "s_hid",
+      label: "Hidden",
+      required: true,
+      showWhen: { field: "s_pick", operator: "equals", value: "A" },
+    },
+  ],
+  { name: "engine-m8-scope", validateOn: "blur" },
+);
+form = mount(renderFormShell({ form: scopeSpec }));
+attachForm(form);
+fire(input(form, "s_pick"), "blur");
+check("blur flags an empty required radio group", input(form, "s_pick").hasAttribute("aria-invalid"));
+fire(input(form, "s_hid"), "blur");
+check("blur on a hidden conditional field is ignored", !input(form, "s_hid").hasAttribute("aria-invalid") && errorCount(form) === 1);
+
+const repValSpec = jsonSpec(
+  [
+    {
+      type: "repeater",
+      id: "members",
+      name: "members",
+      label: "Members",
+      minRows: 1,
+      maxRows: 3,
+      fields: [{ type: "text", id: "m_name", name: "m_name", label: "Name", required: true }],
+    },
+  ],
+  { name: "engine-m8-repval", validateOn: "change" },
+);
+form = mount(renderFormShell({ form: repValSpec }));
+attachForm(form);
+fire(input(form, "m_name"), "input");
+check("change validation runs inside repeater rows", input(form, "m_name").hasAttribute("aria-invalid"));
+const addRowBtn = find(form, "[data-add-row]");
+if (addRowBtn) fire(addRowBtn, "click");
+const row1ValName = form
+  .querySelectorAll<HTMLElement>("[data-repeater-row]")[1]
+  .querySelector<HTMLInputElement>('[name="m_name"]')!;
+fire(row1ValName, "input");
+check("cloned repeater rows wire the same live mode", row1ValName.hasAttribute("aria-invalid") && errorCount(form) === 2);
+
+/* ---- 14. M8: `autoSuccess` — consumer-owned success presentation + payload ---- */
+
+// autoSuccess:false suppresses *only* the success presentation: no success
+// box, no rf-form--success collapse, still reset + errors cleared + the
+// event (now carrying the message). The error box stays engine-driven.
+const asSpec = jsonSpec(
+  [{ type: "text", id: "as_name", name: "as_name", label: "Name", required: true }],
+  { name: "engine-m8-autosuccess", statusMode: "replace" },
+);
+
+form = mount(renderFormShell({ form: asSpec }));
+const asEvents: Array<Record<string, unknown>> = [];
+const asAttached = attachForm(form, { autoSuccess: false });
+asAttached.on("rf:submit-success", (e) => asEvents.push((e as CustomEvent).detail as Record<string, unknown>));
+input(form, "as_name").value = "Jane";
+fire(input(form, "as_name"), "input");
+submit(form);
+check("autoSuccess:false still emits rf:submit-success", await until(() => asEvents.length > 0));
+check("rf:submit-success carries the success message", asEvents[0]?.message === "Thanks!", JSON.stringify(asEvents[0]));
+check("autoSuccess:false keeps the status box hidden on success", (find(form, ".rf-status") as HTMLElement).hidden);
+check("autoSuccess:false never collapses a replace form", !form.classList.contains("rf-form--success"));
+check("autoSuccess:false still resets and clears errors", input(form, "as_name").value === "" && errorCount(form) === 0);
+
+form = mount(renderFormShell({ form: { ...asSpec, name: "engine-m8-autosuccess-fail", endpoint: "https://example.test/fail-m8" } }));
+attachForm(form, { autoSuccess: false });
+input(form, "as_name").value = "Jane";
+fire(input(form, "as_name"), "input");
+submit(form);
+check("autoSuccess:false keeps the engine default error box", await until(() => !(find(form, ".rf-status") as HTMLElement).hidden));
+check("the error box carries rf-status--error", (find(form, ".rf-status") as HTMLElement).classList.contains("rf-status--error"));
+
+// The engine default (`autoSuccess: true`) is unchanged: success box +
+// replace-mode collapse, and the event still carries the message.
+form = mount(renderFormShell({ form: asSpec }));
+const defEvents: Array<Record<string, unknown>> = [];
+attachForm(form).on("rf:submit-success", (e) => defEvents.push((e as CustomEvent).detail as Record<string, unknown>));
+input(form, "as_name").value = "Jane";
+fire(input(form, "as_name"), "input");
+submit(form);
+check("default autoSuccess collapses the replace form", await until(() => form.classList.contains("rf-form--success")));
+check("default autoSuccess shows the success box", await until(() => !(find(form, ".rf-status") as HTMLElement).hidden));
+check("default autoSuccess emits the message too", defEvents[0]?.message === "Thanks!");
+
 console.log(failures === 0 ? "\nENGINE ALL PASS" : `\nENGINE ${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);

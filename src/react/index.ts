@@ -8,4 +8,4 @@
  * <ContactForm form={spec} config={{ endpoint }} />
  * ```
  */
-export { ContactForm, Field, type ContactFormProps, type FieldProps } from "./ContactForm";
+export { ContactForm, Field, type ContactFormProps, type SubmitStatusContext, type FieldProps } from "./ContactForm";

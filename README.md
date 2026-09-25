@@ -161,7 +161,11 @@ import "@clearstorm/contact-form/styles.css";
 `hooks` is optional and accepts the engine's lifecycle hooks (plus a named
 registry for spec hook-refs); `values` prefills controls at attach (see
 [Draft autosave + prefilled values](#draft-autosave--prefilled-values));
-`Field` renders a single field from the spec.
+`validateOn` and `autoSuccess` override the spec's validation timing and
+success presentation; `renderStatus` swaps the whole form for a custom
+success screen on submit (see [Validation](#validation) and
+[Success state](#success-state--status--statusmode)); `Field` renders a single
+field from the spec.
 
 ### Vanilla JS (`renderForm`)
 
@@ -243,7 +247,7 @@ receives them too. `detach()` removes subscriptions with every other listener.
 | `rf:row-add` / `rf:row-remove` | a repeater row added / removed | `{ name, count }` |
 | `rf:step-change` | wizard step transition (Next, Back, stepper jump) | `{ from, to, total }` — `total` counts the *visible* steps, so conditional panes shrink it |
 | `rf:submit-start` | after validation passes, before the mailer | `{ name, id, form }` |
-| `rf:submit-success` | the mailer accepted the submission | `{ name, id }` |
+| `rf:submit-success` | the mailer accepted the submission | `{ name, id, message }` — `message` is the same success string the status box would show |
 | `rf:submit-error` | the mailer failed | `{ name, id, message }` |
 
 Lifecycle **hooks** let a consumer veto or observe those same moments
@@ -535,7 +539,10 @@ Behaviour:
   a hidden conditional field can't block a step); **Back never validates**; the
   **final button** validates the visible form (current step + shared prefix)
   and submits. Only the **last marker's `submit` label** wins on that button —
-  `form.submit`'s label is the fallback.
+  `form.submit`'s label is the fallback. Step advances are unchanged by
+  [`validateOn`](#validation-timing-validateon) — a wizard carrying
+  `"validateOn": "touched"` (like the flagship demo) validates live only once a
+  field has been left or a submit attempt has happened.
 - **Step headers + stepper chrome (opt-in `stepper` key)** — a top-level
   `stepper` form key is the one place wizard chrome lives: `nav` styles the
   strip (`variant`: `left` / `center` / `right` / `even`; `line`:
@@ -772,6 +779,52 @@ readers in both modes.
 }
 ```
 
+### Custom success screens (`autoSuccess` / `renderStatus`)
+
+Set `autoSuccess: false` (as an option to `renderForm` / `attachForm`, or a
+React prop) and the engine stops showing the success presentation entirely: no
+status box, no `rf-form--success` collapse — nothing changes for submit errors
+(the engine default box stays), field-level errors, the form reset, the
+lifecycle or `rf:submit-success` (which now carries `{ name, id, message }`).
+It suppresses *only* the success display, so a consumer can own success
+without fighting the engine:
+
+```js
+renderForm("#root", spec, {
+  config: { endpoint },
+  autoSuccess: false,
+});
+// the form el never shows a success box — drive your own UI:
+form.addEventListener("rf:submit-success", (e) =>
+  document.querySelector("#my-success").textContent = e.detail.message,
+);
+```
+
+The React binding turns this into a component. A `renderStatus` prop renders
+your success screen **in place of the whole form** after a successful submit,
+with `{ message, name, id, form, reset }` — `reset()` re-mounts the form as a
+fresh engine-wired instance:
+
+```tsx
+import { ContactForm } from "@clearstorm/contact-form/react";
+
+<ContactForm
+  form={spec}
+  renderStatus={({ message, reset }) => (
+    <div className="success-card">
+      <h2>✓ {message}</h2>
+      <button onClick={reset}>Fill it in again</button>
+    </div>
+  )}
+/>
+```
+
+Success-only: submit errors still use the engine's default status box, which
+keeps appearing as long as the form is shown. Prefer a stable function identity
+for `renderStatus` (e.g. `useCallback`) — like `hooks`, it is an effect
+dependency. The react-demo's `/mailers` page renders the JSON echo form with a
+custom `renderStatus` screen (re-keyed as `json-success-custom`).
+
 ---
 
 ## Copy (text copy is consumer-driven)
@@ -947,6 +1000,33 @@ shared code keyed by field type (`email`, `tel`, `url`, `number`/`range`
 bounds, `color`, `textarea` min length 10, names ≥ 2 letters, checkbox/radio
 selection). Errors render inline and clear on input; the honeypot field
 absorbs bots (pretend-success, nothing sent).
+
+### Validation timing (`validateOn`)
+
+By default the form fully validates on submit — an *already-flagged* field
+clears its error as you fix it, but a pristine field is never checked until the
+submit button is pressed. Set `validateOn` on the spec (or pass it to
+`renderForm` / `attachForm` / the React `validateOn` prop — options win) to
+validate pristine fields earlier:
+
+| Mode | Behaviour |
+| --- | --- |
+| `"blur"` | Validate a control the moment it loses focus. |
+| `"change"` | Validate on every `input` / `change`, even while typing. |
+| `"touched"` | Submit normally; a field starts validating live the first time it loses focus, and every in-scope field validates live once a submit attempt has happened. *Don't nag untouched fields.* |
+
+An **array** combines modes — `["blur", "change"]` validates on blur *and* on
+every keystroke. Whatever the mode, validation rules still run through the same
+[`ValidationProvider`](#validation-is-pluggable) seam (only *when* they run
+changes, never which or how), and hidden conditional fields / skipped wizard
+panes never validate live.
+
+```jsonc
+{ "name": "enquiry", "validateOn": "touched", "fields": [ … ] }
+```
+
+The flagship wizard demo opts in via `"validateOn": "touched"`; its wizard
+"Next" validation is unchanged.
 
 ### Custom validation rules
 

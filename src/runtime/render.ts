@@ -16,7 +16,7 @@
  */
 import { attachForm, type FormEventName, type HookRegistry } from "./engine";
 import { renderFormShell, type ShellOptions } from "./markup";
-import type { FormSpec, ValidationProvider } from "../core";
+import type { FormSpec, ValidateOn, ValidationProvider } from "../core";
 
 export interface RenderOptions extends Omit<ShellOptions, "form"> {
   /**
@@ -43,6 +43,19 @@ export interface RenderOptions extends Omit<ShellOptions, "form"> {
    * `autoSave` draft, so explicit values win. Not serialised; runtime-only.
    */
   values?: Record<string, string | string[]>;
+  /**
+   * Override the form's `validateOn` timing (wins over the spec key / the
+   * shell's `data-validate-on`). Not serialised; runtime-only.
+   */
+  validateOn?: ValidateOn;
+  /**
+   * `false` — the consumer owns the *success* presentation: the engine never
+   * shows the success status box and never adds `rf-form--success` on success
+   * (field errors, the reset, the error box and the `rf:submit-success`
+   * event stay engine-driven). Pair with a `rf:submit-success` listener to
+   * swap in a custom success UI. Defaults to `true`.
+   */
+  autoSuccess?: boolean;
 }
 
 export interface RenderedForm {
@@ -91,6 +104,8 @@ export function renderForm(
     validation: options.validation,
     hooks: options.hooks,
     values: options.values,
+    validateOn: options.validateOn,
+    autoSuccess: options.autoSuccess,
   });
   return {
     form: formEl,

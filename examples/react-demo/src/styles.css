@@ -138,6 +138,31 @@ h2 {
   margin-block: 1.4rem;
 }
 
+.demo-success-screen {
+  display: grid;
+  place-items: start;
+  gap: 0.9rem;
+  padding: 2.2rem 2rem;
+  text-align: left;
+  background:
+    linear-gradient(135deg, rgba(21, 128, 61, 0.08), rgba(21, 128, 61, 0.02)),
+    #ffffff;
+  border: 1px solid #bbe5c3;
+  border-radius: 8px;
+}
+
+.demo-success-screen .demo-success-title {
+  margin: 0;
+  font-size: 1.15rem;
+  color: #166534;
+}
+
+.demo-success-screen .demo-success-meta {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
 .demo-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));

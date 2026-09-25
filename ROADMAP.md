@@ -52,6 +52,20 @@ in [FEATURES.md](FEATURES.md) as implemented:
   `rf:submit-success`) — and the runtime `values` prefill option that beats a
   stored draft. The demo flagship wizard grows a conditional "Company" pane
   and opts into `autoSave`.
+- **M8 — validation timing + custom success screens.** `FormSpec.validateOn`
+  selects *when* pristine controls live-validate before submit — `"blur"`,
+  `"change"`, `"touched"` (no nagging until a field is first left or a submit
+  attempt happens) or an array combining modes — serialised as
+  `data-validate-on`, overridable at attach via `renderForm` / `attachForm` /
+  the React `validateOn` prop, and running through the same `ValidationProvider`
+  seam (rules never change, only their timing). Plus `autoSuccess: false`:
+  the engine stops showing the success box / `rf-form--success` collapse so a
+  consumer owns the success presentation (the error box, the reset and
+  `rf:submit-success` — now `{ name, id, message }` — stay engine-driven);
+  the React binding's `renderStatus` prop renders a custom success screen in
+  place of the form with `{ message, name, id, form, reset }`. The flagship
+  wizard demo opts into `"validateOn": "touched"`; the react-demo `/mailers`
+  page demos a `renderStatus` success screen.
 
 ---
 

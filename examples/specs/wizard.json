@@ -26,6 +26,7 @@
     "mailer": "json",
     "endpoint": "http://localhost:8787/submit",
     "autoSave": true,
+    "validateOn": "touched",
     "copy": {
       "sending": "Sending…",
       "submitError": "Sending failed (HTTP {status}) — is the echo server running (npm run demo:api)?"

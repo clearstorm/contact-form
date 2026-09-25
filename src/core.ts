@@ -530,6 +530,31 @@ export function stepperModifiers(stepper: StepperSpec | undefined): string {
  */
 export type HookName = "beforeValidateStep" | "afterStepChange" | "beforeSubmit" | "afterSubmit";
 
+/**
+ * When per-control validation runs *before* submit.
+ *
+ * - absent / `"submit"` — the default: full validation on submit only
+ *   (errors already on screen still clear live as the visitor types).
+ * - `"blur"` — validate a control the moment it loses focus, even if it was
+ *   never flagged.
+ * - `"change"` — validate on every `input` / `change`, even for pristine
+ *   fields.
+ * - `"touched"` — submit normally; a field starts validating live the first
+ *   time it loses focus, and every in-scope field validates live after the
+ *   first submit attempt. Avoids nagging untouched fields.
+ *
+ * An array combines modes (`["blur", "change"]`). The mode is serialised on
+ * the form shell as `data-validate-on` (space-joined for arrays) and can be
+ * overridden at attach time through `renderForm` / `attachForm` / the React
+ * `validateOn` prop (options win over the spec).
+ */
+export type ValidateOn =
+  | "submit"
+  | "blur"
+  | "change"
+  | "touched"
+  | Array<"blur" | "change" | "touched">;
+
 export interface FormSpec {
   /** Baked form identity (e.g. "enquiry" | "booking") — keys data-mail-form, the form id and the JS hooks. */
   name: string;
@@ -586,6 +611,17 @@ export interface FormSpec {
    * quietly disables persistence. The draft never survives a successful submit.
    */
   autoSave?: boolean | string;
+  /**
+   * When per-control validation runs before submit (see `ValidateOn`):
+   * `"blur"`, `"change"` or `"touched"` — or an array combining them, e.g.
+   * `["blur", "change"]`. Absent / `"submit"` keeps today's behaviour: the
+   * form fully validates on submit, and already-flagged errors clear live.
+   *
+   * Serialised as `data-validate-on` on the form shell; a runtime override in
+   * `renderForm` / `attachForm` options (or the React `<ContactForm />`
+   * `validateOn` prop) wins over the spec.
+   */
+  validateOn?: ValidateOn;
   /**
    * The ordered layout of the form: real fields plus (optionally) structural
    * elements — `heading`, `description`, `divider`, `section` — and wizard

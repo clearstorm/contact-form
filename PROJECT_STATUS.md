@@ -16,6 +16,26 @@ next item instead of duplicating it.
   vanilla · TanStack). Immutable tags: `v0.1.0`, `v0.2.0`, `v0.3.0`.
 - **Branch:** `dev` (ahead of `main`), working tree clean.
 - **Most recent work (HEAD):**
+  - Expanded mailer schema + transport resolution + proxy docs (`02c4e16`) —
+    `mailer` becomes a `MailerSpec` (provider shorthand or a `MailerConfig`
+    object: `provider` / `endpoint` / `formId` / `method` / `headers` /
+    public `formToken` / `to`; master keys are typed off the client surface).
+    New adapters: direct publics `wpforms` / `formspree` / `formkeep` /
+    `getform` (client → provider, config/URL shaping only, no secrets) plus
+    proxy-only `resend` / `postmark` / `sendgrid` that POST provider-shaped
+    JSON `{ provider, formId, to, payload }` to the consumer's `/api/contact`
+    endpoint; the generic transport gains a `"custom"` alias of `"json"` and
+    honours `method` / `headers`. Resolution: config props → mailer config
+    object → legacy `endpoint`/`cf7` blocks → per-provider build-time warning.
+    The shell serialises provider + client-safe config onto `data-mailer` and
+    `data-mailer-method` / `data-mailer-headers` / `data-form-token` /
+    `data-to` (specless `initForms` resolves config-object mailers);
+    `AttachOptions.config` now merges on submit (runtime overrides win).
+    `docs/transport-proxies.md` ships Next.js + Astro raw-`fetch` proxy
+    boilerplate (env keys, no new deps) and absorbs the Nodemailer/SMTP idea
+    as a worker variant. Fixtures +3 (`shell-mailer-config`,
+    `shell-mailer-wpforms`; diff reviewed); the `/mailers` demos show a
+    provider-config tab + a resend proxy envelope against the echo server.
   - Validation timing + custom success screens (`d563dfa`) —
     `FormSpec.validateOn: "submit" | "blur" | "change" | "touched" |
     Array<…>` selects *when* pristine controls live-validate before submit
@@ -105,11 +125,13 @@ next item instead of duplicating it.
 
 ## Feature summary
 
-- **46 implemented** / **2 planned** of 48 tracked features (see
+- **49 implemented** / **2 planned** of 51 tracked features (see
   FEATURES.md). Implemented means shipped, exercised by the test suite
   (`npm test`) and demonstrated in `examples/`.
 - The 2 planned features: the **Nodemailer mail-delivery adapter**
-  (`mailer-nodemailer`) and **npm publishing** (`release-npm-publish`).
+  (`mailer-nodemailer` — re-scoped: a first-party SDK would break the
+  zero-runtime-dependency rule; the SMTP worker is a consumer-side variant in
+  `docs/transport-proxies.md`) and **npm publishing** (`release-npm-publish`).
 
 ## Health
 
@@ -121,7 +143,7 @@ next item instead of duplicating it.
 
 ## Immediate next work
 
-The top item on [ROADMAP.md](ROADMAP.md): the **Nodemailer-based
-mail-delivery adapter** (v0.4.0 target) — the serverless worker half of the
-`json` mailer path, completing the browser → worker → email story. See the
-roadmap for sequencing and dependencies.
+The top item on [ROADMAP.md](ROADMAP.md): **M10 — structural additions
+(`callout` + `html`)** next, then **M11 — the declarative `FormSpec.analytics`
+block** (auto-resolved into the `createAnalytics` seam). See the roadmap for
+sequencing and dependencies.

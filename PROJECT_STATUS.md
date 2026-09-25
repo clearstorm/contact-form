@@ -15,6 +15,18 @@ next item instead of duplicating it.
   vanilla · TanStack). Immutable tags: `v0.1.0`, `v0.2.0`, `v0.3.0`.
 - **Branch:** `dev` (ahead of `main`), working tree clean.
 - **Most recent work (HEAD):**
+  - Wizard hooks + the `rf:*` event bus (`5107a64`) — `attachForm` /
+    `renderForm` now return `{ on(event, handler), detach() }`: the
+    namespaced `rf:*` event bus (`rf:fields-change`, `rf:row-add` /
+    `rf:row-remove`, `rf:step-change`, `rf:submit-start` / `submit-success` /
+    `submit-error`) rides the engine's detach-safe listener registry, so
+    `detach()` removes subscriptions with everything else and native
+    `addEventListener` on the form sees the same events. Veto-capable
+    lifecycle hooks (`beforeValidateStep` / `afterStepChange` /
+    `beforeSubmit` / `afterSubmit`) across `attachForm` / `renderForm`
+    options, the React `hooks` prop and the TanStack bridge; `FormSpec.hooks`
+    hook-ref *names* resolve against the options' named registry (specs stay
+    serialisable).
   - Repeaters — dynamic row groups (`f006672`) — `type: "repeater"` specs
     holding any field types, visitor add/remove rows bounded by `minRows` /
     `maxRows` (the add button disables at the ceiling, remove at the floor),
@@ -51,7 +63,7 @@ next item instead of duplicating it.
 
 ## Feature summary
 
-- **38 implemented** / **2 planned** of 40 tracked features (see
+- **40 implemented** / **2 planned** of 42 tracked features (see
   FEATURES.md). Implemented means shipped, exercised by the test suite
   (`npm test`) and demonstrated in `examples/`.
 - The 2 planned features: the **Nodemailer mail-delivery adapter**
@@ -67,6 +79,10 @@ next item instead of duplicating it.
 
 ## Immediate next work
 
-The top item on [ROADMAP.md](ROADMAP.md): the **Nodemailer-based
-mail-delivery adapter** (v0.4.0 target) — the serverless worker half of the
-`json` mailer path. See the roadmap for sequencing and dependencies.
+The next milestone on [ROADMAP.md](ROADMAP.md): **M6 — analytics +
+deprecation cleanup** — a zero-dependency `createAnalytics({ adapter })`
+seam subscribed to the M5 `rf:*` bus, then removing the legacy `copy.back` /
+`copy.next` label fallbacks and the `66` size alias (keep `67`). After that
+the roadmap's separate release track is the Nodemailer-based mail-delivery
+adapter (v0.4.0 target) — the serverless worker half of the `json` mailer
+path.

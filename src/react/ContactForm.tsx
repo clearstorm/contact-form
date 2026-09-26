@@ -21,6 +21,7 @@
 import { useEffect, useRef, useState, type ReactElement } from "react";
 import { fieldRenderProps, renderField, renderFormShell } from "../runtime/markup";
 import { attachForm, type HookRegistry } from "../runtime/engine";
+import type { AnalyticsAttachment } from "../runtime/analytics";
 import type { FormFieldSpec, FormSpec, ValidateOn, ValidationProvider } from "../core";
 
 export interface ContactFormProps {
@@ -60,6 +61,13 @@ export interface ContactFormProps {
    */
   autoSuccess?: boolean;
   /**
+   * Analytics wiring: an explicit `createAnalytics` object (or the resolved
+   * form of a `FormSpec.analytics` block) forwards the `rf:*` bus, or `false`
+   * opts out. Absent — `form.analytics` auto-resolves when present (see
+   * `attachForm` options). Not serialised; runtime-only.
+   */
+  analytics?: false | AnalyticsAttachment;
+  /**
    * Success-only render prop: when a submit succeeds the form is replaced in
    * place by this component (mounted with the success context below); when
    * `reset()` is called the form re-mounts as a fresh engine-wired instance.
@@ -91,7 +99,7 @@ interface SubmitSuccessState {
 }
 
 /** Server-rendered, engine-wired contact form for any React-based framework. */
-export function ContactForm({ form, config, prefill, validation, hooks, values, validateOn, autoSuccess, renderStatus }: ContactFormProps): ReactElement {
+export function ContactForm({ form, config, prefill, validation, hooks, values, validateOn, autoSuccess, analytics, renderStatus }: ContactFormProps): ReactElement {
   const rootRef = useRef<HTMLDivElement>(null);
   const [success, setSuccess] = useState<SubmitSuccessState | null>(null);
   const [resetKey, setResetKey] = useState(0);
@@ -117,9 +125,8 @@ export function ContactForm({ form, config, prefill, validation, hooks, values, 
       hooks,
       values,
       validateOn,
-      // With a custom success screen the engine owns everything up to (not
-      // including) the success presentation.
       autoSuccess: renderStatus ? false : autoSuccess,
+      analytics,
     });
     if (renderStatus) {
       attached.on("rf:submit-success", (event) => {
@@ -128,7 +135,7 @@ export function ContactForm({ form, config, prefill, validation, hooks, values, 
       });
     }
     return () => attached.detach();
-  }, [form, validation, hooks, values, validateOn, autoSuccess, renderStatus, resetKey]);
+  }, [form, validation, hooks, values, validateOn, autoSuccess, analytics, renderStatus, resetKey]);
 
   if (success && renderStatus) {
     return (

@@ -251,6 +251,7 @@ receives them too. `detach()` removes subscriptions with every other listener.
 | `rf:fields-change` | a control's `input` / `change` | `{ name, value }` |
 | `rf:row-add` / `rf:row-remove` | a repeater row added / removed | `{ name, count }` |
 | `rf:step-change` | wizard step transition (Next, Back, stepper jump) | `{ from, to, total }` — `total` counts the *visible* steps, so conditional panes shrink it |
+| `rf:validation-error` | a validation gate fails: the submit path, a wizard "Next" gate, or a live `validateOn` run leaving a control invalid | `{ name, id, errors: [{ name, message }], count }` — the messages are the ones shown to the visitor |
 | `rf:submit-start` | after validation passes, before the mailer | `{ name, id, form }` |
 | `rf:submit-success` | the mailer accepted the submission | `{ name, id, message }` — `message` is the same success string the status box would show |
 | `rf:submit-error` | the mailer failed | `{ name, id, message }` |
@@ -278,22 +279,56 @@ binding exposes the same seam through its optional `hooks` prop; the TanStack
 bridge mirrors the submit hooks (`beforeSubmit` / `afterSubmit` options) and
 the `rf:submit-*` events (`bridge.on(...)`).
 
-**Analytics** — `createAnalytics({ adapter })` is the zero-dependency analytics
-seam over the same bus. Give it a tracker (`track(event, detail)`) and subscribe
-each form once; the whole `rf:*` bus is forwarded with its details (form
-identity, step transitions, row counts, submit outcomes):
+**Analytics** — specs can carry a declarative `analytics` block that routes the
+`rf:*` bus to a consumer-loaded tracking global with friendly event names:
+
+```js
+// spec
+{
+  name: "enquiry",
+  analytics: {
+    provider: "dataLayer",        // "dataLayer" (default) | "customEvent" | "plausible" | "posthog"
+    eventName: "lead_captured",   // submit-success event name (default "form_submitted")
+    trackSteps: true,             // rf:step-change → form_step_view
+    trackFieldErrors: true,       // rf:validation-error → form_validation_error
+  },
+}
+```
+
+| Watch | Routes to | Props |
+| --- | --- | --- |
+| `rf:step-change` | `form_step_view` | `formName`, `formId`, `stepTo`, `stepTotal` |
+| `rf:validation-error` | `form_validation_error` | `formName`, `formId`, `failedFields` (the invalid field names) |
+| `rf:submit-success` | `eventName` (default `"form_submitted"`) | `formName`, `formId` |
+| `rf:submit-error` | the same name | + `outcome: "error"` |
+
+Providers are *consumer-loaded globals* — the package never ships a tracking
+SDK (zero-runtime-dep rule) and never fabricates one: `dataLayer` pushes the
+GTM array, `customEvent` dispatches a window `CustomEvent`, and
+`plausible` / `posthog` call their globals when the snippet is present. A
+missing global is a silent no-op. `enabled: false`, an absent block, or the
+older `createAnalytics` seam (below) all keep today's no-tracking behaviour.
+
+The block auto-resolves when the spec is in scope — `attachForm(form,
+{ spec })`, `renderForm("#root", spec)`, and the React `<ContactForm />` — and
+is **not serialised** into `data-*`, so specless wiring (`initForms`, a bare
+`attachForm(form)`) never auto-resolves. Override the block with an explicit
+analytics object on attach (`attachForm(form, { spec, analytics })` /
+`renderForm` options / the React `analytics` prop) or opt out with `false`:
 
 ```js
 import { renderForm, createAnalytics } from "@clearstorm/contact-form/vanilla";
 
 const analytics = createAnalytics({ adapter: { track: (e, d) => telemetry(e, d) } });
-const { form, detach } = renderForm("#root", spec, { config: { endpoint } });
-const stop = analytics.attach(form); // on unmount
+const { form, detach } = renderForm("#root", spec, { config: { endpoint }, analytics }); // beats the spec block
+// or: renderForm("#root", spec, { analytics: false }) to disable tracking
 ```
 
-It only consumes events the engine already emits — no fabricated events, no
-`data-*` hooks — and its `attach` uses native `addEventListener`, so it works
-even on forms the engine didn't wire. FEATURES tracks it as `analytics-seam`.
+`createAnalytics({ adapter })` remains the low-level seam over the same bus: it
+forwards every `rf:*` event (now including `rf:validation-error`) to a tracker
+of your choosing and its `attach` uses native `addEventListener`, so it works
+even on forms the engine didn't wire. FEATURES tracks it as `analytics-seam`;
+the declarative block is `analytics-block`.
 
 ---
 

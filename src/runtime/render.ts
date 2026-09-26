@@ -15,6 +15,7 @@
  * it directly for script-tag / plain-HTML use).
  */
 import { attachForm, type FormEventName, type HookRegistry } from "./engine";
+import type { AnalyticsAttachment } from "./analytics";
 import { renderFormShell, type ShellOptions } from "./markup";
 import type { FormSpec, ValidateOn, ValidationProvider } from "../core";
 
@@ -56,6 +57,13 @@ export interface RenderOptions extends Omit<ShellOptions, "form"> {
    * swap in a custom success UI. Defaults to `true`.
    */
   autoSuccess?: boolean;
+  /**
+   * Analytics wiring: an explicit `createAnalytics` object (or the resolved
+   * form of a `FormSpec.analytics` block) forwards the `rf:*` bus, or `false`
+   * opts out. Absent — `spec.analytics` auto-resolves when present (see
+   * `attachForm` options). Not serialised; runtime-only.
+   */
+  analytics?: false | AnalyticsAttachment;
 }
 
 export interface RenderedForm {
@@ -106,6 +114,7 @@ export function renderForm(
     values: options.values,
     validateOn: options.validateOn,
     autoSuccess: options.autoSuccess,
+    analytics: options.analytics,
   });
   return {
     form: formEl,

@@ -13,7 +13,13 @@
  * ```
  */
 import { attachForm, initForms, type AttachOptions } from "./engine";
-import { createAnalytics, type AnalyticsSubscription, type AnalyticsTracker } from "./analytics";
+import {
+  createAnalytics,
+  resolveAnalytics,
+  type AnalyticsAttachment,
+  type AnalyticsSubscription,
+  type AnalyticsTracker,
+} from "./analytics";
 import {
   renderDecor,
   renderElement,
@@ -36,8 +42,10 @@ export {
   type AttachOptions,
   // analytics seam over the rf:* bus
   createAnalytics,
+  resolveAnalytics,
   type AnalyticsTracker,
   type AnalyticsSubscription,
+  type AnalyticsAttachment,
   // markup builders
   renderDecor,
   renderElement,
@@ -56,4 +64,4 @@ export {
   type ValidationProvider,
 };
 
-export type { FormSpec, FormFieldSpec } from "../core";
+export type { FormSpec, FormFieldSpec, AnalyticsProvider, AnalyticsSpec } from "../core";

@@ -100,9 +100,11 @@ the client spec like the other structural types. Flip `struct-callout` and
 An optional `analytics` spec block (`provider: "dataLayer" | "customEvent" |
 "plausible" | "posthog"`, `eventName`, `trackSteps`, `trackFieldErrors`)
 auto-resolves into the existing `createAnalytics` seam when the spec is wired
-by `attachForm` / `renderForm` / `initForms`; an explicit analytics option on
-attach overrides the block. Adds the `rf:validation-error` bus event (the
-`trackFieldErrors` signal). Flip `analytics-block` and
+in scope by `attachForm(form, { spec })` / `renderForm`; an explicit analytics
+option on attach overrides the block, `false` opts out. The block is **not**
+serialised into `data-*`, so specless wiring (`initForms`, a bare
+`attachForm(form)`) never auto-resolves. Adds the `rf:validation-error` bus
+event (the `trackFieldErrors` signal). Flip `analytics-block` and
 `validation-error-event` when done.
 
 ## npm publishing

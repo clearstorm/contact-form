@@ -112,6 +112,44 @@ export interface MailerConfig {
 export type MailerSpec = MailerProvider | "json" | MailerConfig;
 
 /**
+ * Analytics providers the declarative `FormSpec.analytics` block can route to.
+ * All four are *consumer-loaded globals* — the runtime never ships a tracking
+ * SDK (zero-runtime-dependency rule) and never fabricates one, so a missing
+ * global is a silent no-op. `dataLayer` pushes the GTM array, `customEvent`
+ * dispatches a window `CustomEvent` (for tag managers that listen on
+ * `window`), and `plausible` / `posthog` call their global functions when the
+ * consumer's snippet is present.
+ */
+export type AnalyticsProvider = "dataLayer" | "customEvent" | "plausible" | "posthog";
+
+/**
+ * Declarative form analytics — resolved at attach time into the package's
+ * `createAnalytics` seam (see `src/runtime/analytics.ts` and the README).
+ *
+ * Absent from the spec (or `enabled: false`) means no tracking. An explicit
+ * `analytics` object on `attachForm` / `renderForm` (or the React
+ * `<ContactForm />` prop) overrides the block; `false` opts out. Like
+ * `hooks` / `autoSave`, this is a spec-level key and is **not serialised**
+ * into `data-*` — specless `initForms` wiring never auto-resolves it.
+ */
+export interface AnalyticsSpec {
+  /** `false` disables the block entirely (default: `true` when present). */
+  enabled?: boolean;
+  /** Global tracker to route to (default: `"dataLayer"`). */
+  provider?: AnalyticsProvider;
+  /**
+   * Submit-success event name (default `"form_submitted"`). Submit errors
+   * share the name with an `outcome: "error"` prop so funnels can split
+   * successes from failures without extra configuration.
+   */
+  eventName?: string;
+  /** Forward `rf:step-change` as `form_step_view` (default: `true`). */
+  trackSteps?: boolean;
+  /** Forward `rf:validation-error` as `form_validation_error` (default: `true`). */
+  trackFieldErrors?: boolean;
+}
+
+/**
  * Visitor-facing copy for a form. Every key is optional — when absent the
  * package's built-in default is used. Overrides win per field in this order:
  * `FormFieldSpec.message` → `FormCopy[key]` → built-in default.
@@ -699,6 +737,16 @@ export interface FormSpec {
    * analytics never loses visibility (see FEATURES `event-bus`).
    */
   hooks?: Partial<Record<HookName, string>>;
+  /**
+   * Declarative analytics: route the form's `rf:*` lifecycle to a
+   * consumer-loaded tracking global (`dataLayer` / `customEvent` /
+   * `plausible` / `posthog`). Auto-resolves into the `createAnalytics` seam
+   * when the spec is wired by `attachForm` / `renderForm`; an explicit
+   * `analytics` option on attach overrides the block and `false` opts out.
+   * Not serialised into `data-*` — specless `initForms` wiring never resolves
+   * it (see `AnalyticsSpec`).
+   */
+  analytics?: AnalyticsSpec;
   /**
    * Opt-in draft persistence: the engine saves the visitor's in-scope values
    * (plus the current wizard step) to localStorage as they type, restores them

@@ -1137,6 +1137,235 @@ check(
   String(legacyForm.querySelector("[data-next-label]")?.textContent),
 );
 
+/* ---- 11c. M11: declarative analytics (FormSpec.analytics) + rf:validation-error ---- */
+
+const { resolveAnalytics } = await import("../src/runtime/analytics");
+const dataLayer = (): Array<Record<string, unknown>> => (globalThis as any).dataLayer ?? [];
+const resetDataLayer = () => {
+  (globalThis as any).dataLayer = [];
+};
+
+// 11c-a. Auto-resolve `spec.analytics` on attachForm — no option passed.
+resetDataLayer();
+const anSpec = jsonSpec(
+  [{ type: "text", id: "an_name", name: "an_name", label: "Name", required: true }],
+  {
+    name: "engine-m11-dataLayer",
+    endpoint: "https://example.test/fail", // the second submit exercises the error route
+    analytics: { provider: "dataLayer", eventName: "lead_submitted", trackFieldErrors: true },
+  },
+);
+let anForm = mount(renderFormShell({ form: anSpec }));
+let anAttached = attachForm(anForm, { spec: anSpec }); // spec in scope → auto-resolve
+const valErrors: Array<Record<string, unknown>> = [];
+anAttached.on("rf:validation-error", (e) => valErrors.push((e as CustomEvent).detail as Record<string, unknown>));
+check(
+  "analytics is never serialised into the shell's data-* attributes",
+  !renderFormShell({ form: anSpec }).includes("analytics"),
+  renderFormShell({ form: anSpec }).slice(0, 200),
+);
+submit(anForm); // empty required field → validation gate failure
+await until(() => dataLayer().length > 0);
+check(
+  "analytics auto-resolves spec.analytics → form_validation_error on a failed submit",
+  dataLayer().some(
+    (d) => d.event === "form_validation_error" && (d.failedFields as string[])?.includes("an_name"),
+  ),
+  JSON.stringify(dataLayer()),
+);
+check(
+  "rf:validation-error detail carries { name, id, errors, count }",
+  valErrors.length === 1 &&
+    valErrors[0].count === 1 &&
+    (valErrors[0].errors as Array<{ name: string }>)[0]?.name === "an_name" &&
+    valErrors[0].name === "engine-m11-dataLayer",
+  JSON.stringify(valErrors),
+);
+input(anForm, "an_name").value = "Jane";
+submit(anForm); // valid → mailer hits the /fail endpoint → submit-error route
+await until(() => dataLayer().some((d) => d.event === "lead_submitted" && d.outcome === "error"));
+check(
+  "submit-error routes to eventName with outcome: 'error'",
+  dataLayer().some((d) => d.event === "lead_submitted" && d.outcome === "error"),
+  JSON.stringify(dataLayer()),
+);
+// Success route: default eventName "form_submitted".
+const anOkSpec = jsonSpec([{ type: "text", id: "an2", name: "an2", label: "N", required: true }], {
+  name: "engine-m11-ok",
+  analytics: { provider: "dataLayer" },
+});
+anForm = mount(renderFormShell({ form: anOkSpec }));
+anAttached = attachForm(anForm, { spec: anOkSpec });
+input(anForm, "an2").value = "x";
+submit(anForm);
+await until(() => dataLayer().some((d) => d.event === "form_submitted"));
+check(
+  "submit-success routes to the default eventName form_submitted with formName/formId",
+  dataLayer().some((d) => d.event === "form_submitted" && d.formName === "engine-m11-ok"),
+  JSON.stringify(dataLayer()),
+);
+
+// 11c-b. customEvent provider dispatches a window CustomEvent.
+const customEvents: Array<{ name: string; detail: unknown }> = [];
+const onWindowEvent = (e: Event) => customEvents.push({ name: e.type, detail: (e as CustomEvent).detail });
+window.addEventListener("form_submitted", onWindowEvent);
+resetDataLayer();
+const ceSpec = jsonSpec([{ type: "text", id: "ce_a", name: "ce_a", label: "A", required: true }], {
+  name: "engine-m11-customEvent",
+  analytics: { provider: "customEvent" },
+});
+const ceForm = mount(renderFormShell({ form: ceSpec }));
+attachForm(ceForm, { spec: ceSpec });
+input(ceForm, "ce_a").value = "ok";
+submit(ceForm);
+await until(() => customEvents.length > 0);
+check(
+  "customEvent provider dispatches a window CustomEvent with formName/formId props",
+  customEvents.some(
+    (c) => c.name === "form_submitted" && (c.detail as { formName?: string }).formName === "engine-m11-customEvent",
+  ),
+  JSON.stringify(customEvents),
+);
+window.removeEventListener("form_submitted", onWindowEvent);
+
+// 11c-c. An explicit analytics option overrides the spec block.
+resetDataLayer();
+const overrideTracked: Array<{ event: string; detail: Record<string, unknown> }> = [];
+const overrideAnalytics = createAnalytics({
+  adapter: { track: (event, detail) => overrideTracked.push({ event, detail }) },
+});
+const ovForm = mount(
+  renderFormShell({
+    form: jsonSpec([{ type: "text", id: "ov_a", name: "ov_a", label: "A", required: true }], {
+      name: "engine-m11-override",
+      analytics: { provider: "dataLayer" }, // would push to dataLayer if the block won
+    }),
+  }),
+);
+attachForm(ovForm, { analytics: overrideAnalytics });
+input(ovForm, "ov_a").value = "x";
+submit(ovForm);
+await until(() => overrideTracked.some((t) => t.event === "rf:submit-success"));
+check(
+  "explicit analytics option overrides the spec block (adapter gets the bus, dataLayer stays empty)",
+  overrideTracked.some((t) => t.event === "rf:submit-start" && t.detail?.name === "engine-m11-override") &&
+    dataLayer().length === 0,
+  JSON.stringify({ overrideTracked, dataLayer: dataLayer() }),
+);
+
+// 11c-d. `analytics: false` opts out entirely.
+resetDataLayer();
+const offForm = mount(
+  renderFormShell({
+    form: jsonSpec([{ type: "text", id: "off_a", name: "off_a", label: "A", required: true }], {
+      name: "engine-m11-off",
+      analytics: { provider: "dataLayer" },
+    }),
+  }),
+);
+attachForm(offForm, { analytics: false });
+input(offForm, "off_a").value = "x";
+submit(offForm);
+await until(() => offForm.querySelector(".rf-status") && !offForm.querySelector(".rf-status")!.hidden);
+check("analytics: false opts out (nothing pushed to dataLayer)", dataLayer().length === 0, JSON.stringify(dataLayer()));
+
+// 11c-e. Live-validation gate failures emit rf:validation-error (blur gate).
+const liveForm = mount(
+  renderFormShell({
+    form: jsonSpec([{ type: "text", id: "live_a", name: "live_a", label: "A", required: true }], {
+      name: "engine-m11-live",
+      validateOn: "blur",
+    }),
+  }),
+);
+const liveAttached = attachForm(liveForm);
+const liveErrors: Array<{ count: number; errors: Array<{ name: string }> }> = [];
+liveAttached.on("rf:validation-error", (e) =>
+  liveErrors.push((e as CustomEvent).detail as { count: number; errors: Array<{ name: string }> }),
+);
+fire(input(liveForm, "live_a"), "blur"); // empty + blur-mode → live validation gate failure
+check(
+  "live blur-gate validation failure emits rf:validation-error for the field",
+  liveErrors.length === 1 && liveErrors[0].errors?.[0]?.name === "live_a",
+  JSON.stringify(liveErrors),
+);
+
+// 11c-f. Wizard step changes route to form_step_view (trackSteps).
+resetDataLayer();
+const anWizSpec = jsonSpec(
+  [
+    { type: "step", label: "Step 1" },
+    { type: "text", id: "wz_a", name: "wz_a", label: "A" },
+    { type: "step", label: "Step 2" },
+  ],
+  { name: "engine-m11-wizard", analytics: { provider: "dataLayer" } },
+);
+const wizForm = mount(renderFormShell({ form: anWizSpec }));
+attachForm(wizForm, { spec: anWizSpec });
+submit(wizForm); // "Next" → step transition 0 → 1
+await until(() => dataLayer().some((d) => d.event === "form_step_view"));
+check(
+  "wizard step change routes to form_step_view with stepTo/stepTotal + formName",
+  dataLayer().some(
+    (d) => d.event === "form_step_view" && d.stepTo === 1 && d.stepTotal === 2 && d.formName === "engine-m11-wizard",
+  ),
+  JSON.stringify(dataLayer()),
+);
+
+// 11c-g. renderForm auto-attaches spec.analytics (options not needed).
+resetDataLayer();
+const rfAn = renderForm(
+  root()!,
+  jsonSpec([{ type: "text", id: "rf_a", name: "rf_a", label: "A", required: true }], {
+    name: "engine-m11-render",
+    analytics: { provider: "dataLayer" },
+  }),
+);
+input(rfAn.form, "rf_a").value = "x";
+submit(rfAn.form);
+await until(() => dataLayer().some((d) => d.event === "form_submitted"));
+check(
+  "renderForm auto-attaches spec.analytics → form_submitted pushed",
+  dataLayer().some((d) => d.event === "form_submitted" && d.formName === "engine-m11-render"),
+  JSON.stringify(dataLayer()),
+);
+rfAn.detach();
+
+// 11c-h. detach() stops the auto-resolved analytics feed.
+resetDataLayer();
+const detSpec = jsonSpec([{ type: "text", id: "det_a", name: "det_a", label: "A", required: true }], {
+  name: "engine-m11-detach",
+  analytics: { provider: "dataLayer", eventName: "detach_event" },
+});
+const detForm = mount(renderFormShell({ form: detSpec }));
+const detAttached = attachForm(detForm, { spec: detSpec });
+input(detForm, "det_a").value = "x";
+submit(detForm);
+await until(() => dataLayer().some((d) => d.event === "detach_event"));
+check(
+  "detach test pre-condition: the auto-resolved feed pushes before detach",
+  dataLayer().some((d) => d.event === "detach_event"),
+  JSON.stringify(dataLayer()),
+);
+detAttached.detach();
+const afterDetach = dataLayer().length;
+input(detForm, "det_a").value = "y";
+submit(detForm);
+await tick();
+check("detach() stops the auto-resolved analytics feed", dataLayer().length === afterDetach, JSON.stringify(dataLayer()));
+
+// 11c-i. Specless initForms wiring never auto-resolves analytics.
+resetDataLayer();
+const initAnalyticsForm = mount(
+  renderFormShell({ form: jsonSpec([{ type: "text", id: "i_a", name: "i_a", label: "A" }], { name: "engine-m11-init" }) }),
+);
+const initAnalyticsStop = initForms(document);
+input(initAnalyticsForm, "i_a").value = "x";
+submit(initAnalyticsForm);
+await until(() => initAnalyticsForm.querySelector(".rf-status") && !initAnalyticsForm.querySelector(".rf-status")!.hidden);
+check("specless initForms never auto-resolves analytics (no pushes)", dataLayer().length === 0, JSON.stringify(dataLayer()));
+initAnalyticsStop();
+
 /* ---- 12. M7: conditional steps + draft persistence + values prefill ---- */
 
 // 12a. Conditional wizard steps (`showWhen` on markers): skipped panes are

@@ -41,6 +41,7 @@ import {
   type ValidationProvider,
   type VisibilityConditionLike,
 } from "../core";
+import { resolveAnalytics, type AnalyticsAttachment } from "./analytics";
 import { getMailer, mailerSpecName, type MailerConfig } from "../mailers";
 import {
   applyDraft,
@@ -139,6 +140,7 @@ export type FormEventName =
   | "rf:row-add"
   | "rf:row-remove"
   | "rf:step-change"
+  | "rf:validation-error"
   | "rf:submit-start"
   | "rf:submit-success"
   | "rf:submit-error";
@@ -176,6 +178,30 @@ const setInvalid = (control: Control, message: string): void => {
   control.setAttribute("aria-invalid", "true");
   control.classList.add("rf-input-invalid");
 };
+
+/* ---- `rf:validation-error` detail ---- */
+
+/** The detail payload carried by every `rf:validation-error` emission. */
+interface ValidationErrorDetail {
+  name: string;
+  id: string;
+  errors: Array<{ name: string; message: string }>;
+  count: number;
+}
+
+/** Build the `rf:validation-error` detail from a list of named errors. */
+const validationErrorDetail = (
+  name: string,
+  id: string,
+  errors: Array<{ name: string; message: string }>,
+): ValidationErrorDetail => ({ name, id, errors, count: errors.length });
+
+/** Per-control detail entries — the message the visitor is shown. */
+const controlErrors = (controls: Control[]): Array<{ name: string; message: string }> =>
+  controls.map((control) => ({
+    name: control.name,
+    message: findError(control)?.textContent ?? "",
+  }));
 
 // Checkbox/radio groups share a name — the "value" is whether any option is
 // selected, collapsed to "1" / "" before validation. When `row` is given (a
@@ -506,6 +532,15 @@ async function handleSubmit(
   if (!(form instanceof HTMLFormElement)) return;
   event.preventDefault();
 
+  // The `rf:*` submit bus: dispatch named custom events on the form so attach
+  // subscribers (and native `addEventListener`) observe the submit lifecycle.
+  // Defined up top because the validation gates below emit `rf:validation-error`.
+  const formName = form.dataset.mailForm ?? "";
+  const formId = form.id;
+  const emit = (name: string, detail?: unknown): void => {
+    form.dispatchEvent(new CustomEvent(name, { detail }));
+  };
+
   const genericError = copy.error ?? "Something went wrong. Please try again in a moment.";
 
   const status = form.querySelector<HTMLElement>(".rf-status");
@@ -549,6 +584,7 @@ async function handleSubmit(
   const invalidControls = scoped.filter((control) => !validate(control));
 
   if (invalidControls.length > 0) {
+    emit("rf:validation-error", validationErrorDetail(formName, formId, controlErrors(invalidControls)));
     invalidControls[0].focus();
     return;
   }
@@ -572,7 +608,9 @@ async function handleSubmit(
     if (count < min) {
       const defaultMin =
         min === 1 ? "Please add at least 1 row." : `Please add at least ${min} rows.`;
-      showRepeaterError(repeaterEl, specField?.message ?? defaultMin);
+      const message = specField?.message ?? defaultMin;
+      showRepeaterError(repeaterEl, message);
+      emit("rf:validation-error", validationErrorDetail(formName, formId, [{ name: repeaterName, message }]));
       (repeaterEl.querySelector<HTMLElement>("[data-add-row]") ?? repeaterEl.querySelector<HTMLElement>("input, select, textarea"))?.focus();
       return;
     }
@@ -580,7 +618,9 @@ async function handleSubmit(
       const overshoot = count - max;
       const defaultMax =
         overshoot === 1 ? "Please remove at least 1 row." : `Please remove at least ${overshoot} rows.`;
-      showRepeaterError(repeaterEl, specField?.message ?? defaultMax);
+      const message = specField?.message ?? defaultMax;
+      showRepeaterError(repeaterEl, message);
+      emit("rf:validation-error", validationErrorDetail(formName, formId, [{ name: repeaterName, message }]));
       (repeaterEl.querySelector<HTMLElement>("[data-remove-row]") ?? repeaterEl.querySelector<HTMLElement>("input, select, textarea"))?.focus();
       return;
     }
@@ -595,13 +635,6 @@ async function handleSubmit(
     button.textContent = sending ? sendingLabel : originalLabel;
   };
 
-  // The `rf:*` submit bus: dispatch named custom events on the form so attach
-  // subscribers (and native `addEventListener`) observe the submit lifecycle.
-  const formName = form.dataset.mailForm ?? "";
-  const formId = form.id;
-  const emit = (name: string, detail?: unknown): void => {
-    form.dispatchEvent(new CustomEvent(name, { detail }));
-  };
   const submitContext: BeforeSubmitContext = { form, name: formName, id: formId };
 
   // Lifecycle hook — vetoing cancels the submission outright (no mailer call,
@@ -710,6 +743,14 @@ export interface AttachOptions {
    * swap in your own success UI. Defaults to `true`.
    */
   autoSuccess?: boolean;
+  /**
+   * Analytics wiring: an explicit `createAnalytics` object (or the resolved
+   * form of a `FormSpec.analytics` block) forwards the `rf:*` bus, or `false`
+   * opts out. Absent — the engine auto-resolves `spec.analytics` when the
+   * spec carries one (and never otherwise, so specless `initForms` wiring
+   * stays untracked). The subscription is held and detached in `detach()`.
+   */
+  analytics?: false | AnalyticsAttachment;
 }
 
 interface StepsMeta {
@@ -827,6 +868,17 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): Att
   const emit = (name: string, detail?: unknown): void => {
     form.dispatchEvent(new CustomEvent(name, { detail }));
   };
+
+  /* ---- Declarative analytics (`spec.analytics`) ----
+     Resolved into the `createAnalytics` seam. Resolution order: an explicit
+     `opts.analytics` object overrides the block; `opts.analytics === false`
+     opts out; otherwise `spec.analytics` auto-resolves when present (specless
+     `initForms` wiring never tracks). The subscription is detached in
+     `detach()` like every other engine listener. */
+  let analytics: AnalyticsAttachment | undefined;
+  if (opts.analytics !== undefined) analytics = opts.analytics === false ? undefined : opts.analytics;
+  else analytics = resolveAnalytics(spec?.analytics);
+  const analyticsStop = analytics?.attach(form);
 
   // Resolve a lifecycle hook: the inline canonical key wins; else the spec's
   // hook-ref *name*, looked up in the options' named registry.
@@ -1154,6 +1206,7 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): Att
       if ((hookFor("beforeValidateStep") as StepHook | undefined)?.({ from: currentStep, to: nextStep, form }) === false) return;
       const invalid = stepControls.filter((control) => !validateControl(control));
       if (invalid.length > 0) {
+        emit("rf:validation-error", validationErrorDetail(form.dataset.mailForm ?? "", form.id, controlErrors(invalid)));
         invalid[0].focus();
         return;
       }
@@ -1233,10 +1286,16 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): Att
       // Live validation: `validateOn` may demand a pristine field be checked
       // on everyday typing ("change" mode, or "touched" once the field is
       // live); the submit path always re-validates already-flagged controls.
+      // A live run that leaves the control invalid is a validation gate
+      // failure — emit `rf:validation-error` for it.
+      let liveFailed = false;
       if (shouldLiveValidate(control, "change")) {
-        validateControl(control);
+        liveFailed = !validateControl(control);
       } else if (control.hasAttribute("aria-invalid")) {
-        validateControl(control);
+        liveFailed = !validateControl(control);
+      }
+      if (liveFailed) {
+        emit("rf:validation-error", validationErrorDetail(form.dataset.mailForm ?? "", form.id, controlErrors([control])));
       }
       // Shared-name groups (checkbox/radio): selection count is group-level,
       // so re-check flagged siblings too when one member changes.
@@ -1269,8 +1328,13 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): Att
     const onBlur = (): void => {
       // "touched": leaving a field at least once makes it live-validated
       // from then on ("blur" mode validates the blurred control directly).
+      // A failing live run emits `rf:validation-error` (see onInput).
       touchedNames.add(control.name);
-      if (shouldLiveValidate(control, "blur")) validateControl(control);
+      if (shouldLiveValidate(control, "blur")) {
+        if (!validateControl(control)) {
+          emit("rf:validation-error", validationErrorDetail(form.dataset.mailForm ?? "", form.id, controlErrors([control])));
+        }
+      }
     };
     on(control, "input", onInput);
     on(control, "change", onInput);
@@ -1405,6 +1469,7 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): Att
     },
     detach() {
       if (saveTimer) clearTimeout(saveTimer);
+      analyticsStop?.detach();
       for (const [target, byType] of listeners) {
         for (const [type, handlers] of byType) {
           for (const handler of handlers) target.removeEventListener(type, handler as EventListener);

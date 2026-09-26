@@ -16,6 +16,26 @@ next item instead of duplicating it.
   vanilla · TanStack). Immutable tags: `v0.1.0`, `v0.2.0`, `v0.3.0`.
 - **Branch:** `dev` (ahead of `main`), working tree clean.
 - **Most recent work (HEAD):**
+  - Declarative `FormSpec.analytics` + `rf:validation-error` (`5def710`) — an
+    optional spec block (`{ enabled?, provider: "dataLayer" |
+    "customEvent" | "plausible" | "posthog", eventName?, trackSteps?,
+    trackFieldErrors? }`) auto-resolves into the existing `createAnalytics`
+    seam whenever a spec is in scope (`attachForm({ spec })`, `renderForm`,
+    React). An explicit `analytics` option overrides, `false` opts out,
+    `enabled: false` disables; the block is **not** serialised into `data-*`
+    (specless `initForms` wiring never auto-resolves). Routing (consumer-loaded
+    globals only, zero deps): `rf:step-change` → `form_step_view`
+    (`formName`/`formId`/`stepTo`/`stepTotal`), `rf:validation-error` →
+    `form_validation_error` (`failedFields`), `rf:submit-success` →
+    `eventName ?? "form_submitted"`, `rf:submit-error` → same + `outcome:
+    "error"`; a missing global is a silent no-op. New bus event
+    `rf:validation-error` (`{ name, id, errors: [{ name, message }], count }`,
+    visitor-facing messages) fires on every validation gate failure — submit
+    path incl. repeater min/max, wizard "Next" gates, and live `validateOn`
+    runs leaving a control invalid — no new `data-*`, fixtures untouched;
+    `AnalyticsTracker.track(event, detail, form?)` takes the form as an
+    optional third arg. Tests cover routing, auto-attach/override/opt-out,
+    specless no-resolve, live blur-gate emission and detach cleanup.
   - Structural `callout` + `html` elements (`2a9eeee`) — two new render-only
     `FormElement`s routed through the shared `renderDecor`/`renderElement`
     builders (no engine change; both carry no `name`, so they never
@@ -139,7 +159,7 @@ next item instead of duplicating it.
 
 ## Feature summary
 
-- **51 implemented** / **2 planned** of 53 tracked features (see
+- **53 implemented** / **2 planned** of 55 tracked features (see
   FEATURES.md). Implemented means shipped, exercised by the test suite
   (`npm test`) and demonstrated in `examples/`.
 - The 2 planned features: the **Nodemailer mail-delivery adapter**
@@ -157,7 +177,7 @@ next item instead of duplicating it.
 
 ## Immediate next work
 
-The top item on [ROADMAP.md](ROADMAP.md): **M11 — the declarative
-`FormSpec.analytics` block** (auto-resolved into the `createAnalytics` seam,
-plus the new `rf:validation-error` bus event). See the roadmap for sequencing
-and dependencies.
+The top item on [ROADMAP.md](ROADMAP.md): **npm publishing** — drop
+`private: true`, publish the versioned build to the npm registry (flipping
+`release-npm-publish` to implemented). See the roadmap for sequencing and
+dependencies.

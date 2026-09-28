@@ -5,7 +5,7 @@
     "status": "Thanks — the envelope reached the CF7 proxy route.",
     "mailer": {
       "provider": "custom",
-      "formId": "z10",
+      "formId": "5",
       "target": "cf7",
       "endpoint": "/api/contact"
     },

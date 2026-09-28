@@ -48,6 +48,19 @@ npm run dev              # http://localhost:4321
 > `prepreview` scripts check for the local install and print this hint if it's
 > missing.
 
+### Environment variables
+
+Astro never writes `.env` into `process.env` — it exposes `.env` through
+`import.meta.env` (it checks the server's real environment first, then `.env`
+files). The route therefore reads env the Astro way: `import.meta.env`, with a
+`process.env` fallback so the zero-dependency verify harness can import the
+same file under plain Node (the fallback is inert in Astro).
+
+So `cp .env.example .env` is all you need locally — no exports or `loadEnv`
+calls. At deploy time, expose the same names as real environment variables on
+the host process (or next to the built server); the fallback only matters
+inside `npm run verify`.
+
 Now POST the exact envelope the client produces:
 
 ```bash

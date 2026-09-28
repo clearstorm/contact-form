@@ -91,6 +91,14 @@ binding's zero-runtime-dependency rule extends to your worker too. Each reads
 its secrets from the environment and never returns them (or the backend URLs)
 to the browser.
 
+How each framework reads `.env` differs — the Next.js route uses `process.env`
+(Next auto-loads `.env` into it at startup); the Astro route uses
+`import.meta.env` (Astro never writes `.env` into `process.env`), with a
+`process.env` fallback so its zero-dependency verify harness can import the
+same file under plain Node. In both examples `cp .env.example .env` is enough
+for local dev; at deploy time expose the same names as real environment
+variables on the host.
+
 ---
 
 ## Generic multi-provider dispatch

@@ -152,7 +152,10 @@ own `/api/contact`. The two spec copies are kept identical; edit either and the
 sibling carries the same change.
 
 Both read the same multi-provider `.env.example`; the route files are
-self-contained so you can copy one straight into your own app. Full
+self-contained so you can copy one straight into your own app. Env surface
+differs per framework: **Next** auto-loads `.env` into `process.env`, while
+the **Astro** route reads Astro's `import.meta.env` (falling back to
+`process.env` only inside its no-dependency verify harness). Full
 walkthrough: [`docs/transport-proxies.md`](../docs/transport-proxies.md).
 
 > **Run `npm install` inside each example folder before `npm run dev`.**

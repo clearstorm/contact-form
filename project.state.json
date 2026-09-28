@@ -2,7 +2,7 @@
   "$comment": "Synchronized machine-readable twin of FEATURES.md. A feature status change must update both files in the same pull request. Status vocabulary: implemented | partial | planned | deprecated.",
   "schema": 1,
   "package": "@clearstorm/contact-form",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "features": {
     "json-spec": { "status": "implemented", "notes": "FormSpec / FormFieldSpec / FormElement — the JSON source of truth." },
     "field-types-20": { "status": "implemented", "notes": "All 20 field types with rendering + validation." },
@@ -49,6 +49,9 @@
     "ux-status-mode": { "status": "implemented", "notes": "inline default; replace collapses the form to the success box." },
     "status-renderer": { "status": "implemented", "notes": "autoSuccess:false suppresses only the success presentation (no box, no rf-form--success) while errors, reset, lifecycle + rf:submit-success ({ name, id, message }) stay engine-driven; React renderStatus renders a custom success screen in place of the form ({ message, name, id, form, reset }), reset() re-mounts a fresh engine-wired form." },
     "ux-honeypot": { "status": "implemented", "notes": "Pretend-success on filled hidden field." },
+    "captcha-block": { "status": "implemented", "notes": "Top-level FormSpec.captcha (provider: turnstile|recaptcha-v3|hcaptcha, public siteKey, optional theme/action/onPendingSubmit) serialised as data-captcha (present keys only) for the specless initForms path; builders emit the [data-rf-captcha] slot (before submit row / final wizard pane); --rf-captcha-* tokens; FormCopy captchaRequired/captchaFailed/captchaExpired." },
+    "captcha-engine": { "status": "implemented", "notes": "Zero-dep captcha.ts: idempotent lazy script injection, widget mount with token/expired/error callbacks, v3 inline execute (action, default submit); submit gate after validation — block shows captchaRequired, auto queues + requestSubmit()s on resolve (expiry/error clear queue + inform); single-use tokens resigned on rf:submit-success, destroy on detach; dev-warn on direct (non-proxy) mailer; rf:captcha-error { name, id, message }." },
+    "captcha-proxy-verify": { "status": "implemented", "notes": "Both /api/contact routes verify captchaToken/captchaProvider via provider siteverify (secret+response form POST, remoteip from x-forwarded-for) before dispatch — 400 unsupported/missing token, 500 missing secret/outage, 403 rejection, never reaches a backend; MailerContext.captcha feeds proxy + custom+target envelopes (direct json never leaks); *_SECRET_KEY env; Turnstile demo form with always-pass keys; Astro verify harness + tests." },
     "ux-theming-tokens": { "status": "implemented", "notes": "Color, label, spacing --rf-* tokens." },
     "ux-prefill": { "status": "implemented", "notes": "prefill=\"datetime\" fills date/time with now." },
     "ux-file-uploads": { "status": "implemented", "notes": "Single + multiple; filenames in canonical payload; cf7 re-attaches bytes." },
@@ -58,7 +61,7 @@
     "quality-test-suite": { "status": "implemented", "notes": "Core/mailers, markup snapshots, TanStack + Zod suites, engine under happy-dom." },
     "quality-typecheck": { "status": "implemented", "notes": "Strict tsc --noEmit over src/." },
     "quality-examples": { "status": "implemented", "notes": "astro-demo, react-demo (route parity), tanstack-demo, shared specs." },
-    "release-tags": { "status": "implemented", "notes": "v0.1.0, v0.2.0, v0.3.0, v0.3.1 immutable git tags." },
+    "release-tags": { "status": "implemented", "notes": "v0.1.0, v0.2.0, v0.3.0, v0.3.1, v0.4.0 immutable git tags." },
     "release-npm-publish": { "status": "planned", "notes": "Drop private: true and release a versioned build." }
   }
 }

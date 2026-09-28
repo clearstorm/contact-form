@@ -97,6 +97,14 @@ Status vocabulary: `implemented` · `partial` · `planned` · `deprecated`.
 | `ux-datalist` | Datalist suggestions | `options` on non-picker inputs renders a `<datalist>` — steers, never restricts | implemented |
 | `ux-a11y` | Accessibility | Inline errors + `aria-invalid`, `role="status"`, `aria-busy`/`aria-current`, `inert` hidden panes, focus management on stepper jumps | implemented |
 
+## Anti-bot — `src/runtime/captcha.ts`
+
+| ID | Feature | Scope | Status |
+| --- | --- | --- | --- |
+| `captcha-block` | Declarative `FormSpec.captcha` block | Top-level `captcha` on the spec (`provider: "turnstile" \| "recaptcha-v3" \| "hcaptcha"`, public `siteKey`, optional `theme` / `action` / `onPendingSubmit`) — serialised as `data-captcha` (present keys only, engine fills the `"block"` default) so the specless `initForms` path resolves it; the builders emit the `[data-rf-captcha]` slot (before the submit row / inside the final wizard pane); `--rf-captcha-*` tokens + `.rf-captcha` reserved height in the shared stylesheet; three `FormCopy` keys (`captchaRequired` / `captchaFailed` / `captchaExpired`) with built-in defaults | implemented |
+| `captcha-engine` | Engine gate + widget lifecycle + `rf:captcha-error` | Zero-dependency `captcha.ts` runtime: idempotent lazy provider-script injection (one `<script>` per URL), widget mount (`turnstile` / `hcaptcha`) with token/expired/error callbacks, reCAPTCHA v3 inline `{ action }` execute (default `"submit"`), per-form controller (`token()` / `reset()` / `destroy()`). Submit gate sits after validation: `onPendingSubmit: "block"` shows `captchaRequired` and never dispatches; `"auto"` queues the submit and re-runs the full path via `requestSubmit()` when the widget resolves — expiry/error clear the queue and inform. Tokens are single-use — the widget resigns on `rf:submit-success`, `destroy()` on `detach()`. A captcha paired with a direct (non-proxy) mailer dev-warns at attach. New bus event `rf:captcha-error` (`{ name, id, message }`) | implemented |
+| `captcha-proxy-verify` | Proxy `siteverify` gate + demo forms | Both `/api/contact` routes verify `captchaToken` / `captchaProvider` via the provider's `siteverify` (form-encoded `secret` + `response`, `remoteip` from `x-forwarded-for`) before dispatch: 400 unsupported provider / token missing, 500 missing server secret or verify outage, 403 provider rejection — a rejected token never reaches a backend. `MailerContext.captcha` threads the token into the proxy-only + `custom`+`target` envelopes; the direct json path never leaks captcha fields. Secrets only in `.env` (`TURNSTILE_SECRET_KEY` / `RECAPTCHA_SECRET_KEY` / `HCAPTCHA_SECRET_KEY`); a `Contact — Turnstile-protected CF7` demo form (always-pass test keys) in both proxy examples; Astro `verify` harness + engine/mailer suites cover the matrix | implemented |
+
 ## Quality & release
 
 | ID | Feature | Scope | Status |
@@ -104,5 +112,5 @@ Status vocabulary: `implemented` · `partial` · `planned` · `deprecated`.
 | `quality-test-suite` | Test suite | `npm test`: core + mailers (no DOM), markup snapshots pinned to `scripts/fixtures/*.html` (`RECORD=1` regen), TanStack bridge + Zod adapter (no DOM), client engine under happy-dom | implemented |
 | `quality-typecheck` | Strict typecheck | `npm run typecheck` — `tsc --noEmit` over `src/` | implemented |
 | `quality-examples` | Runnable demos | `examples/astro-demo` (7 routes), `examples/react-demo` (route parity), `examples/tanstack-demo` (bridge + vanilla\|Zod toggle), `examples/specs/*.json` single source for the demos | implemented |
-| `release-tags` | Immutable release tags | `v0.1.0`, `v0.2.0`, `v0.3.0`, `v0.3.1` git tags for reproducible installs | implemented |
+| `release-tags` | Immutable release tags | `v0.1.0`, `v0.2.0`, `v0.3.0`, `v0.3.1`, `v0.4.0` git tags for reproducible installs | implemented |
 | `release-npm-publish` | npm publishing | Package currently `private: true` and installed via git dependency; publish path is dropping `private` and releasing a versioned build | planned |

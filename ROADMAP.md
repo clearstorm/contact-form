@@ -122,6 +122,24 @@ transport posts the plain canonical payload exactly as before. Serialised as
 becomes the generic dispatcher (Next.js + Astro, cf7/resend/postmark/sendgrid/
 mailchimp cases). Flip `mailer-target` when done.
 
+## M13 — CAPTCHA / anti-bot protection (v0.4.0)
+
+An optional top-level `captcha` block on the FormSpec (`provider: turnstile |
+recaptcha-v3 | hcaptcha`, public `siteKey`, optional `theme` / `action` /
+`onPendingSubmit`) mounts a challenge widget into the builder-emitted
+`[data-rf-captcha]` slot and gates the submit on a provider-verified token.
+Serialised as `data-captcha` (present keys only) so the specless `initForms`
+path resolves it; the engine's gate sits after validation — `onPendingSubmit:
+"block"` (default) shows the `captchaRequired` copy and holds, `"auto"`
+queues the submit and re-runs the full path via `requestSubmit()` when the
+widget resolves (expiry/error clear the queue). reCAPTCHA v3 is invisible and
+executes `{ action }` inline. Tokens are single-use (resigned on
+`rf:submit-success`) and travel in the proxy envelope as `captchaToken` /
+`captchaProvider`; both `/api/contact` routes verify them with the provider's
+`siteverify` (server `*_SECRET_KEY` env, `remoteip` from `x-forwarded-for`)
+before dispatch — a rejected token never reaches a backend. Flip
+`captcha-block`, `captcha-engine` and `captcha-proxy-verify` when done.
+
 ## npm publishing
 
 The package is currently `private: true` and installed via immutable git tags.

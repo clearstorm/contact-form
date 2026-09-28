@@ -17,9 +17,16 @@ its API key / backend URL from the environment.
     "first_name": "Jane",
     "email": "jane@example.test",
     "message": "…"
-  }
+  },
+  "captchaToken": "0.xxx",        // optional — a FormSpec `captcha` challenge token
+  "captchaProvider": "turnstile"  // optional — "turnstile" | "recaptcha-v3" | "hcaptcha"
 }
 ```
+
+`captchaProvider` + `captchaToken` only appear when the form spec carries a
+[`captcha` block](README.md) — the proxy then verifies the token via the
+provider's `siteverify` before dispatching (see
+[Anti-bot siteverify](#anti-bot-siteverify-formspeccaptcha)).
 
 Two client paths produce this envelope:
 
@@ -63,7 +70,7 @@ project and fill in the providers you host:
 
 ```env
 # --- Route whitelist guardrail (optional) ---
-ALLOWED_FORM_IDS="z10,10,30-4d-al,demo-form"
+ALLOWED_FORM_IDS="z10,10,30-4d-al,demo-form,5"
 
 # --- Target: Contact Form 7 (WordPress) ---
 CF7_BACKEND_URL="https://internal-cms.yourdomain.com"
@@ -85,6 +92,11 @@ SENDGRID_API_KEY="…"
 MAILCHIMP_API_KEY="…"
 MAILCHIMP_AUDIENCE_ID="a1b2c3d4e5"
 MAILCHIMP_SERVER_PREFIX="us1"
+
+# --- Anti-bot verification (FormSpec `captcha` block → siteverify) ---
+TURNSTILE_SECRET_KEY="1x00000000000000000000AA"   # always-pass test key
+RECAPTCHA_SECRET_KEY=""
+HCAPTCHA_SECRET_KEY=""
 ```
 
 The routes are **raw `fetch` only** — zero package dependencies, so the
@@ -124,21 +136,28 @@ cd examples/nextjs-proxy
 npm install && cp .env.example .env && npm run dev
 ```
 
-Both landing pages render the **client side** of the story — four forms from
-`content/forms/proxy.json` (proxied **CF7**, **Fluent Forms** and **Mailchimp**
-targets via the generic `custom` + `target` transport, plus a **Resend**
-proxy-only envelope) — and each form submits the envelope same-origin to its
-own `/api/contact`. Submit one with `.env` left empty and the route answers the
-documented **500** (server misconfiguration) — the form's error copy points at
-the missing variable. The two spec copies are kept identical.
+Both landing pages render the **client side** of the story — five forms from
+`content/forms/proxy.json` (proxied **CF7**, **Turnstile-protected CF7**,
+**Fluent Forms** and **Mailchimp** targets via the generic `custom` + `target`
+transport, plus a **Resend** proxy-only envelope) — and each form submits the
+envelope same-origin to its own `/api/contact`. Submit one with `.env` left
+empty and the route answers the documented **500** (server misconfiguration) —
+the form's error copy points at the missing variable. The two spec copies are
+kept identical. The Turnstile-protected form demonstrates the
+[Anti-bot siteverify](#anti-bot-siteverify-formspeccaptcha) gate with
+Cloudflare's always-pass test keys.
 
 Both routes implement the same contract:
 
 - **400** — missing `provider` or `formId`; unknown provider; the provider
-  rejected the submission (e.g. CF7 responds with `status !== "mail_sent"`).
-- **403** — `ALLOWED_FORM_IDS` is set and the envelope's `formId` is not in it.
+  rejected the submission (e.g. CF7 responds with `status !== "mail_sent"`);
+  `captchaProvider` set without a `captchaToken`; an unsupported captcha
+  provider.
+- **403** — `ALLOWED_FORM_IDS` is set and the envelope's `formId` is not in
+  it; a captcha token the provider's `siteverify` rejected.
 - **500** — server misconfiguration (the case exists but its env vars are
-  missing) or an unexpected error.
+  missing, including a captcha's `*_SECRET_KEY`), a captcha verification
+  outage, or an unexpected error.
 - Every success is `{ success: true }`, every failure `{ error }` (with a
   status) — provider keys, backend URLs and raw error bodies are never
   returned to the browser.
@@ -194,6 +213,43 @@ one is a spec-only change: set `provider: "custom"` and add `target`.
 
 ---
 
+## Anti-bot siteverify (`FormSpec.captcha`)
+
+A client-side challenge is only worth anything if the dispatch verifies its
+token. A form whose spec carries a
+[`captcha` block](README.md) (in the README: `turnstile` | `recaptcha-v3` |
+`hcaptcha`) sends two extra envelope fields — `captchaProvider` +
+`captchaToken` — and both reference routes gate on them with the provider's
+official `siteverify` API **before any backend is touched**:
+
+| Provider | `captchaProvider` | `siteverify` endpoint | Server secret |
+| --- | --- | --- | --- |
+| Cloudflare Turnstile | `"turnstile"` | `https://challenges.cloudflare.com/turnstile/v1/siteverify` | `TURNSTILE_SECRET_KEY` |
+| Google reCAPTCHA v3 | `"recaptcha-v3"` | `https://www.google.com/recaptcha/api/siteverify` | `RECAPTCHA_SECRET_KEY` |
+| hCaptcha | `"hcaptcha"` | `https://hcaptcha.com/siteverify` | `HCAPTCHA_SECRET_KEY` |
+
+The verification is a form-encoded POST of the server `secret` + the client
+`response` (token); the route also forwards `remoteip` taken from the request's
+`x-forwarded-for` header (first hop — the visitor's public IP) so the provider
+can pin score signals. Fresh challenge tokens are single-use, so replays fail
+verify. Outcomes:
+
+- **400** — `captchaProvider` set without a `captchaToken`, or an unsupported
+  captcha provider.
+- **403** — `siteverify` rejected the token (`success: false`).
+- **500** — the provider's `*_SECRET_KEY` is missing server-side, or the
+  verify call itself failed (network / provider outage).
+
+The gate sits before provider dispatch, so a rejected or unverifiable token
+never reaches a backend. Turnstile's always-pass test keys
+(`1x00000000000000000000AA` for both the sitekey and the secret) drive the
+`Contact — Turnstile-protected CF7` demo form, and the Astro `verify` harness
+covers every outcome against the real route (missing token, unknown provider,
+missing secret, 403 rejection with no backend call, always-pass 200 dispatch,
+`remoteip` forwarding, and the recaptcha/hcaptcha endpoint mapping).
+
+---
+
 ## Environment variables
 
 All examples read secrets only server-side:
@@ -207,6 +263,9 @@ All examples read secrets only server-side:
 | Postmark | `POSTMARK_SERVER_TOKEN` |
 | Sendgrid | `SENDGRID_API_KEY` |
 | Mailchimp | `MAILCHIMP_API_KEY`, `MAILCHIMP_AUDIENCE_ID`, `MAILCHIMP_SERVER_PREFIX` |
+| Turnstile (anti-bot) | `TURNSTILE_SECRET_KEY` |
+| reCAPTCHA v3 (anti-bot) | `RECAPTCHA_SECRET_KEY` |
+| hCaptcha (anti-bot) | `HCAPTCHA_SECRET_KEY` |
 
 The client spec only ever names targets by identifier (`MailTarget`), never by
 URL — a target with no server-side case is a route-level 400, and no backend

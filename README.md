@@ -255,6 +255,7 @@ receives them too. `detach()` removes subscriptions with every other listener.
 | `rf:submit-start` | after validation passes, before the mailer | `{ name, id, form }` |
 | `rf:submit-success` | the mailer accepted the submission | `{ name, id, message }` — `message` is the same success string the status box would show |
 | `rf:submit-error` | the mailer failed | `{ name, id, message }` |
+| `rf:captcha-error` | the CAPTCHA gate blocks a submit (or a queued "auto" submit is dropped on expiry/error) | `{ name, id, message }` |
 
 Lifecycle **hooks** let a consumer veto or observe those same moments
 declaratively by passing them in the attach options:
@@ -329,6 +330,61 @@ forwards every `rf:*` event (now including `rf:validation-error`) to a tracker
 of your choosing and its `attach` uses native `addEventListener`, so it works
 even on forms the engine didn't wire. FEATURES tracks it as `analytics-seam`;
 the declarative block is `analytics-block`.
+
+**CAPTCHA / bot protection** — an optional top-level `captcha` block mounts a
+challenge widget and gates the submit on a provider-verified token:
+
+```js
+// spec
+{
+  name: "enquiry",
+  captcha: {
+    provider: "turnstile",          // "turnstile" | "recaptcha-v3" | "hcaptcha"
+    siteKey: "1x00000000000000000000AA", // public — ships in the markup on purpose
+    theme: "auto",                  // widget theme (light | dark | auto; hcaptcha accepts light/dark)
+    action: "contact_submit",       // reCAPTCHA v3 action tag (default "submit"); Turnstile passes it through
+    onPendingSubmit: "block",       // "block" (default) | "auto"
+  },
+}
+```
+
+The site key is **public by design** — it's serialised as `data-captcha` on the
+shell (present keys only; the engine fills defaults), so the specless
+`initForms` path resolves a captcha from the markup alone. The matching
+provider *secret* lives only in your proxy's `.env`. The engine mounts the
+widget into the `[data-rf-captcha]` slot the builders emit (before the submit
+row, or inside the wizard's final pane) and hands the mailer the challenge
+token; the proxied `/api/contact` route verifies it with the provider's
+`siteverify` **before** dispatching — see
+[`docs/transport-proxies.md`](docs/transport-proxies.md#anti-bot-siteverify-formspeccaptcha).
+
+- **`turnstile`** / **`hcaptcha`** render a visible widget:
+  - `onPendingSubmit: "block"` (default) — pressing send before the challenge
+    completes shows the `captchaRequired` copy and holds; nothing is sent.
+  - `onPendingSubmit: "auto"` — the press is queued and the form re-submits
+    the moment the widget callback delivers a token (full re-validation, just
+    like a real submit). An expiry/error while queued drops the submission and
+    shows the `captchaExpired` / `captchaFailed` copy.
+  - Challenge tokens are single-use: the engine retires the widget's token
+    after `rf:submit-success`, so the next submission starts from a fresh
+    challenge.
+- **`recaptcha-v3`** is invisible — the script loads at attach (its badge is
+  part of Google's terms) and `{ action }` executes inline on submit. A failed
+  provider run shows the `captchaFailed` copy and holds.
+
+| Copy key | Fallback | When shown |
+| --- | --- | --- |
+| `captchaRequired` | "Please complete the security check before sending." | a "block"-mode send while the widget challenge is unsolved |
+| `captchaFailed` | "Security check failed — please try again." | v3 provider failure; a queued "auto" submit dropped on widget error |
+| `captchaExpired` | "The security check expired — please try again." | a queued "auto" submit dropped because the challenge expired |
+
+A captcha paired with a **direct** (non-proxy) mailer dev-warns at attach — the
+token is only verified by a proxy route — so pair it with `custom` + `target`
+or a proxy-only mailer. The `rf:captcha-error` bus event fires whenever the
+gate blocks or a queue is dropped. Both `/api/contact` examples ship a
+`Contact — Turnstile-protected CF7` demo form using Cloudflare's always-pass
+test keys. FEATURES tracks it as `captcha-block`, `captcha-engine`,
+`captcha-proxy-verify`.
 
 ---
 

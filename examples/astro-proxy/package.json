@@ -11,7 +11,10 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "verify": "node scripts/verify.mjs"
+    "verify": "node scripts/verify.mjs",
+    "predev": "node scripts/boot-check.mjs",
+    "prebuild": "node scripts/boot-check.mjs",
+    "prepreview": "node scripts/boot-check.mjs"
   },
   "dependencies": {
     "astro": "^7.3.2"

@@ -97,7 +97,7 @@ identical `{ provider, formId, to, payload }` contract, cases and status codes:
 
 | Example | Framework | Route file | Output mode |
 | --- | --- | --- | --- |
-| [`examples/astro-proxy/`](../examples/astro-proxy/README.md) | Astro | `src/pages/api/contact.ts` | hybrid — `output: "hybrid"` + `prerender = false` |
+| [`examples/astro-proxy/`](../examples/astro-proxy/README.md) | Astro | `src/pages/api/contact.ts` | hybrid-style — `output: "static"` (Astro 7 unified mode) + `prerender = false` |
 | [`examples/nextjs-proxy/`](../examples/nextjs-proxy/README.md) | Next.js App Router | `app/api/contact/route.ts` | on-demand — `runtime: "nodejs"`, `dynamic: "force-dynamic"` |
 
 Run them:

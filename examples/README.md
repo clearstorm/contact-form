@@ -132,7 +132,8 @@ envelope (from the `custom` + `target` transport and the proxy-only
 backend, with provider URLs/keys read from `.env` — never from the client. The
 two route files implement the identical contract:
 
-- **`astro-proxy/`** — Astro with **hybrid output** (`output: "hybrid"`, the
+- **`astro-proxy/`** — Astro with **hybrid-style output** (`output: "static"`,
+  Astro 7's unified mode where `prerender = false` routes stay on-demand), the
   landing page static and `/api/contact` on-demand via `prerender = false`).
   Ships a zero-dependency smoke harness: `npm run verify` imports the real
   route (Node type-stripping), stubs `fetch` + env, and asserts 400/403/500
@@ -145,6 +146,13 @@ two route files implement the identical contract:
 Both read the same multi-provider `.env.example`; the route files are
 self-contained so you can copy one straight into your own app. Full
 walkthrough: [`docs/transport-proxies.md`](../docs/transport-proxies.md).
+
+> **Run `npm install` inside each example folder before `npm run dev`.**
+> The repo root declares `astro` as a required peer dependency, so skipping the
+> astro-proxy install resolves the *root* copy of astro and fails with
+> `Cannot find module '@astrojs/node'` — the example's `predev`/`prebuild`
+> scripts check for the local install and print that hint; the nextjs-proxy
+> simply needs `next`/`react` installed locally.
 
 ---
 

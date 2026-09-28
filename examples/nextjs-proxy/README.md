@@ -21,10 +21,14 @@ in the Mailchimp case keeps edge runtimes a drop-in swap.
 ## Run it
 
 ```bash
-npm install
+npm install   # required first
 cp .env.example .env     # fill in at least one provider
 npm run dev              # http://localhost:3000
 ```
+
+> **Run `npm install` in this folder first** — `next` and `react` are
+> example-level dependencies, so `npm run dev` won't resolve without the local
+> install.
 
 Now POST the exact envelope the client produces:
 

@@ -8,18 +8,49 @@ next item instead of duplicating it.
 
 ## Current state
 
-- **Latest release:** `v0.3.1` — everything from `v0.3.0` (file uploads,
-  multi-selects, structural + conditional wizard steps, localStorage
-  `autoSave`, framework-independent bindings) plus the M9–M12 transport
-  work: expanded `MailerSpec` + direct/proxy adapters and, finally,
-  runnable **generic multi-provider proxy examples** (Astro + Next.js:
-  `/api/contact` routes, rendered proxy forms, multi-provider `.env.example`,
-  zero-dependency `verify` harnesses). Includes the Astro `.env` access fix
-  (`import.meta.env` with `process.env` fallback — Astro never writes `.env`
-  into `process.env`) and the CF7 field/form-id alignment. Immutable tags:
-  `v0.1.0`, `v0.2.0`, `v0.3.0`, `v0.3.1`.
+- **Latest release:** `v0.4.0` — everything from `v0.3.1` plus **M13:
+  CAPTCHA / anti-bot protection** (`captcha-block`, `captcha-engine`,
+  `captcha-proxy-verify`): an optional top-level `captcha` block on the
+  FormSpec (`turnstile` / `recaptcha-v3` / `hcaptcha`, public `siteKey`,
+  optional `theme` / `action` / `onPendingSubmit`) drives a zero-dependency
+  widget runtime and gates the submit on a challenge token — "block" holds
+  with `captchaRequired`, "auto" queues and re-submits on completion, v3
+  executes inline, tokens are single-use (resigned on `rf:submit-success`).
+  Both `/api/contact` proxy examples verify the token via the provider's
+  `siteverify` before dispatch (server `*_SECRET_KEY` env, `remoteip` from
+  `x-forwarded-for`), ship a Turnstile-protected CF7 demo form with
+  always-pass test keys, and the Astro `verify` harness covers the full
+  matrix. Immutable tags: `v0.1.0`, `v0.2.0`, `v0.3.0`, `v0.3.1`, `v0.4.0`.
 - **Branch:** `dev` (ahead of `main`), working tree clean.
 - **Most recent work (HEAD):**
+  - M13 CAPTCHA engine + proxy siteverify gate (`8a51e5b`, `c6151ec`,
+    `7f4010e`) — an optional `FormSpec.captcha` block
+    (`CaptchaSpec`/`CaptchaProvider`, `onPendingSubmit: "block" | "auto"`)
+    serialised as `data-captcha` (present keys only, so the specless
+    `initForms` path resolves it) with the builder-emitted `[data-rf-captcha]`
+    slot before the submit row / in the final wizard pane. The new zero-dep
+    `src/runtime/captcha.ts` injects provider scripts idempotently, mounts
+    turnstile/hcaptcha widgets with token/expired/error callbacks, executes
+    reCAPTCHA v3 `{ action }` inline, and exposes a per-form controller. The
+    engine gates submits after validation: "block" shows `captchaRequired`
+    and never dispatches; "auto" queues and re-runs the full submit via
+    `requestSubmit()` when the widget resolves — expiry/error clear the queue
+    and inform; success resigns the single-use token, `detach()` destroys the
+    widget; a captcha on a direct (non-proxy) mailer dev-warns. New bus event
+    `rf:captcha-error` (`{ name, id, message }`); `MailerContext.captcha`
+    threads the token into proxy + `custom`+`target` envelopes as
+    `captchaToken`/`captchaProvider` (the direct json path never leaks it).
+    Both `/api/contact` routes verify the token with the provider's
+    `siteverify` (form `secret`+`response`, `remoteip` from `x-forwarded-for`)
+    before any backend: 400 unsupported provider / missing token, 500 missing
+    server secret or verify outage, 403 provider rejection — a rejected token
+    never reaches a backend. `.env.example` gains `TURNSTILE_SECRET_KEY` /
+    `RECAPTCHA_SECRET_KEY` / `HCAPTCHA_SECRET_KEY`; both `proxy.json` copies
+    gain a `Contact — Turnstile-protected CF7` demo form (always-pass test
+    keys); fixtures `shell-captcha` + `shell-captcha-wizard` pin the
+    serialisation and slot, and the engine/mailer/Astro-verify suites cover
+    block/auto/v3 gating, queue expiry, envelope fields, single-use reset and
+    detach.
   - Runnable proxy examples + CF7 alignment (`16a5a3b`, `e5876e3`,
     `1f81cc7`) — the generic transport proxy examples now ship with real
     `/api/contact` routes, rendered proxy forms, multi-provider
@@ -186,7 +217,7 @@ next item instead of duplicating it.
 
 ## Feature summary
 
-- **54 implemented** / **2 planned** of 56 tracked features (see
+- **57 implemented** / **2 planned** of 59 tracked features (see
   FEATURES.md). Implemented means shipped, exercised by the test suite
   (`npm test`) and demonstrated in `examples/`.
 - The 2 planned features: the **Nodemailer mail-delivery adapter**

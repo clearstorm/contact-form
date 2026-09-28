@@ -30,7 +30,7 @@ async function withEnv(env, fn) {
  * Drive a POST envelope through the real route with a stubbed fetch.
  * `onFetch({ url, init })` returns the `Response` the route should see.
  */
-async function send(body, onFetch = () => new Response("{}", { status: 200 })) {
+async function send(body, onFetch = () => new Response("{}", { status: 200 }), headers = {}) {
   const calls = [];
   globalThis.fetch = async (url, init) => {
     const entry = { url: String(url), init };
@@ -40,7 +40,7 @@ async function send(body, onFetch = () => new Response("{}", { status: 200 })) {
   try {
     const request = new Request("https://example.test/api/contact", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...headers },
       body: JSON.stringify(body),
     });
     const res = await POST({ request });
@@ -51,7 +51,7 @@ async function send(body, onFetch = () => new Response("{}", { status: 200 })) {
   }
 }
 
-const sendWithEnv = (env, body, onFetch) => withEnv(env, () => send(body, onFetch));
+const sendWithEnv = (env, body, onFetch, headers) => withEnv(env, () => send(body, onFetch, headers));
 
 const failed = [];
 let passed = 0;
@@ -241,6 +241,114 @@ await expect("400 — mailchimp without an email address", async () => {
   );
   assert.equal(status, 400);
   assert.match(body.error, /valid email address/);
+});
+
+// --- M13: CAPTCHA siteverify gate (FormSpec `captcha` block) ---
+
+await expect("400 — captcha envelope missing its token", async () => {
+  const { status, body, calls } = await sendWithEnv(
+    { TURNSTILE_SECRET_KEY: "k" },
+    { provider: "cf7", formId: "z10", payload: {}, captchaProvider: "turnstile" },
+  );
+  assert.equal(status, 400);
+  assert.match(body.error, /Security token missing/);
+  assert.equal(calls.length, 0, "tokenless captcha claims never touch a backend");
+});
+
+await expect("400 — unknown captcha provider", async () => {
+  const { status, body, calls } = await sendWithEnv(
+    {},
+    { provider: "cf7", formId: "z10", payload: {}, captchaProvider: "funky", captchaToken: "t" },
+  );
+  assert.equal(status, 400);
+  assert.match(body.error, /Unsupported captcha provider: funky/);
+  assert.equal(calls.length, 0, "unknown providers never touch a backend");
+});
+
+await expect("500 — captcha without its server secret", async () => {
+  const { status, body } = await sendWithEnv(
+    {},
+    { provider: "cf7", formId: "z10", payload: {}, captchaProvider: "turnstile", captchaToken: "t" },
+  );
+  assert.equal(status, 500);
+  assert.match(body.error, /TURNSTILE_SECRET_KEY/);
+});
+
+await expect("403 — siteverify rejection blocks the backend", async () => {
+  const { status, body, calls } = await sendWithEnv(
+    { TURNSTILE_SECRET_KEY: "1x-secret", CF7_BACKEND_URL: "https://wp.example.com" },
+    { provider: "cf7", formId: "z10", payload: {}, captchaProvider: "turnstile", captchaToken: "bad-token" },
+    (entry) =>
+      entry.url.includes("siteverify")
+        ? new Response(JSON.stringify({ success: false, "error-codes": ["invalid-input-response"] }), { status: 200 })
+        : new Response("{}", { status: 200 }),
+  );
+  assert.equal(status, 403);
+  assert.match(body.error, /Bot verification failed/);
+  assert.equal(calls.length, 1, "a rejected token must never reach a backend");
+});
+
+await expect("200 — turnstile always-pass token verifies then dispatches", async () => {
+  const { status, body, calls } = await sendWithEnv(
+    { TURNSTILE_SECRET_KEY: "1x00000000000000000000AA", CF7_BACKEND_URL: "https://wp.example.com" },
+    {
+      provider: "cf7",
+      formId: "z10",
+      payload: { first_name: "Jane" },
+      captchaProvider: "turnstile",
+      captchaToken: "1x-token",
+    },
+    (entry) =>
+      entry.url.includes("siteverify")
+        ? new Response(JSON.stringify({ success: true }), { status: 200 })
+        : new Response(JSON.stringify({ status: "mail_sent" }), { status: 200 }),
+  );
+  assert.equal(status, 200);
+  assert.equal(body.success, true);
+  assert.equal(calls.length, 2, "siteverify call + the backend dispatch");
+  const verifyCall = calls[0];
+  assert.equal(verifyCall.url, "https://challenges.cloudflare.com/turnstile/v1/siteverify");
+  assert.equal(verifyCall.init.method, "POST");
+  assert.ok(verifyCall.init.body instanceof URLSearchParams, "siteverify body must be form-encoded");
+  assert.equal(verifyCall.init.body.get("secret"), "1x00000000000000000000AA");
+  assert.equal(verifyCall.init.body.get("response"), "1x-token");
+});
+
+await expect("200 — remoteip forwarded from x-forwarded-for", async () => {
+  const { status, calls } = await sendWithEnv(
+    { TURNSTILE_SECRET_KEY: "k", CF7_BACKEND_URL: "https://wp.example.com" },
+    { provider: "cf7", formId: "z10", payload: {}, captchaProvider: "turnstile", captchaToken: "t" },
+    (entry) =>
+      entry.url.includes("siteverify")
+        ? new Response(JSON.stringify({ success: true }), { status: 200 })
+        : new Response(JSON.stringify({ status: "mail_sent" }), { status: 200 }),
+    { "x-forwarded-for": "203.0.113.7, 10.0.0.1" },
+  );
+  assert.equal(status, 200);
+  assert.equal(calls[0].init.body.get("remoteip"), "203.0.113.7");
+});
+
+await expect("200 — recaptcha-v3 + hcaptcha siteverify endpoints", async () => {
+  const rv3 = await sendWithEnv(
+    { RECAPTCHA_SECRET_KEY: "k", CF7_BACKEND_URL: "https://wp.example.com" },
+    { provider: "cf7", formId: "z10", payload: {}, captchaProvider: "recaptcha-v3", captchaToken: "t" },
+    (entry) =>
+      entry.url.includes("siteverify")
+        ? new Response(JSON.stringify({ success: true, score: 0.9 }), { status: 200 })
+        : new Response(JSON.stringify({ status: "mail_sent" }), { status: 200 }),
+  );
+  assert.equal(rv3.status, 200);
+  assert.equal(rv3.calls[0].url, "https://www.google.com/recaptcha/api/siteverify");
+  const hc = await sendWithEnv(
+    { HCAPTCHA_SECRET_KEY: "k", CF7_BACKEND_URL: "https://wp.example.com" },
+    { provider: "cf7", formId: "z10", payload: {}, captchaProvider: "hcaptcha", captchaToken: "t" },
+    (entry) =>
+      entry.url.includes("siteverify")
+        ? new Response(JSON.stringify({ success: true }), { status: 200 })
+        : new Response(JSON.stringify({ status: "mail_sent" }), { status: 200 }),
+  );
+  assert.equal(hc.status, 200);
+  assert.equal(hc.calls[0].url, "https://hcaptcha.com/siteverify");
 });
 
 console.log(`\n${passed} checks passed.`);

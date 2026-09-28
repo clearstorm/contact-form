@@ -8,8 +8,9 @@
  * Private backends can be added with extra `case`s without the browser ever
  * learning their identity or URL.
  *
- * Contract: 400 missing `provider`/`formId`, unknown provider, or backend
- * rejection; 403 `formId` not in `ALLOWED_FORM_IDS`; 500 server
+ * Contract: 400 missing `provider`/`formId`, unknown provider, missing
+ * captcha token, or backend rejection; 403 `formId` not in
+ * `ALLOWED_FORM_IDS`, or a `siteverify` rejection; 500 server
  * misconfiguration; success is always `{ success: true }` and failure always
  * `{ error }` with a status. Read the fixture `.env.example` for the
  * variables each case expects.
@@ -36,7 +37,7 @@ export const prerender = false;
 
 export const POST: APIRoute = async ({ request }) => {
   try {
-    const { provider, formId, to, payload } = await request.json();
+    const { provider, formId, to, payload, captchaToken, captchaProvider } = await request.json();
 
     // 1. Validation — both identifiers are required in the envelope.
     if (!provider || !formId) {
@@ -50,6 +51,18 @@ export const POST: APIRoute = async ({ request }) => {
       if (!allowed.includes(formId)) {
         return json({ error: `Unauthorized formId: ${formId}` }, 403);
       }
+    }
+
+    // 2b. Anti-bot gate — a `FormSpec.captcha` block sends a challenge token
+    // in the envelope; verify it against the provider's `siteverify` before
+    // any backend is touched. A captcha-claiming envelope without a token is
+    // itself a red flag — reject it, never dispatch uninspected.
+    if (captchaProvider) {
+      if (!captchaToken) {
+        return json({ error: "Security token missing" }, 400);
+      }
+      const verified = await verifyCaptchaToken(captchaProvider, captchaToken, request);
+      if (verified !== null) return json({ error: verified.error }, verified.status);
     }
 
     // 3. Generic provider dispatch — add a `case` per `MailTarget` you host.
@@ -261,6 +274,51 @@ const json = (body: Record<string, unknown>, status: number) =>
     status,
     headers: { "content-type": "application/json" },
   });
+
+/** Provider `siteverify` endpoints + the env var holding each matching secret. */
+const CAPTCHA_VERIFY: Record<string, string> = {
+  turnstile: "https://challenges.cloudflare.com/turnstile/v1/siteverify",
+  "recaptcha-v3": "https://www.google.com/recaptcha/api/siteverify",
+  hcaptcha: "https://hcaptcha.com/siteverify",
+};
+const CAPTCHA_SECRET_ENV: Record<string, string> = {
+  turnstile: "TURNSTILE_SECRET_KEY",
+  "recaptcha-v3": "RECAPTCHA_SECRET_KEY",
+  hcaptcha: "HCAPTCHA_SECRET_KEY",
+};
+
+/**
+ * Run a provider's `siteverify` for a client challenge token. Returns `null`
+ * on success or `{ status, error }` mapped from the failure kind: 400 unknown
+ * provider, 500 missing server secret / verification unavailable, 403 the
+ * provider rejected the token. `remoteip` is forwarded from
+ * `x-forwarded-for` (first hop — the visitor's public IP) so the provider can
+ * pin score signals; a fresh token is single-use, so replays fail verify.
+ */
+const verifyCaptchaToken = async (
+  provider: string,
+  token: string,
+  request: Request,
+): Promise<{ status: number; error: string } | null> => {
+  const verifyUrl = CAPTCHA_VERIFY[provider];
+  if (!verifyUrl) return { status: 400, error: `Unsupported captcha provider: ${provider}` };
+  const secretKey = environment[CAPTCHA_SECRET_ENV[provider]];
+  if (!secretKey) return { status: 500, error: `Server misconfiguration: ${CAPTCHA_SECRET_ENV[provider]} missing` };
+  const body = new URLSearchParams();
+  body.append("secret", secretKey);
+  body.append("response", token);
+  const remoteIp = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  if (remoteIp) body.append("remoteip", remoteIp);
+  let res: Response;
+  try {
+    res = await fetch(verifyUrl, { method: "POST", body });
+  } catch {
+    return { status: 500, error: "Captcha verification unavailable" };
+  }
+  const outcome = (await res.json()) as { success?: boolean; "error-codes"?: string[] };
+  if (outcome.success === true) return null;
+  return { status: 403, error: "Bot verification failed" };
+};
 
 const formatFieldList = (payload: Record<string, unknown>): string =>
   Object.entries(payload ?? {})

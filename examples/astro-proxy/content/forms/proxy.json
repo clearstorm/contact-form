@@ -60,6 +60,73 @@
       }
     ]
   },
+  "Contact — Turnstile-protected CF7": {
+    "name": "proxy-cf7-captcha",
+    "submit": "Send via proxy",
+    "status": "Thanks — the security check passed and the envelope reached the CF7 proxy route.",
+    "mailer": {
+      "provider": "custom",
+      "formId": "5",
+      "target": "cf7",
+      "endpoint": "/api/contact"
+    },
+    "captcha": {
+      "provider": "turnstile",
+      "siteKey": "1x00000000000000000000AA",
+      "theme": "auto",
+      "action": "contact_submit"
+    },
+    "copy": {
+      "sending": "Verifying security check…",
+      "submitError": "Delivery failed (HTTP {status}) — check CF7_BACKEND_URL and the Turnstile secrets in .env."
+    },
+    "fields": [
+      {
+        "type": "text",
+        "id": "first_name",
+        "name": "first_name",
+        "label": "First name",
+        "required": true,
+        "size": 50,
+        "autocomplete": "given-name"
+      },
+      {
+        "type": "text",
+        "id": "last_name",
+        "name": "last_name",
+        "label": "Last name",
+        "required": true,
+        "size": 50,
+        "autocomplete": "family-name"
+      },
+      {
+        "type": "email",
+        "id": "email",
+        "name": "email",
+        "label": "Email address",
+        "required": true,
+        "size": 50,
+        "autocomplete": "email"
+      },
+      {
+        "type": "text",
+        "id": "subject",
+        "name": "subject",
+        "label": "Subject",
+        "required": true,
+        "size": 50
+      },
+      {
+        "type": "textarea",
+        "id": "message",
+        "name": "message",
+        "label": "Message",
+        "required": true,
+        "size": 100,
+        "rows": 5
+      }
+    ]
+  },
   "Contact — Fluent Forms": {
     "name": "proxy-fluent",
     "submit": "Send via proxy",

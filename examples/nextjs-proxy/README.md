@@ -3,12 +3,23 @@
 A runnable, copy-paste-ready **Next.js (App Router)** host for the generic
 multi-provider transport proxy: one `/api/contact` route that receives the
 `{ provider, formId, to, payload }` envelope from any ContactForm client and
-forwards it to the right backend (CF7, Resend, Postmark, Sendgrid, Mailchimp)
-with credentials/URLs read from `.env` — never from the browser.
+forwards it to the right backend (CF7, Fluent Forms, Resend, Postmark,
+Sendgrid, Mailchimp) with credentials/URLs read from `.env` — never from the
+browser.
 
 Most of the route is transport-agnostic: the `custom` + `target` transport and
 the proxy-only mailers (`resend` / `postmark` / `sendgrid`) both post the same
 envelope, so the same server route serves every `MailTarget`.
+
+## Try the forms on `/`
+
+The landing page renders four live forms from `content/forms/proxy.json` —
+proxied **CF7**, **Fluent Forms** and **Mailchimp** targets (the `custom` +
+`target` transport) plus a **Resend** proxy-only envelope. All four submit
+same-origin to `/api/contact`; each card has a Spec tab showing the exact JSON.
+Submit one with `.env` left empty and the route answers **500** (server
+misconfiguration) — the form's error copy names the missing variable. The spec
+is an identical copy of the one in `astro-proxy` — keep them in lockstep.
 
 ## Output mode — hybrid (static pages + on-demand route)
 

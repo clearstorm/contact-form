@@ -1,0 +1,196 @@
+{
+  "Contact — proxied CF7": {
+    "name": "proxy-cf7",
+    "submit": "Send via proxy",
+    "status": "Thanks — the envelope reached the CF7 proxy route.",
+    "mailer": {
+      "provider": "custom",
+      "formId": "z10",
+      "target": "cf7",
+      "endpoint": "/api/contact"
+    },
+    "copy": {
+      "sending": "Sending via proxy…",
+      "submitError": "Delivery failed (HTTP {status}) — is CF7_BACKEND_URL set in .env?"
+    },
+    "fields": [
+      {
+        "type": "text",
+        "id": "first_name",
+        "name": "first_name",
+        "label": "First name",
+        "required": true,
+        "size": 50,
+        "autocomplete": "given-name"
+      },
+      {
+        "type": "text",
+        "id": "last_name",
+        "name": "last_name",
+        "label": "Last name",
+        "required": true,
+        "size": 50,
+        "autocomplete": "family-name"
+      },
+      {
+        "type": "email",
+        "id": "email",
+        "name": "email",
+        "label": "Email address",
+        "required": true,
+        "size": 50,
+        "autocomplete": "email"
+      },
+      {
+        "type": "textarea",
+        "id": "message",
+        "name": "message",
+        "label": "Message",
+        "required": true,
+        "size": 100,
+        "rows": 5
+      }
+    ]
+  },
+  "Contact — Fluent Forms": {
+    "name": "proxy-fluent",
+    "submit": "Send via proxy",
+    "status": "Thanks — the envelope reached the Fluent Forms proxy route.",
+    "mailer": {
+      "provider": "custom",
+      "formId": "10",
+      "target": "fluentforms",
+      "endpoint": "/api/contact"
+    },
+    "copy": {
+      "sending": "Sending via proxy…",
+      "submitError": "Delivery failed (HTTP {status}) — is FLUENT_FORMS_BACKEND_URL set in .env?"
+    },
+    "fields": [
+      {
+        "type": "text",
+        "id": "first_name",
+        "name": "first_name",
+        "label": "First name",
+        "required": true,
+        "size": 50,
+        "autocomplete": "given-name"
+      },
+      {
+        "type": "text",
+        "id": "last_name",
+        "name": "last_name",
+        "label": "Last name",
+        "required": true,
+        "size": 50,
+        "autocomplete": "family-name"
+      },
+      {
+        "type": "email",
+        "id": "email",
+        "name": "email",
+        "label": "Email address",
+        "required": true,
+        "size": 50,
+        "autocomplete": "email"
+      },
+      {
+        "type": "textarea",
+        "id": "message",
+        "name": "message",
+        "label": "Message",
+        "required": true,
+        "size": 100,
+        "rows": 5
+      }
+    ]
+  },
+  "Newsletter — Mailchimp": {
+    "name": "proxy-mailchimp",
+    "submit": "Subscribe",
+    "status": "Subscribed — the envelope reached the Mailchimp proxy route.",
+    "mailer": {
+      "provider": "custom",
+      "formId": "30-4d-al",
+      "target": "mailchimp",
+      "endpoint": "/api/contact"
+    },
+    "copy": {
+      "sending": "Subscribing…",
+      "submitError": "Subscription failed (HTTP {status}) — are the MAILCHIMP_* vars set in .env?"
+    },
+    "fields": [
+      {
+        "type": "email",
+        "id": "email",
+        "name": "email",
+        "label": "Email address",
+        "required": true,
+        "size": 50,
+        "autocomplete": "email"
+      },
+      {
+        "type": "text",
+        "id": "first_name",
+        "name": "first_name",
+        "label": "First name",
+        "required": false,
+        "size": 50,
+        "autocomplete": "given-name"
+      },
+      {
+        "type": "text",
+        "id": "last_name",
+        "name": "last_name",
+        "label": "Last name",
+        "required": false,
+        "size": 50,
+        "autocomplete": "family-name"
+      }
+    ]
+  },
+  "Resend proxy envelope": {
+    "name": "proxy-resend",
+    "submit": "Send via proxy",
+    "status": "Thanks — the envelope reached the Resend proxy route.",
+    "mailer": {
+      "provider": "resend",
+      "formId": "demo-form",
+      "to": "team@example.test",
+      "endpoint": "/api/contact"
+    },
+    "copy": {
+      "sending": "Sending envelope…",
+      "submitError": "Delivery failed (HTTP {status}) — is RESEND_API_KEY set in .env?"
+    },
+    "fields": [
+      {
+        "type": "text",
+        "id": "first_name",
+        "name": "first_name",
+        "label": "First name",
+        "required": true,
+        "size": 50,
+        "autocomplete": "given-name"
+      },
+      {
+        "type": "email",
+        "id": "email",
+        "name": "email",
+        "label": "Email address",
+        "required": true,
+        "size": 50,
+        "autocomplete": "email"
+      },
+      {
+        "type": "textarea",
+        "id": "message",
+        "name": "message",
+        "label": "Message",
+        "required": true,
+        "size": 100,
+        "rows": 5
+      }
+    ]
+  }
+}

@@ -178,6 +178,39 @@ await expect("200 — postmark + sendgrid forward", async () => {
   assert.equal(sg.status, 200);
 });
 
+await expect("200 — fluentforms forwards FormData to the form-submit endpoint", async () => {
+  const { status, body, calls } = await sendWithEnv(
+    { FLUENT_FORMS_BACKEND_URL: "https://wp.example.com" },
+    { provider: "fluentforms", formId: "10", payload: { first_name: "Jane", email: "jane@example.test" } },
+    () => new Response(JSON.stringify({ success: true, message: "submitted" }), { status: 200 }),
+  );
+  assert.equal(status, 200);
+  assert.equal(body.success, true);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, "https://wp.example.com/wp-json/fluentform/v1/form-submit");
+  assert.equal(calls[0].init.method, "POST");
+  const fd = calls[0].init.body;
+  assert.ok(fd instanceof FormData, "fluentforms body must be FormData");
+  assert.equal(fd.get("form_id"), "10");
+  assert.equal(fd.get("email"), "jane@example.test");
+});
+
+await expect("400 — fluentforms rejected body surfaces the message", async () => {
+  const { status, body } = await sendWithEnv(
+    { FLUENT_FORMS_BACKEND_URL: "https://wp.example.com" },
+    { provider: "fluentforms", formId: "10", payload: {} },
+    () => new Response(JSON.stringify({ success: false, message: "spam caught" }), { status: 200 }),
+  );
+  assert.equal(status, 400);
+  assert.equal(body.error, "spam caught");
+});
+
+await expect("500 — fluentforms without FLUENT_FORMS_BACKEND_URL", async () => {
+  const { status, body } = await sendWithEnv({}, { provider: "fluentforms", formId: "10" });
+  assert.equal(status, 500);
+  assert.match(body.error, /FLUENT_FORMS_BACKEND_URL/);
+});
+
 await expect("200 — mailchimp fresh subscription", async () => {
   const { status, body } = await sendWithEnv(
     { MAILCHIMP_API_KEY: "k", MAILCHIMP_AUDIENCE_ID: "aud", MAILCHIMP_SERVER_PREFIX: "us1" },

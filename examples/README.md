@@ -7,8 +7,8 @@ Everything you need to see `@clearstorm/contact-form` working end to end.
 | `astro-demo/` | A minimal standalone **Astro site** consuming the package (linked live via a `file:` dependency) — every classic feature in a browser, plus a **vanilla JS** page (`/vanilla`) mounting the same specs with `renderForm` |
 | `react-demo/` | A **Vite + React app** (Vite 6 + React 19) with **route parity with the Astro demo** — the same seven paths (`/`, `/field-types`, `/conditional`, `/wizard`, `/mailers`, `/theming`, `/vanilla`), each rendering the named forms from the same `examples/specs/*.json` via the uncontrolled `<ContactForm />` |
 | `tanstack-demo/` | A **Vite + React app** for the opt-in **TanStack Form** bridge (`useContactForm` + `<ContactFormField />`) and the pluggable-validation seam — a vanilla | Zod provider toggle proving only *which rules run* changes |
-| `astro-proxy/` | A runnable **Astro (hybrid)** server host for the generic transport proxy — `src/pages/api/contact.ts` fans the `{ provider, formId, to, payload }` envelope out to CF7 / Resend / Postmark / Sendgrid / Mailchimp with keys in `.env`; `npm run verify` asserts the 400/403/500 contract with a zero-dependency harness |
-| `nextjs-proxy/` | A runnable **Next.js (App Router)** server host for the same proxy — an on-demand `app/api/contact/route.ts` (`runtime: "nodejs"`) with identical cases and `.env` wiring |
+| `astro-proxy/` | A runnable **Astro (hybrid)** server host for the generic transport proxy — `src/pages/api/contact.ts` fans the `{ provider, formId, to, payload }` envelope out to CF7 / Fluent Forms / Resend / Postmark / Sendgrid / Mailchimp with keys in `.env`; the landing page renders four client forms from `content/forms/proxy.json` that submit to that route; `npm run verify` asserts the 400/403/500 contract with a zero-dependency harness |
+| `nextjs-proxy/` | A runnable **Next.js (App Router)** server host for the same proxy — an on-demand `app/api/contact/route.ts` (`runtime: "nodejs"`) with identical cases, same `.env` wiring and the same four rendered forms |
 | `specs/` | Copy-paste-ready **JSON form specs** the demos actually render (single source of truth) |
 
 ---
@@ -137,11 +137,19 @@ two route files implement the identical contract:
   landing page static and `/api/contact` on-demand via `prerender = false`).
   Ships a zero-dependency smoke harness: `npm run verify` imports the real
   route (Node type-stripping), stubs `fetch` + env, and asserts 400/403/500
-  behavior, the CF7 URL + `_wpcf7_unit_tag` payload, Resend-to-recipient, and
-  Mailchimp "Member Exists" idempotence.
+  behavior, the CF7 URL + `_wpcf7_unit_tag` payload, the Fluent Forms
+  `form_id` FormData, Resend-to-recipient, and Mailchimp "Member Exists"
+  idempotence.
 - **`nextjs-proxy/`** — Next.js App Router with an **on-demand** route handler
   at `app/api/contact/route.ts` (`runtime: "nodejs"`, `dynamic:
   "force-dynamic"`), the same cases and status codes.
+
+Both landing pages also render the **client side** of the story: four forms
+from `content/forms/proxy.json` — proxied **CF7**, **Fluent Forms** and
+**Mailchimp** targets via the generic `custom` + `target` transport, plus a
+**Resend** proxy-only envelope — each posting the envelope same-origin to its
+own `/api/contact`. The two spec copies are kept identical; edit either and the
+sibling carries the same change.
 
 Both read the same multi-provider `.env.example`; the route files are
 self-contained so you can copy one straight into your own app. Full

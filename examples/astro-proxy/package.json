@@ -17,6 +17,7 @@
     "prepreview": "node scripts/boot-check.mjs"
   },
   "dependencies": {
+    "@clearstorm/contact-form": "file:../..",
     "astro": "^7.3.2"
   },
   "devDependencies": {

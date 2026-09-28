@@ -1,20 +1,69 @@
 ---
-// Landing page — static in the hybrid-style build; the actual proxy is /api/contact.
+// Landing page — renders the four proxy forms from content/forms/proxy.json.
+// The forms post the { provider, formId, to, payload } envelope to this
+// example's own /api/contact route; the page itself stays static in the
+// hybrid-style build (the route is on-demand via prerender = false).
+import ContactForm from "@clearstorm/contact-form/astro/ContactForm.astro";
+import type { FormSpec } from "@clearstorm/contact-form/core";
+import "@clearstorm/contact-form/styles.css"; // the shared theme — imported once
+import proxySpec from "../../content/forms/proxy.json";
+
 const envelope = "{ provider, formId, to, payload }";
 ---
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>ContactForm transport proxy — Astro</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 46rem;
+        margin: 2rem auto;
+        padding: 0 1rem;
+        color: #1a202c;
+      }
+      h1 { font-size: 1.6rem; }
+      .proxy-card {
+        border: 1px solid #e2e8f0;
+        border-radius: 0.5rem;
+        padding: 1rem 1.25rem;
+        margin: 1.5rem 0;
+      }
+      .proxy-card h2 { margin: 0 0 0.75rem; font-size: 1.1rem; }
+      details summary { cursor: pointer; font-size: 0.85rem; color: #4a5568; margin-top: 1rem; }
+      pre {
+        background: #f7fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.35rem;
+        padding: 0.75rem;
+        overflow: auto;
+        font-size: 0.78rem;
+      }
+    </style>
   </head>
   <body>
     <h1>Astro transport proxy</h1>
     <p>
-      POST the <code>{envelope}</code> envelope to <code>/api/contact</code>.
-      Server secrets live in <code>.env</code> — see the README and
+      The forms below render from <code>content/forms/proxy.json</code> and POST
+      the <code>{envelope}</code> envelope to <code>/api/contact</code>. Server
+      secrets live in <code>.env</code> — see the README and
       <code>docs/transport-proxies.md</code>.
     </p>
+
+    {
+      Object.entries(proxySpec).map(([title, form]) => (
+        <section class="proxy-card">
+          <h2>{title}</h2>
+          <ContactForm form={form as FormSpec} />
+          <details>
+            <summary>Spec — content/forms/proxy.json</summary>
+            <pre>{JSON.stringify(form, null, 2)}</pre>
+          </details>
+        </section>
+      ))
+    }
   </body>
 </html>

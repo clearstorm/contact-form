@@ -116,6 +116,34 @@ export const POST: APIRoute = async ({ request }) => {
         return json({ success: true });
       }
 
+      case "fluentforms": {
+        const backendUrl = process.env.FLUENT_FORMS_BACKEND_URL;
+        if (!backendUrl) {
+          return json({ error: "Server misconfiguration: FLUENT_FORMS_BACKEND_URL missing" }, 500);
+        }
+        // Public submit endpoint Fluent Forms' own JS posts to: FormData with
+        // `form_id` + the field names. Response shape differs across versions,
+        // so treat 2xx plus a non-failure body as success.
+        const ffFormData = new FormData();
+        for (const [key, value] of Object.entries(payload ?? {})) ffFormData.append(key, String(value));
+        ffFormData.append("form_id", formId);
+
+        const ffRes = await fetch(`${backendUrl}/wp-json/fluentform/v1/form-submit`, {
+          method: "POST",
+          body: ffFormData,
+        });
+        const ffBody = (await ffRes.json().catch(() => ({}))) as {
+          success?: boolean;
+          message?: string;
+          data?: { result?: { success?: boolean } };
+        };
+        const rejected = !ffRes.ok || ffBody.success === false || ffBody.data?.result?.success === false;
+        if (rejected) {
+          return json({ error: ffBody.message || `Fluent Forms rejected the submission (HTTP ${ffRes.status})` }, 400);
+        }
+        return json({ success: true, message: ffBody.message });
+      }
+
       case "mailchimp": {
         const apiKey = process.env.MAILCHIMP_API_KEY;
         const audienceId = process.env.MAILCHIMP_AUDIENCE_ID;

@@ -9,6 +9,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@clearstorm/contact-form": "file:../..",
     "next": "^16.3.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

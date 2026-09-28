@@ -62,10 +62,13 @@ project and fill in the providers you host:
 
 ```env
 # --- Route whitelist guardrail (optional) ---
-ALLOWED_FORM_IDS="z10,20,30-4d-al"
+ALLOWED_FORM_IDS="z10,10,30-4d-al,demo-form"
 
 # --- Target: Contact Form 7 (WordPress) ---
 CF7_BACKEND_URL="https://internal-cms.yourdomain.com"
+
+# --- Target: Fluent Forms (WordPress) ---
+FLUENT_FORMS_BACKEND_URL="https://internal-cms.yourdomain.com"
 
 # --- Target: Resend ---
 RESEND_API_KEY="re_123456789"
@@ -112,6 +115,14 @@ cd examples/nextjs-proxy
 npm install && cp .env.example .env && npm run dev
 ```
 
+Both landing pages render the **client side** of the story — four forms from
+`content/forms/proxy.json` (proxied **CF7**, **Fluent Forms** and **Mailchimp**
+targets via the generic `custom` + `target` transport, plus a **Resend**
+proxy-only envelope) — and each form submits the envelope same-origin to its
+own `/api/contact`. Submit one with `.env` left empty and the route answers the
+documented **500** (server misconfiguration) — the form's error copy points at
+the missing variable. The two spec copies are kept identical.
+
 Both routes implement the same contract:
 
 - **400** — missing `provider` or `formId`; unknown provider; the provider
@@ -124,7 +135,10 @@ Both routes implement the same contract:
   returned to the browser.
 - `cf7` forwards `payload` as `FormData` to
   `${CF7_BACKEND_URL}/wp-json/contact-form-7/v1/contact-forms/${formId}/feedback`
-  (with a `_wpcf7_unit_tag`); `resend` / `postmark` / `sendgrid` email
+  (with a `_wpcf7_unit_tag`); `fluentforms` posts `form_id` + the field names
+  as `FormData` to `${FLUENT_FORMS_BACKEND_URL}/wp-json/fluentform/v1/form-submit`
+  (tolerant of the response-shape differences across Fluent Forms versions);
+  `resend` / `postmark` / `sendgrid` email
   `to ?? <env recipient>`; `mailchimp` subscribes `payload.email` to the
   audience and treats a "Member Exists" response as success. Mailchimp's basic
   auth uses `btoa` (not `Buffer`), so the Next.js route also runs on edge
@@ -162,6 +176,7 @@ All examples read secrets only server-side:
 | --- | --- |
 | Guardrail | `ALLOWED_FORM_IDS` |
 | Contact Form 7 (WordPress) | `CF7_BACKEND_URL` |
+| Fluent Forms (WordPress) | `FLUENT_FORMS_BACKEND_URL` |
 | Resend | `RESEND_API_KEY`, `RESEND_TO_EMAIL` |
 | Postmark | `POSTMARK_SERVER_TOKEN` |
 | Sendgrid | `SENDGRID_API_KEY` |

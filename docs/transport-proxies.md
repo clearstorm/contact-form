@@ -136,16 +136,17 @@ cd examples/nextjs-proxy
 npm install && cp .env.example .env && npm run dev
 ```
 
-Both landing pages render the **client side** of the story — five forms from
-`content/forms/proxy.json` (proxied **CF7**, **Turnstile-protected CF7**,
-**Fluent Forms** and **Mailchimp** targets via the generic `custom` + `target`
-transport, plus a **Resend** proxy-only envelope) — and each form submits the
-envelope same-origin to its own `/api/contact`. Submit one with `.env` left
-empty and the route answers the documented **500** (server misconfiguration) —
-the form's error copy points at the missing variable. The two spec copies are
-kept identical. The Turnstile-protected form demonstrates the
-[Anti-bot siteverify](#anti-bot-siteverify-formspeccaptcha) gate with
-Cloudflare's always-pass test keys.
+Both landing pages render the **client side** of the story — seven forms from
+`content/forms/proxy.json` (proxied **CF7**, **Fluent Forms** and **Mailchimp**
+targets via the generic `custom` + `target` transport, a **Resend** proxy-only
+envelope, and three captcha-protected CF7 forms — **Turnstile**, **reCAPTCHA
+v3** and **hCaptcha**) — and each form submits the envelope same-origin to its
+own `/api/contact`. Submit one with `.env` left empty and the route answers the
+documented **500** (server misconfiguration) — the form's error copy points at
+the missing variable. The two spec copies are kept identical. The
+captcha-protected forms demonstrate the
+[Anti-bot siteverify](#anti-bot-siteverify-formspeccaptcha) gate with each
+provider's always-pass test keys.
 
 Both routes implement the same contract:
 
@@ -241,12 +242,20 @@ verify. Outcomes:
   verify call itself failed (network / provider outage).
 
 The gate sits before provider dispatch, so a rejected or unverifiable token
-never reaches a backend. Turnstile's always-pass test keys
-(`1x00000000000000000000AA` for both the sitekey and the secret) drive the
-`Contact — Turnstile-protected CF7` demo form, and the Astro `verify` harness
-covers every outcome against the real route (missing token, unknown provider,
-missing secret, 403 rejection with no backend call, always-pass 200 dispatch,
-`remoteip` forwarding, and the recaptcha/hcaptcha endpoint mapping).
+never reaches a backend. The three demo forms drive it with each provider's
+documented always-pass test keys:
+
+| Provider | Test site key | Test secret key |
+| --- | --- | --- |
+| Turnstile | `1x00000000000000000000AA` | `1x00000000000000000000AA` |
+| reCAPTCHA v3 | `6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI` | `6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe` |
+| hCaptcha | `10000000-ffff-ffff-ffff-000000000001` | `0x0000000000000000000000000000000000000000` |
+
+All three always pass verification — swap the `.env` secrets for real dashboard
+keys in production. The Astro `verify` harness covers every outcome against the
+real route (missing token, unknown provider, missing secret, 403 rejection with
+no backend call, always-pass 200 dispatch, `remoteip` forwarding, and the
+recaptcha/hcaptcha endpoint mapping).
 
 ---
 

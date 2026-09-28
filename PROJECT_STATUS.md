@@ -16,6 +16,21 @@ next item instead of duplicating it.
   vanilla · TanStack). Immutable tags: `v0.1.0`, `v0.2.0`, `v0.3.0`.
 - **Branch:** `dev` (ahead of `main`), working tree clean.
 - **Most recent work (HEAD):**
+  - Explicit dispatch `target` + generic multi-provider proxy (`8ca46d9`) — a
+    `mailer` config object can carry `target` (`MailTarget`: every
+    `MailerProvider` + `mailchimp`/`mailgun`/`fluentforms`/… + `(string &
+    {})` for private backends). With a target the generic `custom`/`json`
+    transport POSTs the proxy envelope `{ provider: target, formId, to,
+    payload }` (default `/api/contact`), so **one** `/api/contact` route fans
+    out to any backend while provider URLs + keys stay server-side in `.env`
+    (optional `ALLOWED_FORM_IDS` → 403; 400 on missing `provider`/`formId`;
+    normalized `{ success }`/`{ error }`). Absent `target` the transport posts
+    the plain canonical payload unchanged. Wire format is the legacy envelope —
+    resend/postmark/sendgrid untouched. Serialised `data-mailer-target`,
+    overridable at attach; `docs/transport-proxies.md` rewritten as the
+    Generic multi-provider dispatch (Next.js App Router + Astro, cf7 / resend /
+    postmark / sendgrid / mailchimp cases); README updated; no-DOM + happy-dom
+    tests cover the envelope, default endpoint, override and failure surfacing.
   - Declarative `FormSpec.analytics` + `rf:validation-error` (`5def710`) — an
     optional spec block (`{ enabled?, provider: "dataLayer" |
     "customEvent" | "plausible" | "posthog", eventName?, trackSteps?,
@@ -159,7 +174,7 @@ next item instead of duplicating it.
 
 ## Feature summary
 
-- **53 implemented** / **2 planned** of 55 tracked features (see
+- **54 implemented** / **2 planned** of 56 tracked features (see
   FEATURES.md). Implemented means shipped, exercised by the test suite
   (`npm test`) and demonstrated in `examples/`.
 - The 2 planned features: the **Nodemailer mail-delivery adapter**

@@ -433,6 +433,67 @@ const structSpec: FormSpec = {
   ],
 };
 
+// M13: client-side CAPTCHA. The block serialises to `data-captcha` (present
+// keys only — the engine fills the "block" default) and the shell emits the
+// `[data-rf-captcha]` widget slot. `shell-captcha` pins the default
+// single-page placement; `shell-captcha-wizard` pins the auto mode
+// serialisation + slot inside the final wizard pane.
+const captchaSpec: FormSpec = {
+  name: "snapshot-captcha",
+  mailer: "json",
+  submit: "Send",
+  status: "Thanks.",
+  endpoint: "https://example.test/send",
+  captcha: {
+    provider: "turnstile",
+    siteKey: "1x00000000000000000000AA",
+  },
+  fields: [
+    {
+      type: "text",
+      id: "name",
+      name: "name",
+      label: "Name",
+      required: true,
+      size: 50,
+    },
+  ],
+};
+
+const captchaWizardSpec: FormSpec = {
+  name: "snapshot-captcha-wizard",
+  mailer: "json",
+  submit: "Send",
+  status: "Thanks.",
+  endpoint: "https://example.test/send",
+  captcha: {
+    provider: "turnstile",
+    siteKey: "1x00000000000000000000AA",
+    theme: "dark",
+    action: "contact_submit",
+    onPendingSubmit: "auto",
+  },
+  fields: [
+    { type: "step", label: "Contact", submit: "Send" },
+    {
+      type: "text",
+      id: "name",
+      name: "name",
+      label: "Name",
+      required: true,
+      size: 50,
+    },
+    { type: "step", label: "Details" },
+    {
+      type: "textarea",
+      id: "message",
+      name: "message",
+      label: "Message",
+      size: 100,
+    },
+  ],
+};
+
 const fieldCases: [string, string][] = [
   ["field-text", renderField({ label: "Name", id: "n", name: "name", type: "text", required: true, placeholder: "Jane", span: 6 })],
   ["field-single-checkbox", renderField({ label: "I agree", id: "c", name: "consent", type: "checkbox", required: true })],
@@ -506,6 +567,8 @@ const snapshots: Snapshot[] = [
   { name: "shell-mailer-config", html: renderFormShell({ form: mailerConfigSpec }) },
   { name: "shell-mailer-wpforms", html: renderFormShell({ form: mailerDirectSpec }) },
   { name: "shell-struct", html: renderFormShell({ form: structSpec }) },
+  { name: "shell-captcha", html: renderFormShell({ form: captchaSpec }) },
+  { name: "shell-captcha-wizard", html: renderFormShell({ form: captchaWizardSpec }) },
   ...fieldCases.map(([name, html]) => ({ name, html })),
   ...decorCases.map(([name, html]) => ({ name, html })),
 ];
@@ -556,6 +619,28 @@ if (RECORD) {
     }) === shell,
   );
   check("no data-hooks attribute leaks into markup", !shell.includes("data-hooks"));
+
+  /* ---- M13: CAPTCHA block serialisation + widget slot ---- */
+  const captchaShell = snapshots.find((s) => s.name === "shell-captcha")!.html;
+  const captchaAttr = /data-captcha="([^"]*)"/.exec(captchaShell)?.[1];
+  check(
+    "captcha shell serialises data-captcha with present keys only",
+    captchaAttr === "{&quot;provider&quot;:&quot;turnstile&quot;,&quot;siteKey&quot;:&quot;1x00000000000000000000AA&quot;}",
+    captchaAttr ?? "no data-captcha",
+  );
+  check(
+    "widget slot renders before the submit row (single-page)",
+    captchaShell.includes('<div class="rf-captcha" data-rf-captcha role="group" aria-label="Security check"></div><div class="rf-submit-row">'),
+  );
+  const captchaWizardShell = snapshots.find((s) => s.name === "shell-captcha-wizard")!.html;
+  const wizardCaptchaAttr = /data-captcha="([^"]*)"/.exec(captchaWizardShell)?.[1];
+  check(
+    "wizard captcha serialises theme/action/auto + slot inside the final pane",
+    wizardCaptchaAttr?.includes("&quot;provider&quot;:&quot;turnstile&quot;,&quot;siteKey&quot;:&quot;1x00000000000000000000AA&quot;,&quot;theme&quot;:&quot;dark&quot;,&quot;action&quot;:&quot;contact_submit&quot;,&quot;onPendingSubmit&quot;:&quot;auto&quot;") &&
+      captchaWizardShell.includes("data-rf-captcha") &&
+      /<section[^>]*data-pane="1"[\s\S]*data-rf-captcha[\s\S]*<\/section>/.test(captchaWizardShell),
+  );
+  check("no captcha data-* leaks when the block is absent", !shell.includes("data-captcha") && !shell.includes("rf-captcha"));
 
   /* ---- legacy copy.back / copy.next no longer reach markup ---- */
   const legacyCopyShell = renderFormShell({

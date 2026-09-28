@@ -362,6 +362,18 @@
     color: var(--rf-description-color, var(--rf-muted, #6b7280));
   }
 
+  /* CAPTCHA widget slot (`data-rf-captcha`) — the provider script injects its
+     challenge iframe here at runtime. The min-height reserves the space while
+     it loads so the submit row below never jumps. */
+  .rf-captcha {
+    grid-column: span 12;
+    margin: var(--rf-captcha-margin, 0.125rem 0 0);
+    min-height: var(--rf-captcha-min-height, 65px);
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+  }
+
 /* ---- Contact form shell (namespaced; themeable via --rf-* custom props) ---- */
 
   /* Default theme — generic, compact, light. Hosts override any --rf-*
@@ -460,6 +472,9 @@
     --rf-callout-danger-bg: #fef2f2;
     --rf-callout-danger-border: #fca5a5;
     --rf-callout-danger-color: #7f1d1d;
+    /* CAPTCHA widget slot — margin + reserved height while the challenge loads */
+    --rf-captcha-margin: 0.125rem 0 0;
+    --rf-captcha-min-height: 65px;
   }
 
   .rf-form {

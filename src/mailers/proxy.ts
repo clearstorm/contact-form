@@ -18,7 +18,7 @@ import { configErrorMessage, errorMessage, type Mailer, type MailerResult } from
 export function proxyMailer(provider: "resend" | "postmark" | "sendgrid"): Mailer {
   return {
     name: provider,
-    async submit({ data, fields, config }): Promise<MailerResult> {
+    async submit({ data, fields, config, captcha }): Promise<MailerResult> {
       const endpoint = config.endpoint ?? "/api/contact";
 
       const response = await fetch(endpoint, {
@@ -29,6 +29,9 @@ export function proxyMailer(provider: "resend" | "postmark" | "sendgrid"): Maile
           formId: config.formId,
           to: config.to,
           payload: canonicalObject(data, fields),
+          // Optional anti-bot token — the proxy's siteverify gate reads these
+          // two fields (see `CaptchaSpec` + `docs/transport-proxies.md`).
+          ...(captcha ? { captchaToken: captcha.token, captchaProvider: captcha.provider } : {}),
         }),
       });
 

@@ -1050,5 +1050,46 @@ check(
   JSON.stringify(tErr),
 );
 
+// --- 7c. M13: the captcha token rides proxy envelopes only ---
+const proxyCaptchaOk = await getMailer("resend").submit({
+  data: raw,
+  fields,
+  config: { endpoint: "https://api.example.test/contact", to: "team@example.test", formId: "30" },
+  captcha: { provider: "turnstile", token: "tok_abc" },
+});
+check("resend proxy ok with a captcha token", proxyCaptchaOk.ok === true, JSON.stringify(proxyCaptchaOk));
+const proxyCaptchaBody = JSON.parse(String(fetched[fetched.length - 1].body));
+check(
+  "proxy-only envelope appends captchaToken + captchaProvider",
+  proxyCaptchaBody.captchaToken === "tok_abc" && proxyCaptchaBody.captchaProvider === "turnstile",
+  JSON.stringify(proxyCaptchaBody),
+);
+
+await getMailer("custom").submit({
+  data: raw,
+  fields,
+  config: { formId: "z10", target: "cf7" },
+  captcha: { provider: "hcaptcha", token: "tok_h" },
+});
+const targetCaptchaBody = JSON.parse(String(fetched[fetched.length - 1].body));
+check(
+  "target-tagged envelope appends the captcha fields too",
+  targetCaptchaBody.captchaToken === "tok_h" && targetCaptchaBody.captchaProvider === "hcaptcha",
+  JSON.stringify(targetCaptchaBody),
+);
+
+await getMailer("json").submit({
+  data: raw,
+  fields,
+  config: { endpoint: "https://direct.test/x", formId: "9" },
+  captcha: { provider: "turnstile", token: "tok_d" },
+});
+const directBody = fetched[fetched.length - 1].body;
+check(
+  "direct (non-target) json never leaks captcha fields",
+  directBody instanceof FormData && !Object.fromEntries(directBody.entries()).captchaToken,
+  String(directBody),
+);
+
 console.log(failures === 0 ? "\nALL PASS" : `\n${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);

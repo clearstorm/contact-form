@@ -28,6 +28,7 @@ import {
   type FormFieldSpec,
   type FormSpec,
   type CalloutSpec,
+  type CaptchaSpec,
   type HtmlSpec,
   type RepeaterSpec,
   type StepHeaderSpec,
@@ -56,6 +57,29 @@ const attr = (name: string, value: unknown, when = true): string => {
   if (!when || value === undefined || value === null || value === false) return "";
   return value === true ? ` ${name}` : ` ${name}="${esc(value)}"`;
 };
+
+/**
+ * Serialise a `FormSpec.captcha` block for `data-captcha` (present keys only —
+ * the engine fills defaults). The `siteKey` is public by design and belongs in
+ * the client markup; the matching provider secret never leaves the server.
+ */
+const serializeCaptcha = (captcha: CaptchaSpec | undefined): string | undefined => {
+  if (!captcha) return undefined;
+  const out: Record<string, string> = { provider: captcha.provider, siteKey: captcha.siteKey };
+  if (captcha.theme !== undefined) out.theme = captcha.theme;
+  if (captcha.action !== undefined) out.action = captcha.action;
+  if (captcha.onPendingSubmit !== undefined) out.onPendingSubmit = captcha.onPendingSubmit;
+  return JSON.stringify(out);
+};
+
+/**
+ * The CAPTCHA widget slot — the builder-emitted mount point the engine fills
+ * (`data-rf-captcha`). It sits after the fields and before the submit row
+ * (single-page) or inside the final wizard pane, so the challenge only ever
+ * appears next to the "send" action.
+ */
+const renderCaptchaSlot = (): string =>
+  `<div class="rf-captcha" data-rf-captcha role="group" aria-label="Security check"></div>`;
 
 /* ---- Field markup (was FormField.astro) ---- */
 
@@ -539,6 +563,7 @@ export function renderFormShell({ form, config = {}, prefill }: ShellOptions): s
     `${attr("data-mailer-method", mailerMethod)}${attr("data-mailer-headers", mailerHeaders)}` +
     `${attr("data-form-token", formToken)}${attr("data-to", mailerTo)}` +
     `${attr("data-mailer-target", mailerTarget)}` +
+    `${attr("data-captcha", serializeCaptcha(form.captcha))}` +
     `${attr("data-autosave", autoSaveKey)}${attr("data-validate-on", validateOn)}` +
     ` data-rules="${esc(serializeRules(fieldConfig))}"` +
     `${attr("data-copy", form.copy ? JSON.stringify(form.copy) : undefined)}` +
@@ -588,6 +613,9 @@ export function renderFormShell({ form, config = {}, prefill }: ShellOptions): s
           `</header>`;
       }
       out += renderElements(step.elements, form.name, form.copy);
+      // CAPTCHA slot — inside the final pane only, so the challenge shows up
+      // next to the send action rather than on every step.
+      if (form.captcha && i === layout.steps.length - 1) out += renderCaptchaSlot();
       out += `</section>`;
     });
 
@@ -603,6 +631,7 @@ export function renderFormShell({ form, config = {}, prefill }: ShellOptions): s
   } else {
     /* ---- single-page ---- */
     out += renderElements(flatElements, form.name, form.copy);
+    if (form.captcha) out += renderCaptchaSlot();
     out +=
       `<div class="rf-submit-row">` +
       `<button class="rf-submit rf-submit--${submitVariant}" type="submit">${esc(singleSubmitLabel)} <span aria-hidden="true">→</span></button>` +

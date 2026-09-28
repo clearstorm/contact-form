@@ -42,6 +42,7 @@ import {
   type VisibilityConditionLike,
 } from "../core";
 import { resolveAnalytics, type AnalyticsAttachment } from "./analytics";
+import { mountCaptcha, parseCaptchaSpec, type CaptchaController } from "./captcha";
 import { getMailer, mailerSpecName, type MailerConfig } from "../mailers";
 import {
   applyDraft,
@@ -143,7 +144,8 @@ export type FormEventName =
   | "rf:validation-error"
   | "rf:submit-start"
   | "rf:submit-success"
-  | "rf:submit-error";
+  | "rf:submit-error"
+  | "rf:captcha-error";
 
 /** The result of `attachForm`: a detach-safe event subscription + cleanup. */
 export interface AttachedForm {
@@ -151,6 +153,15 @@ export interface AttachedForm {
   on(event: FormEventName, handler: (event: CustomEvent) => void): void;
   /** Remove every listener (incl. `on` subscriptions) and injected error DOM. */
   detach(): void;
+}
+
+/** Runtime state for a mounted CAPTCHA — the engine's submit-gate handle. */
+interface CaptchaRuntime {
+  handle: CaptchaController;
+  /** `onPendingSubmit` resolution — "block" shows copy, "auto" queues the submit. */
+  mode: "block" | "auto";
+  /** True while an "auto"-mode submit waits for the challenge to complete. */
+  pending: boolean;
 }
 
 /* ---- Field error state ---- */
@@ -527,6 +538,8 @@ async function handleSubmit(
   markSubmitAttempt?: () => void,
   /** Runtime config overrides — win over the shell's `data-*` attributes. */
   configOverride?: Partial<MailerConfig>,
+  /** Mounted CAPTCHA state — gates the submit on a challenge token. */
+  captchaRuntime?: CaptchaRuntime,
 ): Promise<void> {
   const form = event.currentTarget;
   if (!(form instanceof HTMLFormElement)) return;
@@ -626,6 +639,36 @@ async function handleSubmit(
     }
   }
 
+  /* ---- CAPTCHA gate ----
+     A challenge token must resolve before anything — lifecycle hooks,
+     `rf:submit-start`, the mailer — fires. Widget challengers (turnstile /
+     hcaptcha) gate on completion: "block" (default) shows the required-copy
+     and holds; "auto" queues the submit for the moment the challenge
+     completes. reCAPTCHA v3 executes inline — a missing result means the
+     provider failed. */
+  let captchaToken: string | undefined;
+  if (captchaRuntime) {
+    const token = captchaRuntime.handle.isWidget
+      ? captchaRuntime.handle.getToken()
+      : await captchaRuntime.handle.token();
+    if (token !== undefined) {
+      captchaToken = token;
+    } else if (captchaRuntime.handle.isWidget && captchaRuntime.mode === "auto") {
+      captchaRuntime.pending = true;
+      return;
+    } else if (captchaRuntime.handle.isWidget) {
+      const message = copy.captchaRequired ?? "Please complete the security check before sending.";
+      showError(status, message);
+      emit("rf:captcha-error", { name: formName, id: formId, message });
+      return;
+    } else {
+      const message = copy.captchaFailed ?? "Security check failed — please try again.";
+      showError(status, message);
+      emit("rf:captcha-error", { name: formName, id: formId, message });
+      return;
+    }
+  }
+
   const originalLabel = button?.textContent ?? "";
   const sendingLabel = copy.sending ?? "Sending…";
   const setSending = (sending: boolean): void => {
@@ -666,6 +709,9 @@ async function handleSubmit(
       // from this list, so hidden conditional fields are excluded outright.
       fields: visibility.visibleFields(),
       config,
+      // The challenge token rides the context so proxy mailers can append it
+      // (`captchaToken` / `captchaProvider`) for the route's siteverify gate.
+      captcha: captchaRuntime && captchaToken ? { provider: captchaRuntime.handle.provider, token: captchaToken } : undefined,
     });
     if (result.ok) {
       ok = true;
@@ -675,6 +721,9 @@ async function handleSubmit(
         showSuccess(status, successMessage);
       }
       form.reset();
+      // Challenge tokens are single-use — retire the current token right after
+      // a successful dispatch so the next submission starts fresh.
+      captchaRuntime?.handle.reset();
       controls.forEach((control) => clearError(control));
       clearRepeaterErrors(form);
       emit("rf:submit-success", { name: formName, id: formId, message: successMessage });
@@ -880,6 +929,65 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): Att
   if (opts.analytics !== undefined) analytics = opts.analytics === false ? undefined : opts.analytics;
   else analytics = resolveAnalytics(spec?.analytics);
   const analyticsStop = analytics?.attach(form);
+
+  /* ---- CAPTCHA (`spec.captcha` / shell `data-captcha`) ----
+     Resolution order: the spec's block wins, then the serialised `data-captcha`
+     (so the specless `initForms` path honours the markup alone). The widget
+     mounts into the builder-emitted `[data-rf-captcha]` slot — custom markup
+     without one gets the standard slot minted before the submit row. The
+     submit gate + the single-use-token reset live in `handleSubmit`; `detach`
+     destroys the handle like every other listener. */
+  let captchaRuntime: CaptchaRuntime | undefined;
+  const captchaSpec = spec?.captcha ?? parseCaptchaSpec(form.dataset.captcha);
+  if (captchaSpec) {
+    let slot = form.querySelector<HTMLElement>("[data-rf-captcha]");
+    if (!slot) {
+      slot = document.createElement("div");
+      slot.className = "rf-captcha";
+      slot.setAttribute("data-rf-captcha", "");
+      slot.setAttribute("role", "group");
+      slot.setAttribute("aria-label", "Security check");
+      const submitRow = form.querySelector<HTMLElement>(".rf-submit-row");
+      (submitRow ?? form).append(slot);
+    }
+    captchaRuntime = {
+      mode: captchaSpec.onPendingSubmit ?? "block",
+      pending: false,
+      handle: mountCaptcha(slot, captchaSpec, {
+        onResolved: () => {
+          // "auto": a submission queued while the challenge was pending —
+          // re-run the full submit path now that a fresh token is stored.
+          if (captchaRuntime && captchaRuntime.mode === "auto" && captchaRuntime.pending) {
+            captchaRuntime.pending = false;
+            form.requestSubmit();
+          }
+        },
+        onExpired: () => {
+          // Token gone (single-use / time-boxed): drop any queued submit so we
+          // never dispatch on a dead token — and tell the visitor why.
+          if (!captchaRuntime || !captchaRuntime.pending) return;
+          captchaRuntime.pending = false;
+          const message = copy.captchaExpired ?? "The security check expired — please try again.";
+          showError(status, message);
+          emit("rf:captcha-error", { name: form.dataset.mailForm ?? "", id: form.id, message });
+        },
+        onError: () => {
+          if (!captchaRuntime || !captchaRuntime.pending) return;
+          captchaRuntime.pending = false;
+          const message = copy.captchaFailed ?? "Security check failed — please try again.";
+          showError(status, message);
+          emit("rf:captcha-error", { name: form.dataset.mailForm ?? "", id: form.id, message });
+        },
+      }),
+    };
+    // A captcha is only worth anything when the token reaches a verifying
+    // proxy — a direct mailer would silently ship untrusted submissions.
+    if (mailerName !== "resend" && mailerName !== "postmark" && mailerName !== "sendgrid" && !form.dataset.mailerTarget) {
+      console.warn(
+        `[contact-form] "${form.dataset.mailForm ?? form.id}" pairs a captcha with the direct "${mailerName}" mailer — the token is only verified by a proxy route. Use a proxy-only mailer or "custom" + target (docs/transport-proxies.md).`,
+      );
+    }
+  }
 
   // Resolve a lifecycle hook: the inline canonical key wins; else the spec's
   // hook-ref *name*, looked up in the options' named registry.
@@ -1188,7 +1296,7 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): Att
 
   on(form, "submit", (event) => {
     if (!isWizard) {
-      void handleSubmit(event, fields, rules, mailerName, successMessage, copy, visibilityForSubmit, undefined, validateControl, submitHooks, autoSuccess, markSubmitAttempt, opts.config);
+      void handleSubmit(event, fields, rules, mailerName, successMessage, copy, visibilityForSubmit, undefined, validateControl, submitHooks, autoSuccess, markSubmitAttempt, opts.config, captchaRuntime);
       return;
     }
     // Wizard: the submit button advances to the next *visible* step; the last
@@ -1214,7 +1322,7 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): Att
       goTo(nextStep);
       return;
     }
-    void handleSubmit(event, fields, rules, mailerName, successMessage, copy, visibilityForSubmit, stepControls, validateControl, submitHooks, autoSuccess, markSubmitAttempt, opts.config);
+    void handleSubmit(event, fields, rules, mailerName, successMessage, copy, visibilityForSubmit, stepControls, validateControl, submitHooks, autoSuccess, markSubmitAttempt, opts.config, captchaRuntime);
   });
 
   // Stepper: completed steps are clickable and jump back without validation
@@ -1471,6 +1579,7 @@ export function attachForm(form: HTMLFormElement, opts: AttachOptions = {}): Att
     detach() {
       if (saveTimer) clearTimeout(saveTimer);
       analyticsStop?.detach();
+      captchaRuntime?.handle.destroy();
       for (const [target, byType] of listeners) {
         for (const [type, handlers] of byType) {
           for (const handler of handlers) target.removeEventListener(type, handler as EventListener);

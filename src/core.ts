@@ -206,6 +206,47 @@ export interface AnalyticsSpec {
 }
 
 /**
+ * Client-side anti-bot challengers. The spec holds only *public* values — the
+ * `siteKey` is meant to ship in the browser; the matching provider *secret*
+ * lives strictly server-side (see `docs/transport-proxies.md`).
+ */
+export type CaptchaProvider = "turnstile" | "recaptcha-v3" | "hcaptcha";
+
+/**
+ * Declarative CAPTCHA / bot protection — an optional top-level `FormSpec`
+ * block. When present the engine mounts the provider's challenge into the
+ * shell's `[data-rf-captcha]` slot and, on submit, hands the challenge token
+ * to the mailer so a proxied `/api/contact` route can verify it against the
+ * provider's `siteverify` API before dispatching.
+ *
+ * `turnstile` and `hcaptcha` render a visible widget the visitor completes;
+ * `recaptcha-v3` is invisible and executes a token on submit. The block is
+ * **serialised** as `data-captcha` on the shell (the `siteKey` is public by
+ * design), so the specless `initForms` path resolves it too — unlike
+ * `analytics`, this is declarative visible UI, not a silent side-effect seam.
+ */
+export interface CaptchaSpec {
+  /** The challenger: `"turnstile"` (default widget flow) | `"recaptcha-v3"` | `"hcaptcha"`. */
+  provider: CaptchaProvider;
+  /** Public site key from the provider dashboard — safe in the client spec. */
+  siteKey: string;
+  /** Widget theme. Defaults to `"auto"` (follows `prefers-color-scheme`). */
+  theme?: "light" | "dark" | "auto";
+  /** Optional action tag (reCAPTCHA v3 always; Turnstile passes it through). */
+  action?: string;
+  /**
+   * What the engine does when the visitor presses send before a *visible*
+   * widget challenge completes:
+   * - `"block"` (default) — show the `captchaRequired` copy and keep the form
+   *   until the challenge is completed, then the visitor submits again.
+   * - `"auto"` — queue the submission and re-submit the moment the challenge
+   *   completes (full re-validation with fresh values).
+   * reCAPTCHA v3 is unaffected — it always executes a token inline.
+   */
+  onPendingSubmit?: "block" | "auto";
+}
+
+/**
  * Visitor-facing copy for a form. Every key is optional — when absent the
  * package's built-in default is used. Overrides win per field in this order:
  * `FormFieldSpec.message` → `FormCopy[key]` → built-in default.
@@ -254,6 +295,12 @@ export interface FormCopy {
   configError?: string;
   /** HTTP-error fallback; `{status}` is replaced with the response status. */
   submitError?: string;
+  /** A visible challenge wasn't completed when the visitor pressed send (`onPendingSubmit: "block"`). */
+  captchaRequired?: string;
+  /** The challenge token could not be obtained or verified client-side. */
+  captchaFailed?: string;
+  /** The rendered challenge expired and needs re-solving (optional comfort copy). */
+  captchaExpired?: string;
 }
 
 /* ---- Conditional fields (showWhen) ---- */
@@ -803,6 +850,17 @@ export interface FormSpec {
    * it (see `AnalyticsSpec`).
    */
   analytics?: AnalyticsSpec;
+  /**
+   * Optional client-side anti-bot challenge (`turnstile` / `recaptcha-v3` /
+   * `hcaptcha`). When present the engine mounts the provider's widget into the
+   * shell, gates the submit on a challenge token and forwards that token to
+   * proxied mailers (`custom` + `target`, `resend`/`postmark`/`sendgrid`) as
+   * `captchaToken` / `captchaProvider` — a `/api/contact` route then verifies
+   * it server-side before dispatching (see `CaptchaSpec` and
+   * `docs/transport-proxies.md`). The `siteKey` is public; the matching secret
+   * lives in the consumer's `.env`.
+   */
+  captcha?: CaptchaSpec;
   /**
    * Opt-in draft persistence: the engine saves the visitor's in-scope values
    * (plus the current wizard step) to localStorage as they type, restores them

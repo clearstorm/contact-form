@@ -2034,5 +2034,206 @@ check(
   JSON.stringify(calls[calls.length - 1]),
 );
 
+/* ---- 15. M13: CAPTCHA gate (Turnstile widget + reCAPTCHA v3) ---- */
+
+// Fake provider globals: `mountCaptcha` short-circuits its script loading
+// whenever the provider global already exists, so happy-dom never touches a
+// real CDN. `widgetOpts` is (re)bound by every form's render call — re-await
+// it after each attach to target the right form's widget.
+let widgetOpts: Record<string, any> | null = null;
+let widgetResets = 0;
+let widgetRemoves = 0;
+(window as unknown as Record<string, unknown>).turnstile = {
+  render: (_el: HTMLElement, opts: Record<string, unknown>) => {
+    widgetOpts = opts;
+    return "w1";
+  },
+  reset: () => {
+    widgetResets++;
+  },
+  remove: () => {
+    widgetRemoves++;
+  },
+};
+let v3Executions = 0;
+(window as unknown as Record<string, unknown>).grecaptcha = {
+  ready: (cb: () => void) => cb(),
+  execute: async () => {
+    v3Executions++;
+    return "v3-token";
+  },
+};
+
+// A proxied `custom` + `target` form — the path that carries the captcha
+// token in the envelope (matching the "Contact — Turnstile-protected CF7"
+// demo form).
+const captchaProxyMailer = { provider: "custom", formId: "z10", target: "cf7", endpoint: "/api/contact" };
+const captchaFields = [
+  { type: "text", id: "name", name: "name", label: "Name", required: true },
+  { type: "email", id: "email", name: "email", label: "Email", required: true },
+];
+const fillRequired = (f: HTMLFormElement): void => {
+  input(f, "name").value = "Jane";
+  input(f, "email").value = "jane@example.com";
+};
+
+// Block mode (default — `onPendingSubmit` absent): pressing send with an
+// unsolved widget shows the required copy, fires `rf:captcha-error` and never
+// dispatches.
+form = mount(
+  renderFormShell({
+    form: {
+      name: "cap-block",
+      submit: "Send",
+      status: "Thanks!",
+      mailer: captchaProxyMailer,
+      captcha: { provider: "turnstile", siteKey: "1x00000000000000000000AA" },
+      fields: captchaFields,
+    },
+  }),
+);
+let captchaErrorCount = 0;
+form.addEventListener("rf:captcha-error", () => captchaErrorCount++);
+attachForm(form);
+await until(() => widgetOpts !== null);
+const blockBefore = calls.length;
+fillRequired(form);
+submit(form);
+check(
+  "block mode holds an unsolved widget — no dispatch, required copy, rf:captcha-error",
+  await until(() => captchaErrorCount === 1) &&
+    calls.length === blockBefore &&
+    /security check/i.test(find(form, ".rf-status")!.textContent ?? ""),
+  `errors=${captchaErrorCount} calls=${calls.length} status=${find(form, ".rf-status")!.textContent}`,
+);
+
+// Completing the challenge and pressing send again dispatches the envelope
+// with captchaToken + captchaProvider; success retires the single-use token.
+(widgetOpts?.callback as (t: string) => void)("tok-1");
+submit(form);
+check(
+  "solved widget submits; the envelope carries the token + provider",
+  await until(() => calls.length === blockBefore + 1),
+  `calls=${calls.length}`,
+);
+const captchaEnvelope = JSON.parse(String(calls[calls.length - 1].data));
+check(
+  "captchaToken/captchaProvider ride the proxy envelope",
+  captchaEnvelope.captchaToken === "tok-1" && captchaEnvelope.captchaProvider === "turnstile",
+  JSON.stringify(captchaEnvelope),
+);
+check("success resets the widget (single-use token)", await until(() => widgetResets === 1), `resets=${widgetResets}`);
+
+// Auto mode: pressing send before the challenge queues the submit; completing
+// the widget re-runs the full submit path with the fresh token.
+form = mount(
+  renderFormShell({
+    form: {
+      name: "cap-auto",
+      submit: "Send",
+      status: "Thanks!",
+      mailer: captchaProxyMailer,
+      captcha: { provider: "turnstile", siteKey: "1x00000000000000000000AA", onPendingSubmit: "auto" },
+      fields: captchaFields,
+    },
+  }),
+);
+let autoErrors = 0;
+form.addEventListener("rf:captcha-error", () => autoErrors++);
+attachForm(form);
+await until(() => widgetOpts !== null);
+const autoBefore = calls.length;
+fillRequired(form);
+submit(form);
+await tick();
+check(
+  "auto mode queues a pending-widget submit — no dispatch, no error copy",
+  calls.length === autoBefore && autoErrors === 0 && find(form, ".rf-status")!.hidden,
+  `calls=${calls.length} errors=${autoErrors}`,
+);
+(widgetOpts?.callback as (t: string) => void)("tok-2");
+check(
+  "auto mode re-submits the moment the challenge completes",
+  await until(() => {
+    if (calls.length !== autoBefore + 1) return false;
+    const body = JSON.parse(String(calls[calls.length - 1].data));
+    return body.captchaToken === "tok-2" && body.captchaProvider === "turnstile";
+  }),
+  `calls=${calls.length}`,
+);
+
+// Expiry drops a queued auto submit and informs the visitor.
+form = mount(
+  renderFormShell({
+    form: {
+      name: "cap-expire",
+      submit: "Send",
+      status: "Thanks!",
+      mailer: captchaProxyMailer,
+      captcha: { provider: "turnstile", siteKey: "1x00000000000000000000AA", onPendingSubmit: "auto" },
+      fields: captchaFields,
+    },
+  }),
+);
+attachForm(form);
+await until(() => widgetOpts !== null);
+const expBefore = calls.length;
+fillRequired(form);
+submit(form);
+await tick();
+(widgetOpts?.["expired-callback"] as () => void)();
+check(
+  "expiry drops the queued submit and tells the visitor",
+  calls.length === expBefore && /expired/i.test(find(form, ".rf-status")!.textContent ?? ""),
+  `calls=${calls.length} status=${find(form, ".rf-status")!.textContent}`,
+);
+
+// reCAPTCHA v3 is invisible — it executes an inline token on submit and the
+// envelope carries it like any other provider.
+form = mount(
+  renderFormShell({
+    form: {
+      name: "cap-v3",
+      submit: "Send",
+      status: "Thanks!",
+      mailer: captchaProxyMailer,
+      captcha: { provider: "recaptcha-v3", siteKey: "6LeSAMPLE000000000000", action: "contact" },
+      fields: captchaFields,
+    },
+  }),
+);
+attachForm(form);
+const v3Before = calls.length;
+fillRequired(form);
+submit(form);
+check(
+  "reCAPTCHA v3 executes an inline token and dispatches",
+  await until(() => {
+    if (calls.length !== v3Before + 1) return false;
+    const body = JSON.parse(String(calls[calls.length - 1].data));
+    return body.captchaProvider === "recaptcha-v3" && body.captchaToken === "v3-token";
+  }),
+  `calls=${calls.length}`,
+);
+check("v3 executed exactly once", v3Executions === 1, `v3Executions=${v3Executions}`);
+
+// detach() unmounts the widget through the provider's remove API.
+form = mount(
+  renderFormShell({
+    form: {
+      name: "cap-detach",
+      submit: "Send",
+      status: "Thanks!",
+      mailer: captchaProxyMailer,
+      captcha: { provider: "turnstile", siteKey: "1x00000000000000000000AA" },
+      fields: captchaFields,
+    },
+  }),
+);
+const attachedCaptcha = attachForm(form);
+await until(() => widgetOpts !== null);
+attachedCaptcha.detach();
+check("detach unmounts the widget", widgetRemoves === 1, `removes=${widgetRemoves}`);
+
 console.log(failures === 0 ? "\nENGINE ALL PASS" : `\nENGINE ${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);

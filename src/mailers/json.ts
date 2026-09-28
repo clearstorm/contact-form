@@ -19,7 +19,7 @@ import type { Mailer, MailerResult } from "./index";
 
 export const jsonMailer: Mailer = {
   name: "json",
-  async submit({ data, fields, config }): Promise<MailerResult> {
+  async submit({ data, fields, config, captcha }): Promise<MailerResult> {
     const endpoint = config.endpoint ?? (config.target ? "/api/contact" : undefined);
     if (!endpoint) {
       return {
@@ -37,6 +37,9 @@ export const jsonMailer: Mailer = {
             formId: config.formId,
             to: config.to,
             payload: canonicalObject(data, fields),
+            // Interleaved in the proxy envelope only (target mode) — `captcha`
+            // is meaningless to a plain endpoint, so the direct path stays as-is.
+            ...(captcha ? { captchaToken: captcha.token, captchaProvider: captcha.provider } : {}),
           }),
         })
       : await fetch(endpoint, {

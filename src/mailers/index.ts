@@ -16,7 +16,7 @@
  *   JSON to the consumer's `/api/contact` endpoint (see
  *   `docs/transport-proxies.md`); master keys never appear in the browser.
  */
-import type { FieldSpec, FormCopy, MailerProvider, MailerSpec, MailTarget } from "../core";
+import type { CaptchaProvider, FieldSpec, FormCopy, MailerProvider, MailerSpec, MailTarget } from "../core";
 import { cf7Mailer } from "./cf7";
 import { jsonMailer } from "./json";
 import { wpformsMailer } from "./wpforms";
@@ -69,6 +69,13 @@ export interface MailerContext {
   /** The client-side field spec (from data-rules). */
   fields: FieldSpec[];
   config: MailerConfig;
+  /**
+   * Challenge token from a `FormSpec.captcha` block. Proxy envelopes
+   * (`custom` + `target`, and the proxy-only mailers) append it as
+   * `captchaToken` / `captchaProvider` so the `/api/contact` route can run
+   * the provider's `siteverify` before dispatching; direct adapters ignore it.
+   */
+  captcha?: { provider: CaptchaProvider; token: string };
 }
 
 export interface Mailer {

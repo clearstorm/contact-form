@@ -252,8 +252,7 @@ export const POST: APIRoute = async ({ request }) => {
         return json({ error: `Unsupported provider: ${provider}` }, 400);
     }
   } catch (e: any) {
-    console.error("Internal server proxy error:", e);
-    return json({ error: `Internal server proxy error: ${e.message}` }, 500);
+    return json({ error: `Internal server proxy error` }, 500);
   }
 };
 

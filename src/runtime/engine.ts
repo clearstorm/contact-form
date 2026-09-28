@@ -652,6 +652,7 @@ async function handleSubmit(
     headers: configOverride?.headers ?? parseSerializedHeaders(form.dataset.mailerHeaders),
     formToken: configOverride?.formToken ?? form.dataset.formToken,
     to: configOverride?.to ?? form.dataset.to,
+    target: configOverride?.target ?? form.dataset.mailerTarget,
     copy,
   };
 
@@ -704,8 +705,8 @@ export interface AttachOptions {
   /**
    * Explicit transport overrides — win over the shell's `data-*` attributes
    * (endpoint trio + the mailer config extras: method / headers / formToken /
-   * to). Config-object mailers normally serialise onto the form at render, so
-   * this mostly matters for custom markup.
+   * to / target). Config-object mailers normally serialise onto the form at
+   * render, so this mostly matters for custom markup.
    */
   config?: Partial<MailerConfig>;
   /**

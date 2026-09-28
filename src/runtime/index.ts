@@ -64,4 +64,4 @@ export {
   type ValidationProvider,
 };
 
-export type { FormSpec, FormFieldSpec, AnalyticsProvider, AnalyticsSpec } from "../core";
+export type { FormSpec, FormFieldSpec, AnalyticsProvider, AnalyticsSpec, MailTarget } from "../core";

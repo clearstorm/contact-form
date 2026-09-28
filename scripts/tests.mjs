@@ -1008,5 +1008,47 @@ check("formspree missing formId → configError", fsNoCfg.ok === false && /form 
 const proxyNoCfg = await getMailer("resend").submit({ data: raw, fields, config: { endpoint: "https://missing.test/404" } });
 check("proxy 404 → configError mentions the proxy", proxyNoCfg.ok === false && /api\/contact/i.test(proxyNoCfg.message), JSON.stringify(proxyNoCfg));
 
+// --- 7b. M12: explicit `target` on the generic transport → proxy envelope ---
+await getMailer("custom").submit({
+  data: raw,
+  fields,
+  config: { formId: "z10", target: "cf7" },
+});
+const tCall = fetched[fetched.length - 1];
+check("target-tagged custom defaults to /api/contact", tCall.url === "/api/contact", tCall.url);
+const tBody = JSON.parse(String(tCall.body));
+check(
+  "target envelope carries provider=target + formId + canonical payload",
+  tBody.provider === "cf7" && tBody.formId === "z10" && tBody.payload.first_name === "Jane",
+  JSON.stringify(tBody),
+);
+
+await getMailer("custom").submit({
+  data: raw,
+  fields,
+  config: { endpoint: "https://proxy.test/contact", formId: "30-4d-al", target: "mailchimp", to: "team@example.test" },
+});
+const mcCall = fetched[fetched.length - 1];
+const mcBody = JSON.parse(String(mcCall.body));
+check(
+  "explicit endpoint + target forward formId + to",
+  mcCall.url === "https://proxy.test/contact" &&
+    mcBody.provider === "mailchimp" &&
+    mcBody.formId === "30-4d-al" &&
+    mcBody.to === "team@example.test",
+  JSON.stringify(mcBody),
+);
+
+const tErr = await getMailer("custom").submit({
+  data: raw,
+  fields,
+  config: { endpoint: "https://boom.test/nope", target: "cf7" },
+});
+check(
+  "target envelope failures surface the provider error body",
+  tErr.ok === false && tErr.message === "provider exploded",
+  JSON.stringify(tErr),
+);
+
 console.log(failures === 0 ? "\nALL PASS" : `\n${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);

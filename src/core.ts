@@ -77,6 +77,51 @@ export type MailerProvider =
   | "custom";
 
 /**
+ * Backend a `target`-tagged `custom` transport should dispatch to, resolved on
+ * the consumer's proxy (see `docs/transport-proxies.md`). Client-safe
+ * identifiers only — never URLs, never keys: when a deployment wants the
+ * provider's endpoint out of the browser entirely, `mailer.target` names the
+ * server-side backend and the `/api/contact` proxy forwards with its
+ * environment config. Covers every `MailerProvider` (any direct transport can
+ * be proxied the same way) plus backend-only targets (Mailchimp, Mailgun,
+ * Fluent Forms, …). The trailing `(string & {})` keeps the union open — the
+ * proxy owns dispatch, so a new/private backend never needs a package release.
+ */
+export type MailTarget =
+  | "cf7"
+  | "wpforms"
+  | "formspree"
+  | "formkeep"
+  | "getform"
+  // Email delivery / ESP
+  | "resend"
+  | "postmark"
+  | "sendgrid"
+  | "mailgun"
+  | "mailjet"
+  | "mandrill"
+  | "sparkpost"
+  | "ses"
+  | "smtp"
+  // Marketing / audience backends
+  | "mailchimp"
+  | "mailerlite"
+  | "brevo"
+  | "convertkit"
+  | "customerio"
+  | "klaviyo"
+  // WordPress form backends
+  | "fluentforms"
+  | "ninjaforms"
+  | "gravityforms"
+  | "forminator"
+  | "elementor"
+  // Generic / webhook
+  | "webhook"
+  // Extensible: unlisted / self-hosted targets pass through the proxy
+  | (string & {});
+
+/**
  * Client-safe transport config. Master API keys / server tokens are typed out
  * of this surface on purpose: anything the browser holds is public, so secrets
  * belong in the consumer's proxy environment instead. `formToken` is the
@@ -95,6 +140,17 @@ export interface MailerConfig {
    * slug, a Getform endpoint id, or the id a proxy worker should forward.
    */
   formId?: string;
+  /**
+   * Explicit server-side dispatch target for the generic `custom` transport:
+   * the provider identifier (`"cf7"`, `"resend"`, `"mailchimp"`, …) the
+   * consumer's `/api/contact` proxy should forward to. Client-safe identifiers
+   * only — the provider URL and keys live in the proxy environment, so the
+   * browser never sees them (see `MailTarget` and
+   * `docs/transport-proxies.md`). When set, the transport sends the proxy
+   * envelope `{ provider, formId, to, payload }` with `provider` =
+   * `target`; absent, it posts the plain canonical payload exactly as before.
+   */
+  target?: MailTarget;
   /** HTTP method for the generic transport (defaults to "POST"). */
   method?: "POST" | "PUT";
   /** Extra request headers (client-safe only — never Authorization / Cookie). */

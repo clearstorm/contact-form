@@ -1973,5 +1973,66 @@ check(
   calls[calls.length - 1]?.url,
 );
 
+/* ---- M12: explicit `target` dispatch tag through the shell + engine ---- */
+
+// A `mailer` config object may carry an explicit server-side dispatch `target`
+// (`"cf7"`, `"mailchimp"`, … — see `MailTarget`): the generic custom transport
+// POSTs the proxy envelope `{ provider: target, formId, to, payload }` so a
+// single /api/contact route can fan out to any backend while the provider URL
+// stays in the proxy environment. Absent `target`, the transport posts the
+// plain canonical payload as before (pinned by the M9 config-object tests).
+const targetSpec = {
+  name: "cfg-target",
+  submit: "Send",
+  status: "Thanks!",
+  mailer: { provider: "custom", formId: "z10", target: "cf7" },
+  fields: [{ type: "text", id: "name", name: "name", label: "Name", required: true, size: 50 }],
+} as const;
+
+form = mount(renderFormShell({ form: targetSpec }));
+const targetBefore = calls.length;
+attachForm(form);
+input(form, "name").value = "Jane";
+fire(input(form, "name"), "input");
+submit(form);
+check(
+  "target-tagged custom posts the proxy envelope to the default /api/contact",
+  await until(() => calls.length === targetBefore + 1 && calls[calls.length - 1].url === "/api/contact"),
+  calls[calls.length - 1]?.url,
+);
+const targetEnvelope =
+  typeof calls[calls.length - 1].data === "string" ? JSON.parse(String(calls[calls.length - 1].data)) : null;
+check(
+  "envelope carries provider=target + formId + canonical payload",
+  targetEnvelope?.provider === "cf7" &&
+    targetEnvelope?.formId === "z10" &&
+    targetEnvelope?.payload?.name === "Jane",
+  JSON.stringify(targetEnvelope),
+);
+check(
+  "shell serialises data-mailer-target",
+  form.dataset.mailerTarget === "cf7",
+  form.getAttribute("data-mailer-target") ?? "no data-mailer-target",
+);
+
+// A runtime `config` override beats the serialised shell target — and the
+// envelope follows suit (30-4d-al is the Mailchimp-style form id).
+form = mount(renderFormShell({ form: targetSpec }));
+const targetOverrideBefore = calls.length;
+attachForm(form, { config: { target: "mailchimp", formId: "30-4d-al" } });
+input(form, "name").value = "Jane";
+fire(input(form, "name"), "input");
+submit(form);
+check(
+  "runtime target override beats the shell and reroutes the envelope",
+  await until(() => {
+    const last = calls[calls.length - 1];
+    if (calls.length !== targetOverrideBefore + 1) return false;
+    const body = typeof last.data === "string" ? JSON.parse(String(last.data)) : null;
+    return body?.provider === "mailchimp" && body?.formId === "30-4d-al" && body?.payload?.name === "Jane";
+  }),
+  JSON.stringify(calls[calls.length - 1]),
+);
+
 console.log(failures === 0 ? "\nENGINE ALL PASS" : `\nENGINE ${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);

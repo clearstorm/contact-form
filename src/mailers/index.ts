@@ -16,7 +16,7 @@
  *   JSON to the consumer's `/api/contact` endpoint (see
  *   `docs/transport-proxies.md`); master keys never appear in the browser.
  */
-import type { FieldSpec, FormCopy, MailerProvider, MailerSpec } from "../core";
+import type { FieldSpec, FormCopy, MailerProvider, MailerSpec, MailTarget } from "../core";
 import { cf7Mailer } from "./cf7";
 import { jsonMailer } from "./json";
 import { wpformsMailer } from "./wpforms";
@@ -49,6 +49,13 @@ export interface MailerConfig {
   formToken?: string;
   /** Optional recipient hint forwarded to a proxy mail-delivery worker. */
   to?: string;
+  /**
+   * Explicit server-side dispatch target for the generic `custom` transport —
+   * the proxy's `provider` tag. When set, the transport sends the JSON proxy
+   * envelope `{ provider: target, formId, to, payload }`; absent, it posts the
+   * plain canonical payload (see `MailTarget` in `src/core.ts`).
+   */
+  target?: MailTarget;
   /**
    * Copy overrides threaded through from the form spec — the mailers fall
    * back to these for their visitor-facing messages before built-in defaults.

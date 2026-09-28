@@ -107,6 +107,21 @@ serialised into `data-*`, so specless wiring (`initForms`, a bare
 event (the `trackFieldErrors` signal). Flip `analytics-block` and
 `validation-error-event` when done.
 
+## M12 — explicit dispatch target + generic multi-provider proxy
+
+An optional `MailerConfig.target` (`MailTarget`: an open-ended union covering
+every `MailerProvider` plus backend-only targets — `mailchimp`, `mailgun`,
+`fluentforms`, `(string & {})` for private backends) lets the generic
+`custom`/`json` transport POST the proxy envelope `{ provider, formId, to,
+payload }` with `provider` = `target` (default endpoint `/api/contact`), so a
+**single generic `/api/contact` route** fans out to any backend and provider
+URLs + keys stay server-side in `.env` (`CF7_BACKEND_URL`, `RESEND_API_KEY`,
+`MAILCHIMP_*`, optional `ALLOWED_FORM_IDS` → 403). Absent `target`, the
+transport posts the plain canonical payload exactly as before. Serialised as
+`data-mailer-target`, overridable at attach; `docs/transport-proxies.md`
+becomes the generic dispatcher (Next.js + Astro, cf7/resend/postmark/sendgrid/
+mailchimp cases). Flip `mailer-target` when done.
+
 ## npm publishing
 
 The package is currently `private: true` and installed via immutable git tags.

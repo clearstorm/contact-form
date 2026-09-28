@@ -404,6 +404,26 @@ Cloudflare Worker / Netlify Function that receives the canonical payload and
 sends via your provider's API. For keyed providers that need a server-side
 secret, see [transport proxies](docs/transport-proxies.md).
 
+To keep the provider's URL and keys out of the browser entirely, tag a config
+object with an explicit server-side dispatch `target` (any `MailTarget`:
+`"cf7"`, `"resend"`, `"mailchimp"`, `"fluentforms"`, …). The transport then
+POSTs the proxy envelope (`{ provider: target, formId, to, payload }`) to
+`/api/contact` (default, same origin) and your generic route forwards:
+
+```jsonc
+"mailer": {
+  "provider": "custom",
+  "endpoint": "/api/contact",  // optional — defaults to /api/contact with a target
+  "formId": "z10",
+  "target": "cf7"
+}
+```
+
+The envelope's `provider` carries the target, so one `/api/contact` route can
+fan out to any backend (`switch (provider)`), while every URL and master key
+stays server-side in `.env`. See
+[Generic multi-provider dispatch](docs/transport-proxies.md#generic-multi-provider-dispatch).
+
 ---
 
 ## Direct public adapters
@@ -441,10 +461,16 @@ canonical payload; see the CF7 payload policy below for how extras fold into
 `resend`, `postmark` and `sendgrid` are **proxy-only**: the browser never
 holds a key. The client POSTs a small JSON envelope
 (`{ provider, formId, to, payload }`) to your `/api/contact` endpoint (default,
-same origin), and a worker forwards it with its environment key. Runnable
-Next.js + Astro boilerplate lives in
-[`docs/transport-proxies.md`](docs/transport-proxies.md) — including how the
-old Nodemailer/SMTP worker idea maps onto the same contract.
+same origin), and a worker forwards it with its environment key. The same
+envelope — with `provider` carrying the [explicit dispatch
+target](docs/transport-proxies.md#generic-multi-provider-dispatch) from
+`mailer.target` — is what the generic `custom` transport sends when a `target`
+is set, so **any** provider (CF7, Mailchimp, Mailgun, Fluent Forms, …) can be
+routed through that one route with its URL and secrets kept server-side.
+Runnable Next.js + Astro boilerplate lives in
+[`docs/transport-proxies.md`](docs/transport-proxies.md) — including an optional
+`ALLOWED_FORM_IDS` whitelist guardrail and how the old Nodemailer/SMTP worker
+idea maps onto the same contract.
 
 ---
 

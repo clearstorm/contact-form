@@ -376,9 +376,9 @@ export interface ShellOptions {
 export function warnMissingConfig(
   formName: string,
   mailerName: string,
-  config: { endpoint?: string; apiUrl?: string; formId?: string },
+  config: { endpoint?: string; apiUrl?: string; formId?: string; target?: string },
 ): void {
-  const { endpoint, apiUrl, formId } = config;
+  const { endpoint, apiUrl, formId, target } = config;
   const missing: string[] = [];
   switch (mailerName) {
     case "cf7":
@@ -398,7 +398,9 @@ export function warnMissingConfig(
       break;
     case "json":
     case "custom":
-      if (!endpoint) missing.push("an `endpoint` (Formspree-style or your API)");
+      // A `target`-tagged custom transport is proxy-dispatch mode: the
+      // endpoint defaults to /api/contact (same origin), so no warning.
+      if (!endpoint && !target) missing.push("an `endpoint` (Formspree-style or your API)");
       break;
     case "resend":
     case "postmark":
@@ -500,6 +502,7 @@ export function renderFormShell({ form, config = {}, prefill }: ShellOptions): s
     : undefined;
   const formToken = mailerSpec?.formToken;
   const mailerTo = mailerSpec?.to;
+  const mailerTarget = mailerSpec?.target;
 
   // Opt-in draft persistence (`autoSave`): `true` scopes the draft to the form
   // name; a string names the exact localStorage key. Absent → no data-autosave.
@@ -535,6 +538,7 @@ export function renderFormShell({ form, config = {}, prefill }: ShellOptions): s
     `${attr("data-wp-url", wpUrl)}${attr("data-form-id", formIdAttr)}` +
     `${attr("data-mailer-method", mailerMethod)}${attr("data-mailer-headers", mailerHeaders)}` +
     `${attr("data-form-token", formToken)}${attr("data-to", mailerTo)}` +
+    `${attr("data-mailer-target", mailerTarget)}` +
     `${attr("data-autosave", autoSaveKey)}${attr("data-validate-on", validateOn)}` +
     ` data-rules="${esc(serializeRules(fieldConfig))}"` +
     `${attr("data-copy", form.copy ? JSON.stringify(form.copy) : undefined)}` +

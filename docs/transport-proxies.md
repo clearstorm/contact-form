@@ -46,10 +46,11 @@ Two client paths produce this envelope:
 }
 ```
 
-The `formId` can be any string your proxy understands — a CF7 form id
-(`"z10"`), a Mailchimp-campaign-ish reference (`"30-4d-al"`), etc. It is the
-value the route's whitelist guardrail checks and, for CF7, the id that ends up
-in the WordPress endpoint path.
+The `formId` can be any string your proxy understands — a Mailchimp-campaign-ish
+reference (`"30-4d-al"`), a demo id (`"demo-form"`), etc. It is the value the
+route's whitelist guardrail checks and, for CF7, the id that ends up in the
+WordPress endpoint path — **CF7 form ids are the numeric ids from wp-admin**
+(the id in the form's shortcode), not arbitrary strings.
 
 ## Server-side environment (`.env`)
 
@@ -157,8 +158,25 @@ Sending the exact envelope the client produces:
 ```bash
 curl -XPOST http://localhost:4321/api/contact \
   -H 'content-type: application/json' \
-  -d '{"provider":"cf7","formId":"z10","payload":{"first_name":"Jane","email":"jane@example.test"}}'
+  -d '{"provider":"cf7","formId":"5","payload":{"first_name":"Jane","last_name":"Doe","email":"jane@example.com","subject":"Proxy test","message":"Sent through the proxy."}}'
 ```
+
+### CF7 integration notes
+
+Two WordPress-side behaviours routinely confuse first-time setups:
+
+- **`formId` must be a real CF7 form id.** A formId that names no form on the
+  site makes the feedback route answer `rest_no_route` — *"No route was found
+  matching the URL and request method."* (HTTP 404).
+- **The payload field names must match the CF7 form's own field tags.** CF7
+  silently drops payload keys it doesn't recognize and runs validation over
+  the rest, so a missing required field surfaces CF7's own `validation_failed`
+  message — *"One or more fields have an error. Please check and try again."*
+  — with the offending field names in `invalid_fields`. The proxy forwards
+  that message verbatim. Add/rename spec fields until the form answers
+  `status: "mail_sent"`; CF7's `email` rule also rejects malformed addresses
+  (e.g. `a@b.c`), so use a real email when testing. The routes already append
+  the `_wpcf7_unit_tag` the feedback endpoint expects.
 
 > Security notes: the client sends `formId` + `provider` plus the canonical
 > fields only — backend URLs and master keys never leave the server. The

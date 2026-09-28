@@ -11,7 +11,7 @@
     },
     "copy": {
       "sending": "Sending via proxy…",
-      "submitError": "Delivery failed (HTTP {status}) — is CF7_BACKEND_URL set in .env?"
+      "submitError": "Delivery failed (HTTP {status}) — check CF7_BACKEND_URL and that the field names match the CF7 form."
     },
     "fields": [
       {
@@ -40,6 +40,14 @@
         "required": true,
         "size": 50,
         "autocomplete": "email"
+      },
+      {
+        "type": "text",
+        "id": "subject",
+        "name": "subject",
+        "label": "Subject",
+        "required": true,
+        "size": 50
       },
       {
         "type": "textarea",

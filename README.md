@@ -52,7 +52,7 @@ Git dependency (recommended for private packages):
 // package.json
 {
   "dependencies": {
-    "@clearstorm/contact-form": "git+https://github.com/clearstorm/contact-form.git#v0.3.0"
+    "@clearstorm/contact-form": "git+https://github.com/clearstorm/contact-form.git#v0.3.1"
   }
 }
 ```

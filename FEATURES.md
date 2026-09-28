@@ -104,5 +104,5 @@ Status vocabulary: `implemented` · `partial` · `planned` · `deprecated`.
 | `quality-test-suite` | Test suite | `npm test`: core + mailers (no DOM), markup snapshots pinned to `scripts/fixtures/*.html` (`RECORD=1` regen), TanStack bridge + Zod adapter (no DOM), client engine under happy-dom | implemented |
 | `quality-typecheck` | Strict typecheck | `npm run typecheck` — `tsc --noEmit` over `src/` | implemented |
 | `quality-examples` | Runnable demos | `examples/astro-demo` (7 routes), `examples/react-demo` (route parity), `examples/tanstack-demo` (bridge + vanilla\|Zod toggle), `examples/specs/*.json` single source for the demos | implemented |
-| `release-tags` | Immutable release tags | `v0.1.0`, `v0.2.0`, `v0.3.0` git tags for reproducible installs | implemented |
+| `release-tags` | Immutable release tags | `v0.1.0`, `v0.2.0`, `v0.3.0`, `v0.3.1` git tags for reproducible installs | implemented |
 | `release-npm-publish` | npm publishing | Package currently `private: true` and installed via git dependency; publish path is dropping `private` and releasing a versioned build | planned |

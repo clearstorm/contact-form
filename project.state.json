@@ -2,7 +2,7 @@
   "$comment": "Synchronized machine-readable twin of FEATURES.md. A feature status change must update both files in the same pull request. Status vocabulary: implemented | partial | planned | deprecated.",
   "schema": 1,
   "package": "@clearstorm/contact-form",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "features": {
     "json-spec": { "status": "implemented", "notes": "FormSpec / FormFieldSpec / FormElement — the JSON source of truth." },
     "field-types-20": { "status": "implemented", "notes": "All 20 field types with rendering + validation." },
@@ -58,7 +58,7 @@
     "quality-test-suite": { "status": "implemented", "notes": "Core/mailers, markup snapshots, TanStack + Zod suites, engine under happy-dom." },
     "quality-typecheck": { "status": "implemented", "notes": "Strict tsc --noEmit over src/." },
     "quality-examples": { "status": "implemented", "notes": "astro-demo, react-demo (route parity), tanstack-demo, shared specs." },
-    "release-tags": { "status": "implemented", "notes": "v0.1.0, v0.2.0, v0.3.0 immutable git tags." },
+    "release-tags": { "status": "implemented", "notes": "v0.1.0, v0.2.0, v0.3.0, v0.3.1 immutable git tags." },
     "release-npm-publish": { "status": "planned", "notes": "Drop private: true and release a versioned build." }
   }
 }

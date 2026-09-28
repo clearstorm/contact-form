@@ -8,14 +8,26 @@ next item instead of duplicating it.
 
 ## Current state
 
-- **Latest release:** `v0.3.0` — file uploads, multi-selects and datalist
-  suggestions, 12-column field sizing, structural field types, multi-step
-  wizard (`step` markers + `stepper` chrome), conditional wizard steps,
-  `showWhen` conditionals, localStorage `autoSave` drafts, `statusMode:
-  "replace"`, framework-independent bindings (Astro · React ·
-  vanilla · TanStack). Immutable tags: `v0.1.0`, `v0.2.0`, `v0.3.0`.
+- **Latest release:** `v0.3.1` — everything from `v0.3.0` (file uploads,
+  multi-selects, structural + conditional wizard steps, localStorage
+  `autoSave`, framework-independent bindings) plus the M9–M12 transport
+  work: expanded `MailerSpec` + direct/proxy adapters and, finally,
+  runnable **generic multi-provider proxy examples** (Astro + Next.js:
+  `/api/contact` routes, rendered proxy forms, multi-provider `.env.example`,
+  zero-dependency `verify` harnesses). Includes the Astro `.env` access fix
+  (`import.meta.env` with `process.env` fallback — Astro never writes `.env`
+  into `process.env`) and the CF7 field/form-id alignment. Immutable tags:
+  `v0.1.0`, `v0.2.0`, `v0.3.0`, `v0.3.1`.
 - **Branch:** `dev` (ahead of `main`), working tree clean.
 - **Most recent work (HEAD):**
+  - Runnable proxy examples + CF7 alignment (`16a5a3b`, `e5876e3`,
+    `1f81cc7`) — the generic transport proxy examples now ship with real
+    `/api/contact` routes, rendered proxy forms, multi-provider
+    `.env.example` and zero-dependency `verify` harnesses. The Astro route
+    reads env via `import.meta.env` (falling back to `process.env` only for
+    its plain-Node harness); both examples are aligned with the site's real
+    CF7 form (numeric form id `5`, required `subject` field) and answer CF7
+    `mail_sent` end-to-end.
   - Explicit dispatch `target` + generic multi-provider proxy (`8ca46d9`) — a
     `mailer` config object can carry `target` (`MailTarget`: every
     `MailerProvider` + `mailchimp`/`mailgun`/`fluentforms`/… + `(string &

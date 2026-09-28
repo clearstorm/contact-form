@@ -1,0 +1,22 @@
+{
+  "name": "contact-form-nextjs-proxy",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Runnable Next.js (App Router) host for the generic @clearstorm/contact-form transport proxy (/api/contact).",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "next": "^16.3.6",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.8.0"
+  }
+}

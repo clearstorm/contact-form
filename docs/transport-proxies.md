@@ -53,6 +53,13 @@ in the WordPress endpoint path.
 
 ## Server-side environment (`.env`)
 
+Server secrets never live in the spec or the client bundle — the route reads
+them from its own environment. Copy the multi-provider example file into your
+project and fill in the providers you host:
+
+- [`examples/astro-proxy/.env.example`](../examples/astro-proxy/.env.example)
+- [`examples/nextjs-proxy/.env.example`](../examples/nextjs-proxy/.env.example)
+
 ```env
 # --- Route whitelist guardrail (optional) ---
 ALLOWED_FORM_IDS="z10,20,30-4d-al"
@@ -76,7 +83,7 @@ MAILCHIMP_AUDIENCE_ID="a1b2c3d4e5"
 MAILCHIMP_SERVER_PREFIX="us1"
 ```
 
-The examples below are **raw `fetch` only** — zero package dependencies, so the
+The routes are **raw `fetch` only** — zero package dependencies, so the
 binding's zero-runtime-dependency rule extends to your worker too. Each reads
 its secrets from the environment and never returns them (or the backend URLs)
 to the browser.
@@ -85,158 +92,50 @@ to the browser.
 
 ## Generic multi-provider dispatch
 
-### Next.js (App Router) — `app/api/contact/route.ts`
+Two runnable, copy-paste-ready reference implementations of the same route —
+identical `{ provider, formId, to, payload }` contract, cases and status codes:
 
-```ts
-// app/api/contact/route.ts
-import { NextResponse } from "next/server";
+| Example | Framework | Route file | Output mode |
+| --- | --- | --- | --- |
+| [`examples/astro-proxy/`](../examples/astro-proxy/README.md) | Astro | `src/pages/api/contact.ts` | hybrid — `output: "hybrid"` + `prerender = false` |
+| [`examples/nextjs-proxy/`](../examples/nextjs-proxy/README.md) | Next.js App Router | `app/api/contact/route.ts` | on-demand — `runtime: "nodejs"`, `dynamic: "force-dynamic"` |
 
-export const runtime = "nodejs"; // or "edge" — fetch works on both
+Run them:
 
-export async function POST(request: Request) {
-  try {
-    const body = (await request.json()) as Record<string, unknown>;
-    const provider = body.provider as string | undefined;
-    const formId = body.formId as string | undefined;
-    const to = body.to as string | undefined;
-    const payload = (body.payload ?? {}) as Record<string, unknown>;
+```bash
+# Astro (http://localhost:4321) — also `npm run verify`
+cd examples/astro-proxy
+npm install && cp .env.example .env && npm run dev
 
-    // 1. Validation — both identifiers are required in the envelope.
-    if (!provider || !formId) {
-      return NextResponse.json({ error: "Missing required 'provider' or 'formId'" }, { status: 400 });
-    }
+# Next.js (http://localhost:3000)
+cd examples/nextjs-proxy
+npm install && cp .env.example .env && npm run dev
+```
 
-    // 2. Optional form-id whitelist guardrail → 403.
-    const allowedIds = process.env.ALLOWED_FORM_IDS;
-    if (allowedIds) {
-      const allowed = allowedIds.split(",").map((id) => id.trim());
-      if (!allowed.includes(formId)) {
-        return NextResponse.json({ error: `Unauthorized formId: ${formId}` }, { status: 403 });
-      }
-    }
+Both routes implement the same contract:
 
-    // 3. Generic provider dispatch — add a `case` per `MailTarget` you host.
-    switch (provider) {
-      case "cf7": {
-        const backendUrl = process.env.CF7_BACKEND_URL;
-        if (!backendUrl) {
-          return NextResponse.json({ error: "Server misconfiguration: CF7_BACKEND_URL missing" }, { status: 500 });
-        }
-        const wpFormData = new FormData();
-        for (const [key, value] of Object.entries(payload)) wpFormData.append(key, String(value));
-        wpFormData.append("_wpcf7_unit_tag", `wpcf7-f${formId}-o1`);
+- **400** — missing `provider` or `formId`; unknown provider; the provider
+  rejected the submission (e.g. CF7 responds with `status !== "mail_sent"`).
+- **403** — `ALLOWED_FORM_IDS` is set and the envelope's `formId` is not in it.
+- **500** — server misconfiguration (the case exists but its env vars are
+  missing) or an unexpected error.
+- Every success is `{ success: true }`, every failure `{ error }` (with a
+  status) — provider keys, backend URLs and raw error bodies are never
+  returned to the browser.
+- `cf7` forwards `payload` as `FormData` to
+  `${CF7_BACKEND_URL}/wp-json/contact-form-7/v1/contact-forms/${formId}/feedback`
+  (with a `_wpcf7_unit_tag`); `resend` / `postmark` / `sendgrid` email
+  `to ?? <env recipient>`; `mailchimp` subscribes `payload.email` to the
+  audience and treats a "Member Exists" response as success. Mailchimp's basic
+  auth uses `btoa` (not `Buffer`), so the Next.js route also runs on edge
+  runtimes.
 
-        const wpRes = await fetch(
-          `${backendUrl}/wp-json/contact-form-7/v1/contact-forms/${formId}/feedback`,
-          { method: "POST", body: wpFormData },
-        );
-        const wpBody = (await wpRes.json()) as { status?: string; message?: string };
-        if (wpBody.status !== "mail_sent") {
-          return NextResponse.json({ error: wpBody.message || "Submission rejected by WordPress" }, { status: 400 });
-        }
-        return NextResponse.json({ success: true, message: wpBody.message });
-      }
+Sending the exact envelope the client produces:
 
-      case "resend": {
-        const apiKey = process.env.RESEND_API_KEY;
-        const recipient = to ?? process.env.RESEND_TO_EMAIL;
-        if (!apiKey || !recipient) {
-          return NextResponse.json({ error: "Server misconfiguration: RESEND_API_KEY/RESEND_TO_EMAIL missing" }, { status: 500 });
-        }
-        const res = await fetch("https://api.resend.com/emails", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            from: "Contact form <onboarding@resend.dev>",
-            to: [recipient],
-            subject: `New submission for form ${formId}`,
-            text: `Form: ${formId}\n\n${formatFieldList(payload)}`,
-            reply_to: String(payload.email ?? ""),
-          }),
-        });
-        if (!res.ok) return NextResponse.json({ error: await res.text() }, { status: res.status });
-        return NextResponse.json({ success: true });
-      }
-
-      case "postmark": {
-        const res = await fetch("https://api.postmarkapp.com/email", {
-          method: "POST",
-          headers: {
-            "X-Postmark-Server-Token": process.env.POSTMARK_SERVER_TOKEN ?? "",
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            From: "contact@yoursite.com",
-            To: to ?? process.env.POSTMARK_TO_EMAIL ?? "you@example.com",
-            Subject: `New submission for form ${formId}`,
-            TextBody: formatFieldList(payload),
-            ReplyTo: String(payload.email ?? ""),
-          }),
-        });
-        if (!res.ok) return NextResponse.json({ error: await res.text() }, { status: res.status });
-        return NextResponse.json({ success: true });
-      }
-
-      case "sendgrid": {
-        const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${process.env.SENDGRID_API_KEY ?? ""}`, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            personalizations: [{ to: [{ email: to ?? "you@example.com" }], subject: `New submission for form ${formId}` }],
-            from: { email: "contact@yoursite.com" },
-            content: [{ type: "text/plain", value: formatFieldList(payload) }],
-            reply_to: { email: String(payload.email ?? "") },
-          }),
-        });
-        if (!res.ok) return NextResponse.json({ error: await res.text() }, { status: res.status });
-        return NextResponse.json({ success: true });
-      }
-
-      case "mailchimp": {
-        const apiKey = process.env.MAILCHIMP_API_KEY;
-        const audienceId = process.env.MAILCHIMP_AUDIENCE_ID;
-        const serverPrefix = process.env.MAILCHIMP_SERVER_PREFIX;
-        if (!apiKey || !audienceId || !serverPrefix) {
-          return NextResponse.json({ error: "Server misconfiguration: MAILCHIMP_* missing" }, { status: 500 });
-        }
-        const email = String(payload.email ?? "");
-        if (!email) return NextResponse.json({ error: "A valid email address is required" }, { status: 400 });
-        const res = await fetch(`https://${serverPrefix}.api.mailchimp.com/3.0/lists/${audienceId}/members`, {
-          method: "POST",
-          headers: {
-            Authorization: `Basic ${Buffer.from(`anystring:${apiKey}`).toString("base64")}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            email_address: email,
-            status: "subscribed",
-            merge_fields: {
-              FNAME: String(payload.first_name ?? ""),
-              LNAME: String(payload.last_name ?? ""),
-            },
-          }),
-        });
-        const mcBody = (await res.json()) as { title?: string; detail?: string };
-        if (res.ok || mcBody.title === "Member Exists") return NextResponse.json({ success: true });
-        return NextResponse.json({ error: mcBody.detail || "Mailchimp subscription failed" }, { status: 400 });
-      }
-
-      default:
-        return NextResponse.json({ error: `Unsupported provider: ${provider}` }, { status: 400 });
-    }
-  } catch {
-    return NextResponse.json({ error: "Internal server proxy error" }, { status: 500 });
-  }
-}
-
-function formatFieldList(payload: Record<string, unknown>): string {
-  return Object.entries(payload)
-    .filter(([, value]) => value !== "" && value != null)
-    .map(([name, value]) => `${label(name)}: ${String(value)}`)
-    .join("\n");
-}
-
-const label = (name: string) => name.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+```bash
+curl -XPOST http://localhost:4321/api/contact \
+  -H 'content-type: application/json' \
+  -d '{"provider":"cf7","formId":"z10","payload":{"first_name":"Jane","email":"jane@example.test"}}'
 ```
 
 > Security notes: the client sends `formId` + `provider` plus the canonical
@@ -247,122 +146,11 @@ const label = (name: string) => name.replace(/[_-]+/g, " ").replace(/\b\w/g, (c)
 > `Referrer-Policy`/CSRF check to taste — this is a starting point, not a
 > security audit.
 
-### Astro — `src/pages/api/contact.ts`
-
-```ts
-// src/pages/api/contact.ts
-import type { APIRoute } from "astro";
-
-export const prerender = false;
-
-export const POST: APIRoute = async ({ request }) => {
-  try {
-    const { provider, formId, to, payload } = await request.json();
-
-    if (!provider || !formId) {
-      return new Response(JSON.stringify({ error: "Missing required 'provider' or 'formId'" }), {
-        status: 400,
-        headers: { "content-type": "application/json" },
-      });
-    }
-
-    const allowedIds = process.env.ALLOWED_FORM_IDS;
-    if (allowedIds) {
-      const allowed = allowedIds.split(",").map((id) => id.trim());
-      if (!allowed.includes(formId)) {
-        return new Response(JSON.stringify({ error: `Unauthorized formId: ${formId}` }), {
-          status: 403,
-          headers: { "content-type": "application/json" },
-        });
-      }
-    }
-
-    if (provider === "cf7") {
-      const backendUrl = process.env.CF7_BACKEND_URL;
-      const wpFormData = new FormData();
-      for (const [key, value] of Object.entries(payload ?? {})) wpFormData.append(key, String(value));
-      wpFormData.append("_wpcf7_unit_tag", `wpcf7-f${formId}-o1`);
-      const wpRes = await fetch(`${backendUrl}/wp-json/contact-form-7/v1/contact-forms/${formId}/feedback`, {
-        method: "POST",
-        body: wpFormData,
-      });
-      const wpBody = await wpRes.json();
-      return new Response(JSON.stringify({ success: true }), {
-        status: wpBody.status === "mail_sent" ? 200 : 400,
-        headers: { "content-type": "application/json" },
-      });
-    }
-
-    if (provider === "resend") {
-      const res = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          from: "Contact form <onboarding@resend.dev>",
-          to: [to ?? process.env.RESEND_TO_EMAIL],
-          subject: `New submission for form ${formId}`,
-          text: `Form: ${formId}\n\n${formatFieldList(payload)}`,
-          reply_to: String(payload.email ?? ""),
-        }),
-      });
-      const body = await res.text();
-      return new Response(body, { status: res.ok ? 200 : res.status, headers: { "content-type": "application/json" } });
-    }
-
-    if (provider === "mailchimp") {
-      const apiKey = process.env.MAILCHIMP_API_KEY;
-      const audienceId = process.env.MAILCHIMP_AUDIENCE_ID;
-      const serverPrefix = process.env.MAILCHIMP_SERVER_PREFIX;
-      const res = await fetch(`https://${serverPrefix}.api.mailchimp.com/3.0/lists/${audienceId}/members`, {
-        method: "POST",
-        headers: {
-          Authorization: `Basic ${Buffer.from(`anystring:${apiKey}`).toString("base64")}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email_address: String(payload.email ?? ""),
-          status: "subscribed",
-          merge_fields: { FNAME: String(payload.first_name ?? ""), LNAME: String(payload.last_name ?? "") },
-        }),
-      });
-      const mcBody = await res.json();
-      const ok = res.ok || mcBody.title === "Member Exists";
-      return new Response(JSON.stringify(ok ? { success: true } : { error: mcBody.detail }), {
-        status: ok ? 200 : 400,
-        headers: { "content-type": "application/json" },
-      });
-    }
-
-    // postmark / sendgrid: mirror the Next.js example's bodies above.
-
-    return new Response(JSON.stringify({ error: `Unsupported provider: ${provider}` }), {
-      status: 400,
-      headers: { "content-type": "application/json" },
-    });
-  } catch {
-    return new Response(JSON.stringify({ error: "Internal server proxy error" }), {
-      status: 500,
-      headers: { "content-type": "application/json" },
-    });
-  }
-};
-
-const formatFieldList = (payload: Record<string, unknown>): string =>
-  Object.entries(payload ?? {})
-    .filter(([, value]) => value !== "" && value != null)
-    .map(([name, value]) => `${name}: ${String(value)}`)
-    .join("\n");
-```
-
-Astro needs the endpoint at the built site's origin. With the spec's
-`mailer.endpoint` left at the default (`/api/contact`), the client posts to
-your Astro site's own `/api/contact` route — same origin, no CORS. The
-`custom` + `target` path behaves identically (it defaults to `/api/contact`
-too), so moving a form from a direct adapter to a proxied one is a spec-only
-change: set `provider: "custom"` and add `target`.
+With the spec's `mailer.endpoint` left at the default (`/api/contact`) the
+client posts to your origin's own `/api/contact` route — same origin, no CORS,
+in both setups. The `custom` + `target` path behaves identically (it defaults
+to `/api/contact` too), so moving a form from a direct adapter to a proxied
+one is a spec-only change: set `provider: "custom"` and add `target`.
 
 ---
 

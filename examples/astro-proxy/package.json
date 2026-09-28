@@ -1,0 +1,22 @@
+{
+  "name": "contact-form-astro-proxy",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Runnable Astro hybrid host for the generic @clearstorm/contact-form transport proxy (/api/contact).",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "verify": "node scripts/verify.mjs"
+  },
+  "dependencies": {
+    "astro": "^7.3.2"
+  },
+  "devDependencies": {
+    "@astrojs/node": "^11.1.6"
+  }
+}

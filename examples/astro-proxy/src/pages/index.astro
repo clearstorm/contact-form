@@ -1,0 +1,19 @@
+---
+// Landing page — static in the hybrid build; the actual proxy is /api/contact.
+---
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ContactForm transport proxy — Astro hybrid</title>
+  </head>
+  <body>
+    <h1>Astro hybrid transport proxy</h1>
+    <p>
+      POST the <code>{ provider, formId, to, payload }</code> envelope to
+      <code>/api/contact</code>. Server secrets live in <code>.env</code> — see
+      the README and <code>docs/transport-proxies.md</code>.
+    </p>
+  </body>
+</html>

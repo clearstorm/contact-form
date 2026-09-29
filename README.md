@@ -381,10 +381,11 @@ token; the proxied `/api/contact` route verifies it with the provider's
 A captcha paired with a **direct** (non-proxy) mailer dev-warns at attach — the
 token is only verified by a proxy route — so pair it with `custom` + `target`
 or a proxy-only mailer. The `rf:captcha-error` bus event fires whenever the
-gate blocks or a queue is dropped. Both `/api/contact` examples ship a
-`Contact — Turnstile-protected CF7` demo form using Cloudflare's always-pass
-test keys. FEATURES tracks it as `captcha-block`, `captcha-engine`,
-`captcha-proxy-verify`.
+gate blocks or a queue is dropped. Both `/api/contact` examples ship one demo
+form per provider (`Contact — Turnstile-protected CF7`, `Contact — reCAPTCHA
+v3-hidden CF7`, `Contact — hCaptcha-protected CF7`) using each provider's
+documented always-pass test keys. FEATURES tracks it as `captcha-block`,
+`captcha-engine`, `captcha-proxy-verify`.
 
 ---
 

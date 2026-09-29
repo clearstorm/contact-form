@@ -77,6 +77,13 @@ do not trade them away for convenience:
   validation messages) without updating the README and the demos that exercise
   it.
 
+## Git & releases
+
+- **Only merge to `main` or push to `origin` at the user's explicit request.**
+  No `main` merges, no pushes (branches or tags) on an agent's own initiative.
+  Work happens on `dev` (or a feature branch); commits stay local until the
+  user asks for the merge/push/release flow.
+
 ## Conventions
 
 - Keep the namespaced `rf-*` class / `data-*` / `--rf-*` naming used across

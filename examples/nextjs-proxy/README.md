@@ -13,10 +13,12 @@ envelope, so the same server route serves every `MailTarget`.
 
 ## Try the forms on `/`
 
-The landing page renders four live forms from `content/forms/proxy.json` —
+The landing page renders seven live forms from `content/forms/proxy.json` —
 proxied **CF7**, **Fluent Forms** and **Mailchimp** targets (the `custom` +
-`target` transport) plus a **Resend** proxy-only envelope. All four submit
-same-origin to `/api/contact`; each card has a Spec tab showing the exact JSON.
+`target` transport), a **Resend** proxy-only envelope, and three captcha-
+protected CF7 forms (**Turnstile**, **reCAPTCHA v3**, **hCaptcha**) running on
+each provider's always-pass test keys. All seven submit same-origin to
+`/api/contact`; each card has a Spec tab showing the exact JSON.
 Submit one with `.env` left empty and the route answers **500** (server
 misconfiguration) — the form's error copy names the missing variable. The spec
 is an identical copy of the one in `astro-proxy` — keep them in lockstep.

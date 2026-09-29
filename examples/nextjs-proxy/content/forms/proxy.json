@@ -47,7 +47,9 @@
         "name": "subject",
         "label": "Subject",
         "required": true,
-        "size": 50
+        "size": 100,
+        "placeholder": "Enter your subject",
+        "maxlength": 100
       },
       {
         "type": "textarea",
@@ -114,7 +116,146 @@
         "name": "subject",
         "label": "Subject",
         "required": true,
-        "size": 50
+        "size": 100,
+        "placeholder": "Enter your subject",
+        "maxlength": 100
+      },
+      {
+        "type": "textarea",
+        "id": "message",
+        "name": "message",
+        "label": "Message",
+        "required": true,
+        "size": 100,
+        "rows": 5
+      }
+    ]
+  },
+  "Contact — reCAPTCHA v3-hidden CF7": {
+    "name": "proxy-cf7-captcha-v3",
+    "submit": "Send via proxy",
+    "status": "Thanks — the security check passed and the envelope reached the CF7 proxy route.",
+    "mailer": {
+      "provider": "custom",
+      "formId": "5",
+      "target": "cf7",
+      "endpoint": "/api/contact"
+    },
+    "captcha": {
+      "provider": "recaptcha-v3",
+      "siteKey": "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI",
+      "action": "contact_submit"
+    },
+    "copy": {
+      "sending": "Verifying security check…",
+      "submitError": "Delivery failed (HTTP {status}) — check CF7_BACKEND_URL and the reCAPTCHA secrets in .env."
+    },
+    "fields": [
+      {
+        "type": "text",
+        "id": "first_name",
+        "name": "first_name",
+        "label": "First name",
+        "required": true,
+        "size": 50,
+        "autocomplete": "given-name"
+      },
+      {
+        "type": "text",
+        "id": "last_name",
+        "name": "last_name",
+        "label": "Last name",
+        "required": true,
+        "size": 50,
+        "autocomplete": "family-name"
+      },
+      {
+        "type": "email",
+        "id": "email",
+        "name": "email",
+        "label": "Email address",
+        "required": true,
+        "size": 50,
+        "autocomplete": "email"
+      },
+      {
+        "type": "text",
+        "id": "subject",
+        "name": "subject",
+        "label": "Subject",
+        "required": true,
+        "size": 100,
+        "placeholder": "Enter your subject",
+        "maxlength": 100
+      },
+      {
+        "type": "textarea",
+        "id": "message",
+        "name": "message",
+        "label": "Message",
+        "required": true,
+        "size": 100,
+        "rows": 5
+      }
+    ]
+  },
+  "Contact — hCaptcha-protected CF7": {
+    "name": "proxy-cf7-captcha-hcaptcha",
+    "submit": "Send via proxy",
+    "status": "Thanks — the security check passed and the envelope reached the CF7 proxy route.",
+    "mailer": {
+      "provider": "custom",
+      "formId": "5",
+      "target": "cf7",
+      "endpoint": "/api/contact"
+    },
+    "captcha": {
+      "provider": "hcaptcha",
+      "siteKey": "10000000-ffff-ffff-ffff-000000000001",
+      "theme": "light",
+      "action": "contact_submit"
+    },
+    "copy": {
+      "sending": "Verifying security check…",
+      "submitError": "Delivery failed (HTTP {status}) — check CF7_BACKEND_URL and the hCaptcha secrets in .env."
+    },
+    "fields": [
+      {
+        "type": "text",
+        "id": "first_name",
+        "name": "first_name",
+        "label": "First name",
+        "required": true,
+        "size": 50,
+        "autocomplete": "given-name"
+      },
+      {
+        "type": "text",
+        "id": "last_name",
+        "name": "last_name",
+        "label": "Last name",
+        "required": true,
+        "size": 50,
+        "autocomplete": "family-name"
+      },
+      {
+        "type": "email",
+        "id": "email",
+        "name": "email",
+        "label": "Email address",
+        "required": true,
+        "size": 50,
+        "autocomplete": "email"
+      },
+      {
+        "type": "text",
+        "id": "subject",
+        "name": "subject",
+        "label": "Subject",
+        "required": true,
+        "size": 100,
+        "placeholder": "Enter your subject",
+        "maxlength": 100
       },
       {
         "type": "textarea",
@@ -196,15 +337,6 @@
     },
     "fields": [
       {
-        "type": "email",
-        "id": "email",
-        "name": "email",
-        "label": "Email address",
-        "required": true,
-        "size": 50,
-        "autocomplete": "email"
-      },
-      {
         "type": "text",
         "id": "first_name",
         "name": "first_name",
@@ -221,6 +353,15 @@
         "required": false,
         "size": 50,
         "autocomplete": "family-name"
+      },
+      {
+        "type": "email",
+        "id": "email",
+        "name": "email",
+        "label": "Email address",
+        "required": true,
+        "size": 50,
+        "autocomplete": "email"
       }
     ]
   },

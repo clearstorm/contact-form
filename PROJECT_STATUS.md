@@ -18,11 +18,22 @@ next item instead of duplicating it.
   executes inline, tokens are single-use (resigned on `rf:submit-success`).
   Both `/api/contact` proxy examples verify the token via the provider's
   `siteverify` before dispatch (server `*_SECRET_KEY` env, `remoteip` from
-  `x-forwarded-for`), ship a Turnstile-protected CF7 demo form with
-  always-pass test keys, and the Astro `verify` harness covers the full
-  matrix. Immutable tags: `v0.1.0`, `v0.2.0`, `v0.3.0`, `v0.3.1`, `v0.4.0`.
+  `x-forwarded-for`), ship one captcha demo form per provider (Turnstile /
+  reCAPTCHA v3 / hCaptcha) with always-pass test keys, and the Astro `verify`
+  harness covers the full matrix. Immutable tags: `v0.1.0`, `v0.2.0`,
+  `v0.3.0`, `v0.3.1`, `v0.4.0`.
 - **Branch:** `dev` (ahead of `main`), working tree clean.
 - **Most recent work (HEAD):**
+  - Tri-provider captcha demo alignment (`ff703e4`, `91a8d02`) — AGENTS.md
+    now enshrines the Git & releases policy (only merge to `main` / push to
+    `origin` at the user's explicit request); both byte-identical `proxy.json`
+    copies gain `Contact — reCAPTCHA v3-hidden CF7` and
+    `Contact — hCaptcha-protected CF7` beside the Turnstile form so the
+    example set covers all three `captcha` providers, and both `.env.example`
+    files ship the matching always-pass test secret keypairs (site + secret
+    per provider). README / transport-proxies / example READMEs now describe
+    the seven live forms; FEATURES + project.state `captcha-proxy-verify`
+    notes updated; Astro `verify` harness rechecks the full matrix.
   - M13 CAPTCHA engine + proxy siteverify gate (`8a51e5b`, `c6151ec`,
     `7f4010e`) — an optional `FormSpec.captcha` block
     (`CaptchaSpec`/`CaptchaProvider`, `onPendingSubmit: "block" | "auto"`)

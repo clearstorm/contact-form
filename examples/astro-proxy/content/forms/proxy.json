@@ -1,8 +1,8 @@
 {
-  "Contact — proxied CF7": {
-    "name": "proxy-cf7",
+  "Contact — Basic": {
+    "name": "contact",
     "submit": "Send via proxy",
-    "status": "Thanks — the envelope reached the CF7 proxy route.",
+    "status": "Thanks — Your message was sent successfully.",
     "mailer": {
       "provider": "custom",
       "formId": "5",
@@ -11,7 +11,7 @@
     },
     "copy": {
       "sending": "Sending via proxy…",
-      "submitError": "Delivery failed (HTTP {status}) — check CF7_BACKEND_URL and that the field names match the CF7 form."
+      "submitError": "Delivery failed (HTTP {status})."
     },
     "fields": [
       {
@@ -47,7 +47,9 @@
         "name": "subject",
         "label": "Subject",
         "required": true,
-        "size": 50
+        "size": 100,
+        "placeholder": "Enter your subject",
+        "maxlength": 100
       },
       {
         "type": "textarea",
@@ -114,7 +116,7 @@
         "name": "subject",
         "label": "Subject",
         "required": true,
-        "size": 50
+        "size": 100
       },
       {
         "type": "textarea",
@@ -139,7 +141,7 @@
     },
     "captcha": {
       "provider": "recaptcha-v3",
-      "siteKey": "6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI",
+      "siteKey": "6Lep_tMtAAAAALbR6uGRzZguy-h0aRMmdGXevOKm",
       "action": "contact_submit"
     },
     "copy": {
@@ -180,7 +182,9 @@
         "name": "subject",
         "label": "Subject",
         "required": true,
-        "size": 50
+        "size": 100,
+        "placeholder": "Enter your subject",
+        "maxlength": 100
       },
       {
         "type": "textarea",
@@ -247,7 +251,9 @@
         "name": "subject",
         "label": "Subject",
         "required": true,
-        "size": 50
+        "size": 100,
+        "placeholder": "Enter your subject",
+        "maxlength": 100
       },
       {
         "type": "textarea",
@@ -329,15 +335,6 @@
     },
     "fields": [
       {
-        "type": "email",
-        "id": "email",
-        "name": "email",
-        "label": "Email address",
-        "required": true,
-        "size": 50,
-        "autocomplete": "email"
-      },
-      {
         "type": "text",
         "id": "first_name",
         "name": "first_name",
@@ -354,6 +351,15 @@
         "required": false,
         "size": 50,
         "autocomplete": "family-name"
+      },
+      {
+        "type": "email",
+        "id": "email",
+        "name": "email",
+        "label": "Email address",
+        "required": true,
+        "size": 50,
+        "autocomplete": "email"
       }
     ]
   },

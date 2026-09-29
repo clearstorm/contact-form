@@ -47,7 +47,9 @@
         "name": "subject",
         "label": "Subject",
         "required": true,
-        "size": 50
+        "size": 100,
+        "placeholder": "Enter your subject",
+        "maxlength": 100
       },
       {
         "type": "textarea",
@@ -114,7 +116,9 @@
         "name": "subject",
         "label": "Subject",
         "required": true,
-        "size": 50
+        "size": 100,
+        "placeholder": "Enter your subject",
+        "maxlength": 100
       },
       {
         "type": "textarea",
@@ -180,7 +184,9 @@
         "name": "subject",
         "label": "Subject",
         "required": true,
-        "size": 50
+        "size": 100,
+        "placeholder": "Enter your subject",
+        "maxlength": 100
       },
       {
         "type": "textarea",
@@ -247,7 +253,9 @@
         "name": "subject",
         "label": "Subject",
         "required": true,
-        "size": 50
+        "size": 100,
+        "placeholder": "Enter your subject",
+        "maxlength": 100
       },
       {
         "type": "textarea",
@@ -329,15 +337,6 @@
     },
     "fields": [
       {
-        "type": "email",
-        "id": "email",
-        "name": "email",
-        "label": "Email address",
-        "required": true,
-        "size": 50,
-        "autocomplete": "email"
-      },
-      {
         "type": "text",
         "id": "first_name",
         "name": "first_name",
@@ -354,6 +353,15 @@
         "required": false,
         "size": 50,
         "autocomplete": "family-name"
+      },
+      {
+        "type": "email",
+        "id": "email",
+        "name": "email",
+        "label": "Email address",
+        "required": true,
+        "size": 50,
+        "autocomplete": "email"
       }
     ]
   },

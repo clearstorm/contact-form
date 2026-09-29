@@ -35,7 +35,7 @@ export default function HomePage() {
 const styles = {
   main: {
     fontFamily: "system-ui, sans-serif",
-    maxWidth: "46rem",
+    maxWidth: "70rem",
     margin: "2rem auto",
     padding: "0 1rem",
     color: "#1a202c",

@@ -5,7 +5,7 @@
   "version": "0.4.0",
   "features": {
     "json-spec": { "status": "implemented", "notes": "FormSpec / FormFieldSpec / FormElement — the JSON source of truth." },
-    "field-types-20": { "status": "implemented", "notes": "All 20 field types with rendering + validation." },
+    "field-types": { "status": "implemented", "notes": "All field types with rendering + validation." },
     "structural-types": { "status": "implemented", "notes": "heading, description, divider, section, callout, html — render-only, never validated or sent." },
     "struct-callout": { "status": "implemented", "notes": "callout note block: rf-callout rf-callout--{variant} role=note, escaped text, --rf-callout-* tokens per variant (info/warning/success/danger)." },
     "struct-html": { "status": "implemented", "notes": "html embed block: rf-html rf-span-12 wrapping the string verbatim (escape-EVERYWHERE carve-out — consumer sanitizes), fixture-pinned, dropped from the client spec." },

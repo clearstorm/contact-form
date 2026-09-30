@@ -6,7 +6,7 @@ a single-call vanilla JS helper, or an opt-in TanStack Form bridge. Built from
 three decoupled pieces:
 
 - **Core** — a framework-agnostic engine (`src/core.ts`): the JSON form spec,
-  validation rules for **20 field types**, conditional visibility, time
+  validation rules for **all field types**, conditional visibility, time
   normalisation and payload normalisation. No framework or DOM dependencies,
   so the same code can run in a browser bundle or a Node worker.
 - **Mailers** — transport adapters (`src/mailers/`): `cf7` (Contact Form 7,
@@ -30,7 +30,7 @@ per-field `message` overrides, with built-in defaults.
 Zero runtime dependencies. No Tailwind required.
 
 > **Want to see it working?** `examples/` holds a runnable **Astro site** (all
-> 20 field types — including file uploads — a transport adapter per mailer you need, CSS-only theming, a
+> all field types — including file uploads — a transport adapter per mailer you need, CSS-only theming, a
 > multi-form wizard, plus a vanilla-JS page mounting the same specs with
 > `renderForm`), a **Vite + React app** with the same seven routes as the Astro
 > demo (each rendering the uncontrolled `<ContactForm />`; `/vanilla` mounts
@@ -588,7 +588,7 @@ uploads from the multipart body, so the email path gets the actual files.
 Every type can be required or optional. `required: false` (the default)
 never blocks submit; `optional: true` additionally renders a muted
 “(optional)” suffix on the label so visitors know they can skip it.
-`/field-types`'s “All 20 field types” form and the wizard's “Every field type” form pair required and
+`/field-types`'s “All field types” form and the wizard's “Every field type” form pair required and
 `optional: true` instances of every optional-capable type side by side.
 
 ---
@@ -683,7 +683,7 @@ Styling follows the same theme system with dedicated tokens —
 
 > Live demo: `/field-types` renders the “Structural field types” named form in
 > [`examples/specs/field-types.json`](examples/specs/field-types.json) — all
-> six structural types in one form; the wizard demos a consent `html` block +
+> all structural types in one form; the wizard demos a consent `html` block +
 > `success` callout on its last step.
 
 ---

@@ -3,7 +3,7 @@ import { FormDemonstration } from "../components/FormDemonstration";
 import fieldTypesSpec from "../../../specs/field-types.json";
 import { getForm, type NamedForms } from "../lib/forms";
 
-const allFields = getForm(fieldTypesSpec as NamedForms, "All 20 field types");
+const allFields = getForm(fieldTypesSpec as NamedForms, "All field types");
 const structure = getForm(fieldTypesSpec as NamedForms, "Structural field types");
 const validationExtras = getForm(fieldTypesSpec as NamedForms, "Validation extras");
 const repeaters = getForm(fieldTypesSpec as NamedForms, "Repeat rows");
@@ -58,12 +58,12 @@ export function FieldTypesPage() {
       <h1>Field types</h1>
       <p className="lead">
         Four named forms in one spec file (<code>examples/specs/field-types.json</code>):
-        the full 20-type kitchen sink, the structural field types, a validation-extras
+        the all-field-types kitchen sink, the structural field types, a validation-extras
         form and a repeat-rows form — every element a form can render, from a text
         input to a section break.
       </p>
 
-      <h2>All 20 field types</h2>
+      <h2>All field types</h2>
       <p className="lead">
         Every type the core renders and validates in a single spec — including a
         checkbox <em>group</em> (multi-value, joined into one payload field), a radio
@@ -112,7 +112,7 @@ export function FieldTypesPage() {
         <FormDemonstration form={structure} />
       </div>
 
-      <h3>The four structural types</h3>
+      <h3>The structural types</h3>
       <table className="demo-table">
         <thead>
           <tr><th>Type</th><th>JSON</th><th>Renders</th></tr>

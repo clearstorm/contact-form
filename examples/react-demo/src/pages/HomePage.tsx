@@ -6,7 +6,7 @@ const pages = [
     to: "/field-types",
     title: "Field types",
     blurb:
-      "Every element a form can render — two named forms in one file: the all-20 field types kitchen sink (including file uploads, a multi-select and a datalist) and the four structural field types.",
+      "Every element a form can render — two named forms in one file: the all-field-types kitchen sink (including file uploads, a multi-select and a datalist) and the structural field types.",
   },
   {
     to: "/conditional",
